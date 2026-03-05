@@ -1,0 +1,643 @@
+import { useEffect, useMemo, useState } from "react";
+import AppLayout from "../components/layout/AppLayout";
+import api from "../services/api";
+import { getUser } from "../services/authStorage";
+
+function monthNow() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+function toNum(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export default function EMI() {
+  const me = getUser();
+  const [month, setMonth] = useState(monthNow());
+  const [open, setOpen] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const [members, setMembers] = useState([]);
+  const [expenseCats, setExpenseCats] = useState([]);
+
+  const [plans, setPlans] = useState([]);
+  const [installments, setInstallments] = useState([]);
+
+  const monthOptions = [1, 3, 6, 9, 12, 18, 24, 36];
+
+  const [form, setForm] = useState({
+    productName: "",
+    brand: "",
+    category: "",
+    purchaseDate: new Date().toISOString().slice(0, 10),
+    originalPrice: "",
+    emiCharge: 0, // percentage (e.g., 0.9 means 0.9%)
+    totalPayable: "",
+    months: 6,
+    startMonth: monthNow(),
+    splitType: "equal",
+    personalUserId: "",
+    ratioMe: 50,
+    ratioOther: 50,
+    fixedMe: "",
+    fixedOther: "",
+    note: "",
+  });
+
+  const [emiExpenseCategoryId, setEmiExpenseCategoryId] = useState("");
+
+  const otherMember = useMemo(
+    () => members.find((m) => m.id !== me?.id) || null,
+    [members, me]
+  );
+
+  function calcTotalPayable(originalPrice, emiChargePercent) {
+    const op = toNum(originalPrice);
+    const pct = toNum(emiChargePercent);
+    // emiCharge is percentage (e.g., 0.9 means 0.9%)
+    const t = op + (op * pct) / 100;
+    return Math.round(t * 100) / 100;
+  }
+
+  async function loadBasics() {
+    const [mRes, exp] = await Promise.all([
+      api.get("/api/family/members"),
+      api.get("/api/categories", { params: { kind: "expense" } }),
+    ]);
+
+    setMembers(mRes.data.members || []);
+    const items = exp.data.items || [];
+    setExpenseCats(items);
+
+    // Auto pick Expense category named "EMI"
+    const found = items.find((c) => String(c?.name || "").trim().toLowerCase() === "emi");
+    if (found) setEmiExpenseCategoryId(found._id);
+  }
+
+  async function loadPlans() {
+    const res = await api.get("/api/emi/plans");
+    setPlans(res.data.plans || []);
+  }
+
+  async function loadInstallments() {
+    const res = await api.get("/api/emi/installments", { params: { month } });
+    setInstallments(res.data.items || []);
+  }
+
+  useEffect(() => {
+    loadBasics();
+    loadPlans();
+    loadInstallments();
+    // eslint-disable-next-line
+  }, []);
+
+  useEffect(() => {
+    loadInstallments();
+    // eslint-disable-next-line
+  }, [month]);
+
+  // Total Payable = Original Price + (Original Price × EMI Charge%)
+  useEffect(() => {
+    const computed = calcTotalPayable(form.originalPrice, form.emiCharge);
+    if (String(form.totalPayable || "") !== String(computed)) {
+      setForm((prev) => ({ ...prev, totalPayable: String(computed) }));
+    }
+    // eslint-disable-next-line
+  }, [form.originalPrice, form.emiCharge]);
+
+  function openModal() {
+    setMsg("");
+    setForm((f) => ({
+      ...f,
+      productName: "",
+      brand: "",
+      category: "",
+      purchaseDate: new Date().toISOString().slice(0, 10),
+      originalPrice: "",
+      emiCharge: 0,
+      totalPayable: "",
+      months: 6,
+      startMonth: month,
+      splitType: "equal",
+      personalUserId: "",
+      ratioMe: 50,
+      ratioOther: 50,
+      fixedMe: "",
+      fixedOther: "",
+      note: "",
+    }));
+    setOpen(true);
+  }
+
+  function closeModal() {
+    setOpen(false);
+    setMsg("");
+  }
+
+  async function createPlan() {
+    setMsg("");
+    try {
+      if (!form.productName) return setMsg("Product name required");
+      if (!form.originalPrice || Number(form.originalPrice) <= 0)
+        return setMsg("Original price required");
+      if (Number(form.emiCharge) < 0) return setMsg("EMI charge (%) cannot be negative");
+      if (!form.months || Number(form.months) <= 0) return setMsg("Months required");
+      if (!form.startMonth) return setMsg("Start month required");
+
+      let payload = {
+        ...form,
+        originalPrice: Number(form.originalPrice),
+        emiCharge: Number(form.emiCharge || 0), // percent
+        months: Number(form.months),
+      };
+
+      // build split config into ratios/fixed arrays for server
+      if (form.splitType === "ratio" && otherMember) {
+        payload.ratios = [
+          { userId: me.id, ratio: Number(form.ratioMe) },
+          { userId: otherMember.id, ratio: Number(form.ratioOther) },
+        ];
+      }
+      if (form.splitType === "fixed" && otherMember) {
+        payload.fixed = [
+          { userId: me.id, amount: Number(form.fixedMe || 0) },
+          { userId: otherMember.id, amount: Number(form.fixedOther || 0) },
+        ];
+      }
+
+      await api.post("/api/emi/plans", payload);
+      closeModal();
+      await loadPlans();
+    } catch (e) {
+      setMsg(e?.response?.data?.message || "Create plan failed");
+    }
+  }
+
+  async function generateMonth() {
+    setMsg("");
+    try {
+      // Backend auto-selects an Expense category named "EMI" if you don't pass one.
+      const payload = emiExpenseCategoryId
+        ? { month, expenseCategoryId: emiExpenseCategoryId }
+        : { month };
+
+      const res = await api.post("/api/emi/generate", payload);
+      const catName = res.data?.usedCategory?.name;
+      setMsg(
+        `Created ${res.data.createdCount} EMI bill(s) for ${month}` +
+          (catName ? ` (Category: ${catName})` : "")
+      );
+      await loadInstallments();
+      await loadPlans();
+    } catch (e) {
+      setMsg(e?.response?.data?.message || e?.message || "Generate failed");
+    }
+  }
+
+  async function setStatus(planId, status) {
+    try {
+      await api.put(`/api/emi/plans/${planId}/status`, { status });
+      await loadPlans();
+    } catch (e) {
+      setMsg(e?.response?.data?.message || "Status update failed");
+    }
+  }
+
+  async function setInstallmentStatus(id, status) {
+    try {
+      await api.put(`/api/emi/installments/${id}/status`, {
+        status,
+        paidByUserId: me?.id,
+      });
+      await loadInstallments();
+      await loadPlans();
+    } catch (e) {
+      setMsg(e?.response?.data?.message || "Update failed");
+    }
+  }
+
+  async function deleteInstallment(id) {
+    const ok = confirm("Delete this installment?");
+    if (!ok) return;
+    try {
+      await api.delete(`/api/emi/installments/${id}`);
+      await loadInstallments();
+      await loadPlans();
+    } catch (e) {
+      setMsg(e?.response?.data?.message || "Delete failed");
+    }
+  }
+
+  return (
+    <AppLayout>
+      <div className="">
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-2xl font-bold">EMI</h2>
+            <p className="text-sm text-gray-600">
+              Create EMI plan → generate monthly payables into ledger.
+            </p>
+          </div>
+
+          <div className="flex gap-2 items-center">
+            <input
+              type="month"
+              className="border rounded-md px-3 py-2 text-sm bg-white"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+            />
+            <button
+              onClick={openModal}
+              className="bg-black text-white rounded-md px-4 py-2 text-sm"
+            >
+              + Add EMI Plan
+            </button>
+          </div>
+        </div>
+
+        {msg && <div className="mb-3 text-sm text-blue-700">{msg}</div>}
+
+        {/* Monthly EMI (clean UX) */}
+        <div className="bg-white border rounded-lg p-4 mb-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="font-medium">Monthly EMI Bills — {month}</div>
+              <div className="text-sm text-gray-600">
+                This creates the <b>pending</b> EMI installment rows for all <b>active</b> plans in this month.
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Uses Expense category <b>EMI</b> automatically. If you don’t have it, go to Settings → Categories and create one.
+              </div>
+            </div>
+            <button
+              onClick={generateMonth}
+              className="bg-black text-white rounded-md px-4 py-2 text-sm whitespace-nowrap"
+            >
+              Create EMI Bills
+            </button>
+          </div>
+
+          <div className="mt-3">
+            <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-gray-50 border text-sm">
+              <span className="text-gray-600">Bills already created for {month}:</span>
+              <b>{installments.length}</b>
+            </div>
+          </div>
+        </div>
+
+        {/* Plans */}
+        <div className="bg-white border rounded-lg overflow-hidden mb-4">
+          <div className="p-3 border-b font-medium text-sm">EMI Plans</div>
+          {plans.length === 0 ? (
+            <div className="p-4 text-sm text-gray-600">No EMI plans yet.</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr className="text-left">
+                  <th className="p-3">Product</th>
+                  <th className="p-3">Total</th>
+                  <th className="p-3">Months</th>
+                  <th className="p-3">Monthly</th>
+                  <th className="p-3">Remaining</th>
+                  <th className="p-3">Progress</th>
+                  <th className="p-3">Start-End</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {plans.map((p) => (
+                  <tr key={p._id} className="border-t">
+                    <td className="p-3">
+                      <div className="font-medium">{p.productName}</div>
+                      <div className="text-xs text-gray-500">
+                        {p.brand || "-"} {p.category ? `• ${p.category}` : ""}
+                      </div>
+                    </td>
+                    <td className="p-3">{p.totalPayable}</td>
+                    <td className="p-3">{p.months}</td>
+                    <td className="p-3">{p.monthlyAmount}</td>
+
+                    <td className="p-3">
+                      <div className="font-medium">{p?.stats?.remaining ?? "-"}</div>
+                      <div className="text-xs text-gray-500">
+                        {p?.stats?.remainingMonths ?? "-"} mo left
+                      </div>
+                    </td>
+
+                    <td className="p-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-28 bg-gray-200 rounded-full h-2 overflow-hidden">
+                          <div
+                            className="bg-black h-2"
+                            style={{
+                              width: `${Math.min(
+                                100,
+                                Math.max(0, Number(p?.stats?.progress || 0))
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          {p?.stats?.progress ?? 0}%
+                        </div>
+                      </div>
+                      {Number(p?.stats?.behindBy || 0) > 0 && (
+                        <div className="text-xs text-amber-700 mt-1">
+                          Behind: {p.stats.behindBy}
+                        </div>
+                      )}
+                    </td>
+
+                    <td className="p-3">
+                      {p.startMonth} → {p.endMonth}
+                    </td>
+                    <td className="p-3">{p.status}</td>
+                    <td className="p-3 text-right">
+                      {p.status === "active" ? (
+                        <button
+                          onClick={() => setStatus(p._id, "closed")}
+                          className="border rounded-md px-3 py-1 hover:bg-gray-50"
+                        >
+                          Close
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setStatus(p._id, "active")}
+                          className="border rounded-md px-3 py-1 hover:bg-gray-50"
+                        >
+                          Reopen
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Installments */}
+        <div className="bg-white border rounded-lg overflow-hidden">
+          <div className="p-3 border-b font-medium text-sm">Installments ({month})</div>
+          {installments.length === 0 ? (
+            <div className="p-4 text-sm text-gray-600">No installments generated for this month.</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr className="text-left">
+                  <th className="p-3">Plan</th>
+                  <th className="p-3">Amount</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {installments.map((i) => (
+                  <tr key={i._id} className="border-t">
+                    <td className="p-3">{i.planId?.productName || "-"}</td>
+                    <td className="p-3">{i.amount}</td>
+                    <td className="p-3">{i.status}</td>
+                    <td className="p-3 text-right">
+                      {i.status === "paid" ? (
+                        <button
+                          onClick={() => setInstallmentStatus(i._id, "pending")}
+                          className="border rounded-md px-3 py-1 hover:bg-gray-50 mr-2"
+                        >
+                          Mark Pending
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setInstallmentStatus(i._id, "paid")}
+                          className="bg-black text-white rounded-md px-3 py-1 mr-2"
+                        >
+                          Mark Paid
+                        </button>
+                      )}
+                      <button
+                        onClick={() => deleteInstallment(i._id)}
+                        className="border rounded-md px-3 py-1 hover:bg-gray-50"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Modal (Create Plan) */}
+        {open && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
+            <div className="w-full max-w-3xl bg-white border rounded-lg p-5">
+              <h3 className="text-lg font-semibold mb-1">Add EMI Plan</h3>
+              <p className="text-sm text-gray-500 mb-4">Monthly amount will be auto calculated.</p>
+
+              <div className="grid md:grid-cols-3 gap-3">
+                <div className="md:col-span-2">
+                  <label className="text-sm font-medium">Product Name</label>
+                  <input
+                    className="w-full border rounded-md px-3 py-2"
+                    value={form.productName}
+                    onChange={(e) => setForm({ ...form, productName: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Brand</label>
+                  <input
+                    className="w-full border rounded-md px-3 py-2"
+                    value={form.brand}
+                    onChange={(e) => setForm({ ...form, brand: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Category (text)</label>
+                  <input
+                    className="w-full border rounded-md px-3 py-2"
+                    value={form.category}
+                    onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Purchase Date</label>
+                  <input
+                    type="date"
+                    className="w-full border rounded-md px-3 py-2"
+                    value={form.purchaseDate}
+                    onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Start Month</label>
+                  <input
+                    type="month"
+                    className="w-full border rounded-md px-3 py-2"
+                    value={form.startMonth}
+                    onChange={(e) => setForm({ ...form, startMonth: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Original Price</label>
+                  <input
+                    className="w-full border rounded-md px-3 py-2"
+                    value={form.originalPrice}
+                    onChange={(e) => setForm({ ...form, originalPrice: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">EMI Charge (%)</label>
+                  <input
+                    className="w-full border rounded-md px-3 py-2"
+                    value={form.emiCharge}
+                    onChange={(e) => setForm({ ...form, emiCharge: e.target.value })}
+                    placeholder="e.g., 0.9"
+                  />
+                  <div className="text-xs text-gray-500 mt-1">
+                    Percentage. Example: <b>0.9</b> means <b>0.9%</b>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Total Payable</label>
+                  <input
+                    className="w-full border rounded-md px-3 py-2"
+                    value={form.totalPayable}
+                    readOnly
+                    title="Auto calculated = Original Price + (Original Price × EMI Charge%)"
+                    style={{ background: "#f9fafb" }}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Months</label>
+                  <select
+                    className="w-full border rounded-md px-3 py-2"
+                    value={form.months}
+                    onChange={(e) => setForm({ ...form, months: e.target.value })}
+                  >
+                    {monthOptions.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Common EMI terms: 1, 3, 6, 9, 12, 18, 24, 36
+                  </div>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-sm font-medium">Split Type</label>
+                  <select
+                    className="w-full border rounded-md px-3 py-2"
+                    value={form.splitType}
+                    onChange={(e) => setForm({ ...form, splitType: e.target.value })}
+                  >
+                    <option value="equal">Equal</option>
+                    <option value="personal">Personal</option>
+                    <option value="ratio">Ratio</option>
+                    <option value="fixed">Fixed</option>
+                  </select>
+                </div>
+
+                {form.splitType === "personal" && (
+                  <div className="md:col-span-3">
+                    <label className="text-sm font-medium">Personal For</label>
+                    <select
+                      className="w-full border rounded-md px-3 py-2"
+                      value={form.personalUserId}
+                      onChange={(e) => setForm({ ...form, personalUserId: e.target.value })}
+                    >
+                      {members.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {form.splitType === "ratio" && otherMember && (
+                  <>
+                    <div>
+                      <label className="text-sm font-medium">My %</label>
+                      <input
+                        className="w-full border rounded-md px-3 py-2"
+                        value={form.ratioMe}
+                        onChange={(e) => setForm({ ...form, ratioMe: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">{otherMember.name} %</label>
+                      <input
+                        className="w-full border rounded-md px-3 py-2"
+                        value={form.ratioOther}
+                        onChange={(e) => setForm({ ...form, ratioOther: e.target.value })}
+                      />
+                    </div>
+                    <div className="md:col-span-3 text-xs text-gray-500">Must sum to 100.</div>
+                  </>
+                )}
+
+                {form.splitType === "fixed" && otherMember && (
+                  <>
+                    <div>
+                      <label className="text-sm font-medium">My Amount</label>
+                      <input
+                        className="w-full border rounded-md px-3 py-2"
+                        value={form.fixedMe}
+                        onChange={(e) => setForm({ ...form, fixedMe: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">{otherMember.name} Amount</label>
+                      <input
+                        className="w-full border rounded-md px-3 py-2"
+                        value={form.fixedOther}
+                        onChange={(e) => setForm({ ...form, fixedOther: e.target.value })}
+                      />
+                    </div>
+                    <div className="md:col-span-3 text-xs text-gray-500">Must sum to monthly amount.</div>
+                  </>
+                )}
+
+                <div className="md:col-span-3">
+                  <label className="text-sm font-medium">Note</label>
+                  <input
+                    className="w-full border rounded-md px-3 py-2"
+                    value={form.note}
+                    onChange={(e) => setForm({ ...form, note: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-5">
+                <button
+                  onClick={closeModal}
+                  className="border rounded-md px-4 py-2 text-sm hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={createPlan}
+                  className="bg-black text-white rounded-md px-4 py-2 text-sm"
+                >
+                  Save Plan
+                </button>
+              </div>
+
+              {msg && <div className="mt-3 text-sm text-red-600">{msg}</div>}
+            </div>
+          </div>
+        )}
+      </div>
+    </AppLayout>
+  );
+}
