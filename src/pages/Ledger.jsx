@@ -126,6 +126,21 @@ export default function Ledger() {
   const [ledgerItems, setLedgerItems] = useState([]);
 
   const [totals, setTotals] = useState({ income: 0, expense: 0, transfer: 0, netCashflow: 0 });
+
+  const fixedExpenseTotal = useMemo(() => {
+    return (allItems || [])
+      .filter(
+        (t) =>
+          t.txType === "expense" &&
+          (t.note?.toLowerCase().includes("fixed") ||
+            t.categoryId?.name?.toLowerCase().includes("housing"))
+      )
+      .reduce((s, t) => s + Number(t.amount || 0), 0);
+  }, [allItems]);
+  // NEW: remaining expense after fixed expenses
+  const remainingExpense = useMemo(() => {
+    return Number(totals.expense || 0) - Number(fixedExpenseTotal || 0);
+  }, [totals, fixedExpenseTotal]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
 
@@ -526,10 +541,20 @@ export default function Ledger() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
           <div className="lg:col-span-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <MetricCard title="Income" value={money(totals.income)} tone="income" />
+
               <MetricCard title="Expense" value={money(totals.expense)} tone="expense" />
+
+              <MetricCard
+                title="Remaining Expense"
+                value={money(remainingExpense)}
+                subtitle={`Expense - Fixed (${money(fixedExpenseTotal)})`}
+                tone="neutral"
+              />
+
               <MetricCard title="Transfer" value={money(totals.transfer)} tone="transfer" />
+
               <MetricCard
                 title="Net Cashflow"
                 value={money(totals.netCashflow)}

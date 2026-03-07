@@ -41,8 +41,8 @@ export default function Wallet() {
     } catch (e) {
       setErr(
         e?.response?.data?.message ||
-          e?.message ||
-          "Failed to load wallet summary"
+        e?.message ||
+        "Failed to load wallet summary"
       );
       setData(null);
     } finally {
@@ -128,6 +128,7 @@ export default function Wallet() {
               const paid = Number(u.paidExpense || 0);
               const share = Number(u.shareExpense || 0);
               const net = Number(u.net || 0);
+              const remaining = income - paid;
 
               const netPositive = net >= 0;
               const pct = Math.round((Math.abs(net) / maxAbsNet) * 100);
@@ -162,7 +163,7 @@ export default function Wallet() {
                   </div>
 
                   {/* Stats */}
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-4 gap-3">
                     <div className="bg-gray-50 border rounded-xl p-3">
                       <p className="text-xs text-gray-500">Income</p>
                       <p className="text-base font-semibold text-gray-900">
@@ -179,6 +180,12 @@ export default function Wallet() {
                       <p className="text-xs text-gray-500">Share</p>
                       <p className="text-base font-semibold text-gray-900">
                         {formatMoney(share)}
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 border rounded-xl p-3">
+                      <p className="text-xs text-gray-500">Remaining</p>
+                      <p className="text-base font-semibold text-gray-900">
+                        {formatMoney(remaining)}
                       </p>
                     </div>
                   </div>
