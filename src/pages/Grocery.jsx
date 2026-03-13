@@ -3,6 +3,7 @@ import AppLayout from "../components/layout/AppLayout";
 import api from "../services/api";
 import { getUser } from "../services/authStorage";
 import ConfirmModal from "../components/ui/ConfirmModal";
+import Loader from "../components/ui/Loader";
 
 function monthNow() {
   const d = new Date();
@@ -21,7 +22,7 @@ function dayNow() {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`; // YYYY-MM-DD
+  return `${y}-${m}-${day}`;
 }
 
 function toLocalYMD(dateLike) {
@@ -36,13 +37,13 @@ export default function Grocery() {
   const me = getUser();
   const [month, setMonth] = useState(monthNow());
   const [msg, setMsg] = useState("");
-  const [day, setDay] = useState(dayNow()); // auto selects current day
+  const [day, setDay] = useState(dayNow());
 
   const [members, setMembers] = useState([]);
   const [expenseCats, setExpenseCats] = useState([]);
   const [methods, setMethods] = useState([]);
   const [cards, setCards] = useState([]);
-  const [accounts, setAccounts] = useState([]); // ✅ NEW
+  const [accounts, setAccounts] = useState([]);
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +60,7 @@ export default function Grocery() {
     cardLabelId: "",
     categoryId: "",
     paidByUserId: "",
-    fromAccountId: "", // ✅ NEW (required)
+    fromAccountId: "",
     discountTotal: 0,
     deliveryFee: 0,
     vatAmount: 0,
@@ -89,9 +90,9 @@ export default function Grocery() {
   ]);
 
   useEffect(() => {
-    const m = day.slice(0, 7); // YYYY-MM
+    const m = day.slice(0, 7);
     if (m !== month) setMonth(m);
-  }, [day]); // (month is from your state)
+  }, [day]);
 
   const otherMember = useMemo(() => members.find((m) => m.id !== me?.id) || null, [members, me]);
 
@@ -120,7 +121,7 @@ export default function Grocery() {
       api.get("/api/categories", { params: { kind: "expense" } }),
       api.get("/api/payment-methods"),
       api.get("/api/card-labels"),
-      api.get("/api/accounts"), // ✅ NEW (must exist in your backend)
+      api.get("/api/accounts"),
     ]);
 
     setMembers(mRes.data.members || []);
@@ -161,7 +162,7 @@ export default function Grocery() {
       ...f,
       paidByUserId: f.paidByUserId || defaultUser,
       personalUserId: f.personalUserId || defaultUser,
-      fromAccountId: f.fromAccountId || defaultAccount, // ✅ auto default
+      fromAccountId: f.fromAccountId || defaultAccount,
     }));
 
     setTxnItems([
@@ -218,7 +219,7 @@ export default function Grocery() {
     try {
       if (!form.categoryId) return setMsg("Select expense category (e.g., Grocery)");
       if (!form.paidByUserId) return setMsg("Select Paid By");
-      if (!form.fromAccountId) return setMsg("Select From Account"); // ✅ required now
+      if (!form.fromAccountId) return setMsg("Select From Account");
       if (txnItems.some((x) => !x.name.trim())) return setMsg("Every item must have a name");
       if (totalPayable <= 0) return setMsg("Total payable must be > 0");
 
@@ -253,7 +254,7 @@ export default function Grocery() {
         cardLabelId: form.cardLabelId || null,
         categoryId: form.categoryId,
         paidByUserId: form.paidByUserId,
-        fromAccountId: form.fromAccountId, // ✅ NEW
+        fromAccountId: form.fromAccountId,
         discountTotal: Number(form.discountTotal || 0),
         deliveryFee: Number(form.deliveryFee || 0),
         vatAmount: Number(form.vatAmount || 0),
@@ -295,27 +296,32 @@ export default function Grocery() {
 
   return (
     <AppLayout>
-      <div className="">
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div>
-            <h2 className="text-2xl font-bold">Grocery</h2>
-            <p className="text-sm text-gray-600">One transaction → many items → split on total.</p>
+      <div className="w-full max-w-full overflow-x-hidden">
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-xl sm:text-2xl font-bold">Grocery</h2>
+            <p className="text-sm text-gray-600">
+              One transaction → many items → split on total.
+            </p>
           </div>
 
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center w-full lg:w-auto">
             <input
               type="month"
-              className="border rounded-md px-3 py-2 text-sm bg-white"
+              className="w-full sm:w-auto border rounded-md px-3 py-2 text-sm bg-white"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
             />
-            <button onClick={openModal} className="bg-black text-white rounded-md px-4 py-2 text-sm">
+            <button
+              onClick={openModal}
+              className="w-full sm:w-auto bg-black text-white rounded-md px-4 py-2 text-sm"
+            >
               + Add Transaction
             </button>
           </div>
         </div>
 
-        {msg && <div className="mb-3 text-sm text-red-600">{msg}</div>}
+        {msg && <div className="mb-3 text-sm text-red-600 break-words">{msg}</div>}
 
         <ConfirmModal
           open={confirmOpen}
@@ -326,24 +332,24 @@ export default function Grocery() {
         />
 
         <div className="bg-white border rounded-lg overflow-hidden">
-          <div className="flex justify-between">
-            <div className="p-5 border-b font-medium text-sm">Transactions ({month})</div>
+          <div className="border-b p-4">
+            <div className="font-medium text-sm mb-3">Transactions ({month})</div>
 
-            <div className="flex flex-wrap items-center gap-3 p-3">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span className="text-sm text-gray-600">Date</span>
                 <input
                   type="date"
                   value={day}
                   onChange={(e) => setDay(e.target.value)}
-                  className="border rounded-md px-3 py-2 text-sm"
+                  className="border rounded-md px-3 py-2 text-sm w-full sm:w-auto"
                 />
               </div>
 
               <button
                 type="button"
                 onClick={() => setDay(dayNow())}
-                className="border rounded-md px-3 py-2 text-sm hover:bg-gray-50"
+                className="border rounded-md px-3 py-2 text-sm hover:bg-gray-50 w-full sm:w-auto"
               >
                 Today
               </button>
@@ -355,19 +361,22 @@ export default function Grocery() {
           </div>
 
           {loading ? (
-            <div className="p-4">Loading...</div>
+            <Loader text="Loading grocery data" subtext="Preparing your entries" />
           ) : items.length === 0 ? (
             <div className="p-4 text-sm text-gray-600">No transactions.</div>
+          ) : filteredTxns.length === 0 ? (
+            <div className="p-4 text-sm text-gray-600">No transactions for selected day.</div>
           ) : (
             <div className="divide-y">
               {filteredTxns.map((t) => (
-                <div key={t._id} className="p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <div className="font-semibold">
-                        {t.shopName || "Grocery Transaction"} — {new Date(t.txnDate).toISOString().slice(0, 10)}
+                <div key={t._id} className="p-3 sm:p-4">
+                  <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-sm sm:text-base break-words">
+                        {t.shopName || "Grocery Transaction"} —{" "}
+                        {new Date(t.txnDate).toISOString().slice(0, 10)}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-500 mt-1 break-words">
                         Category: {t.categoryId?.name || "-"} | Paid by: {t.paidByUserId?.name || "-"} | From:{" "}
                         {t.fromAccountId?.name || "-"} | Total: {t.totalPayable}
                       </div>
@@ -375,14 +384,15 @@ export default function Grocery() {
 
                     <button
                       onClick={() => deleteTxn(t._id)}
-                      className="border rounded-md px-3 py-1 text-sm hover:bg-gray-50"
+                      className="border rounded-md px-3 py-2 text-sm hover:bg-gray-50 w-full sm:w-auto"
                     >
                       Delete
                     </button>
                   </div>
 
-                  <div className="mt-3 overflow-auto">
-                    <table className="w-full text-sm">
+                  {/* Desktop table */}
+                  <div className="mt-3 hidden md:block overflow-x-auto">
+                    <table className="w-full text-sm min-w-[760px]">
                       <thead className="bg-gray-50">
                         <tr className="text-left">
                           <th className="p-2">Item</th>
@@ -390,8 +400,8 @@ export default function Grocery() {
                           <th className="p-2">Unit</th>
                           <th className="p-2">Price</th>
                           <th className="p-2">Discount</th>
-                          <th className="p-2 hidden lg:table-cell">Start</th>
-                          <th className="p-2 hidden lg:table-cell">End</th>
+                          <th className="p-2">Start</th>
+                          <th className="p-2">End</th>
                           <th className="p-2">Line Total</th>
                         </tr>
                       </thead>
@@ -403,11 +413,15 @@ export default function Grocery() {
                             <td className="p-2">{it.unit}</td>
                             <td className="p-2">{it.unitPrice}</td>
                             <td className="p-2">{it.itemDiscount}</td>
-                            <td className="p-2 hidden lg:table-cell">
-                              {it.productStartDate ? new Date(it.productStartDate).toISOString().slice(0, 10) : "-"}
+                            <td className="p-2">
+                              {it.productStartDate
+                                ? new Date(it.productStartDate).toISOString().slice(0, 10)
+                                : "-"}
                             </td>
-                            <td className="p-2 hidden lg:table-cell">
-                              {it.productEndDate ? new Date(it.productEndDate).toISOString().slice(0, 10) : "-"}
+                            <td className="p-2">
+                              {it.productEndDate
+                                ? new Date(it.productEndDate).toISOString().slice(0, 10)
+                                : "-"}
                             </td>
                             <td className="p-2">{it.lineTotal}</td>
                           </tr>
@@ -416,7 +430,37 @@ export default function Grocery() {
                     </table>
                   </div>
 
-                  <div className="mt-2 text-xs text-gray-500">
+                  {/* Mobile cards */}
+                  <div className="mt-3 md:hidden space-y-2">
+                    {(t.items || []).map((it) => (
+                      <div key={it._id} className="border rounded-lg p-3 bg-gray-50">
+                        <div className="font-medium text-sm break-words">{it.name}</div>
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2 text-xs text-gray-600">
+                          <div>Qty: {it.qty}</div>
+                          <div>Unit: {it.unit}</div>
+                          <div>Price: {it.unitPrice}</div>
+                          <div>Discount: {it.itemDiscount}</div>
+                          <div>
+                            Start:{" "}
+                            {it.productStartDate
+                              ? new Date(it.productStartDate).toISOString().slice(0, 10)
+                              : "-"}
+                          </div>
+                          <div>
+                            End:{" "}
+                            {it.productEndDate
+                              ? new Date(it.productEndDate).toISOString().slice(0, 10)
+                              : "-"}
+                          </div>
+                          <div className="col-span-2 font-semibold text-gray-800">
+                            Line Total: {it.lineTotal}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-2 text-xs text-gray-500 break-words">
                     Subtotal: {t.itemsSubtotal} | Discount: {t.discountTotal} | Delivery: {t.deliveryFee} | VAT:{" "}
                     {t.vatAmount} ({t.vatIncluded ? "included" : "added"})
                   </div>
@@ -427,12 +471,14 @@ export default function Grocery() {
         </div>
 
         {open && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
-            <div className="w-full bg-white border rounded-lg p-5 overflow-auto max-h-[90vh]">
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="w-full sm:max-w-6xl bg-white border rounded-t-2xl sm:rounded-lg p-4 sm:p-5 overflow-y-auto max-h-[95vh]">
               <h3 className="text-lg font-semibold mb-1">Add Grocery Transaction</h3>
-              <p className="text-sm text-gray-500 mb-4">Add items like a receipt. Split on total payable.</p>
+              <p className="text-sm text-gray-500 mb-4">
+                Add items like a receipt. Split on total payable.
+              </p>
 
-              <div className="grid md:grid-cols-4 gap-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
                 <div>
                   <label className="text-sm font-medium">Date</label>
                   <input
@@ -541,7 +587,7 @@ export default function Grocery() {
                   </select>
                 </div>
 
-                <div className="md:col-span-4">
+                <div className="sm:col-span-2 xl:col-span-4">
                   <label className="text-sm font-medium">Note</label>
                   <input
                     className="w-full border rounded-md px-3 py-2"
@@ -551,8 +597,9 @@ export default function Grocery() {
                 </div>
               </div>
 
-              <div className="border rounded-lg overflow-auto mb-4">
-                <table className="w-full text-sm">
+              {/* Desktop item table */}
+              <div className="hidden lg:block border rounded-lg overflow-x-auto mb-4">
+                <table className="w-full text-sm min-w-[980px]">
                   <thead className="bg-gray-50">
                     <tr className="text-left">
                       <th className="p-2">Name</th>
@@ -561,8 +608,8 @@ export default function Grocery() {
                       <th className="p-2">Qty</th>
                       <th className="p-2">Unit Price</th>
                       <th className="p-2">Discount</th>
-                      <th className="p-2 hidden lg:table-cell">Start</th>
-                      <th className="p-2 hidden lg:table-cell">End</th>
+                      <th className="p-2">Start</th>
+                      <th className="p-2">End</th>
                       <th className="p-2">Remove</th>
                     </tr>
                   </thead>
@@ -626,7 +673,7 @@ export default function Grocery() {
                             onChange={(e) => updateItem(idx, "itemDiscount", e.target.value)}
                           />
                         </td>
-                        <td className="p-2 hidden lg:table-cell">
+                        <td className="p-2">
                           <input
                             type="date"
                             className="w-full border rounded-md px-2 py-1"
@@ -634,7 +681,7 @@ export default function Grocery() {
                             onChange={(e) => updateItem(idx, "productStartDate", e.target.value)}
                           />
                         </td>
-                        <td className="p-2 hidden lg:table-cell">
+                        <td className="p-2">
                           <input
                             type="date"
                             className="w-full border rounded-md px-2 py-1"
@@ -643,7 +690,10 @@ export default function Grocery() {
                           />
                         </td>
                         <td className="p-2">
-                          <button onClick={() => removeItemRow(idx)} className="border rounded-md px-2 py-1">
+                          <button
+                            onClick={() => removeItemRow(idx)}
+                            className="border rounded-md px-2 py-1"
+                          >
                             ✕
                           </button>
                         </td>
@@ -653,18 +703,129 @@ export default function Grocery() {
                 </table>
               </div>
 
-              <div className="text-xs text-gray-500 mb-4">
-                Tip: Start/End dates are optional (shown on large screens). You can leave End empty.
+              {/* Mobile / tablet item cards */}
+              <div className="lg:hidden space-y-3 mb-4">
+                {txnItems.map((it, idx) => (
+                  <div key={idx} className="border rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="font-medium text-sm">Item {idx + 1}</div>
+                      <button
+                        onClick={() => removeItemRow(idx)}
+                        className="border rounded-md px-3 py-1 text-sm"
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="sm:col-span-2">
+                        <label className="text-sm font-medium">Name</label>
+                        <input
+                          className="w-full border rounded-md px-3 py-2"
+                          value={it.name}
+                          onChange={(e) => updateItem(idx, "name", e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-medium">Brand</label>
+                        <input
+                          className="w-full border rounded-md px-3 py-2"
+                          value={it.brand}
+                          onChange={(e) => updateItem(idx, "brand", e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-medium">Unit</label>
+                        <select
+                          className="w-full border rounded-md px-3 py-2"
+                          value={it.unit}
+                          onChange={(e) => updateItem(idx, "unit", e.target.value)}
+                        >
+                          {UNITS.map((u) => (
+                            <option key={u} value={u}>
+                              {u}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-medium">Qty</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          className="w-full border rounded-md px-3 py-2"
+                          value={it.qty}
+                          onChange={(e) => updateItem(idx, "qty", e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-medium">Unit Price</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="w-full border rounded-md px-3 py-2"
+                          value={it.unitPrice}
+                          onChange={(e) => updateItem(idx, "unitPrice", e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-medium">Discount</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="w-full border rounded-md px-3 py-2"
+                          value={it.itemDiscount}
+                          onChange={(e) => updateItem(idx, "itemDiscount", e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-medium">Start</label>
+                        <input
+                          type="date"
+                          className="w-full border rounded-md px-3 py-2"
+                          value={it.productStartDate || ""}
+                          onChange={(e) => updateItem(idx, "productStartDate", e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-medium">End</label>
+                        <input
+                          type="date"
+                          className="w-full border rounded-md px-3 py-2"
+                          value={it.productEndDate || ""}
+                          onChange={(e) => updateItem(idx, "productEndDate", e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              <button onClick={addItemRow} className="border rounded-md px-3 py-2 text-sm hover:bg-gray-50 mb-4">
+              <div className="text-xs text-gray-500 mb-4">
+                Tip: Start/End dates are optional. You can leave End empty.
+              </div>
+
+              <button
+                onClick={addItemRow}
+                className="w-full sm:w-auto border rounded-md px-3 py-2 text-sm hover:bg-gray-50 mb-4"
+              >
                 + Add Item
               </button>
 
-              <div className="grid md:grid-cols-4 gap-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
                 <div className="bg-gray-50 border rounded-lg p-3">
                   <div className="text-xs text-gray-500">Items Subtotal</div>
-                  <div className="text-lg font-bold">{itemsSubtotal}</div>
+                  <div className="text-lg font-bold break-words">{itemsSubtotal}</div>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Txn Discount</label>
@@ -691,25 +852,26 @@ export default function Grocery() {
                   />
                 </div>
 
-                <div className="md:col-span-2 flex items-center gap-2">
+                <div className="sm:col-span-2 flex items-start gap-2 border rounded-lg p-3">
                   <input
                     type="checkbox"
+                    className="mt-1"
                     checked={form.vatIncluded}
                     onChange={(e) => setForm({ ...form, vatIncluded: e.target.checked })}
                   />
                   <span className="text-sm">VAT already included in item prices</span>
                 </div>
 
-                <div className="bg-gray-50 border rounded-lg p-3 md:col-span-2">
+                <div className="bg-gray-50 border rounded-lg p-3 sm:col-span-2">
                   <div className="text-xs text-gray-500">Total Payable</div>
-                  <div className="text-lg font-bold">{totalPayable}</div>
+                  <div className="text-lg font-bold break-words">{totalPayable}</div>
                 </div>
               </div>
 
               <div className="border rounded-lg p-4 mb-4">
                 <div className="font-medium mb-2">Split</div>
-                <div className="grid md:grid-cols-4 gap-3">
-                  <div className="md:col-span-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                  <div className="sm:col-span-2">
                     <label className="text-sm font-medium">Split Type</label>
                     <select
                       className="w-full border rounded-md px-3 py-2"
@@ -724,7 +886,7 @@ export default function Grocery() {
                   </div>
 
                   {form.splitType === "personal" && (
-                    <div className="md:col-span-2">
+                    <div className="sm:col-span-2">
                       <label className="text-sm font-medium">Personal For</label>
                       <select
                         className="w-full border rounded-md px-3 py-2"
@@ -758,7 +920,9 @@ export default function Grocery() {
                           onChange={(e) => setForm({ ...form, ratioOther: e.target.value })}
                         />
                       </div>
-                      <div className="md:col-span-4 text-xs text-gray-500">Must sum to 100.</div>
+                      <div className="sm:col-span-2 xl:col-span-4 text-xs text-gray-500">
+                        Must sum to 100.
+                      </div>
                     </>
                   )}
 
@@ -780,22 +944,30 @@ export default function Grocery() {
                           onChange={(e) => setForm({ ...form, fixedOther: e.target.value })}
                         />
                       </div>
-                      <div className="md:col-span-4 text-xs text-gray-500">Must sum to total payable.</div>
+                      <div className="sm:col-span-2 xl:col-span-4 text-xs text-gray-500">
+                        Must sum to total payable.
+                      </div>
                     </>
                   )}
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2">
-                <button onClick={closeModal} className="border rounded-md px-4 py-2 text-sm hover:bg-gray-50">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
+                <button
+                  onClick={closeModal}
+                  className="w-full sm:w-auto border rounded-md px-4 py-2 text-sm hover:bg-gray-50"
+                >
                   Cancel
                 </button>
-                <button onClick={saveTxn} className="bg-black text-white rounded-md px-4 py-2 text-sm">
+                <button
+                  onClick={saveTxn}
+                  className="w-full sm:w-auto bg-black text-white rounded-md px-4 py-2 text-sm"
+                >
                   Save Transaction
                 </button>
               </div>
 
-              {msg && <div className="mt-3 text-sm text-red-600">{msg}</div>}
+              {msg && <div className="mt-3 text-sm text-red-600 break-words">{msg}</div>}
             </div>
           </div>
         )}

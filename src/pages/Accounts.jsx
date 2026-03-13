@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../services/api";
+import Loader from "../components/ui/Loader";
 
 const TYPES = [
   { value: "cash", label: "Cash" },
@@ -200,7 +201,7 @@ export default function Accounts() {
         <div className="bg-white border rounded-lg overflow-hidden">
           <div className="p-3 border-b text-sm font-medium">All Accounts</div>
           {loading ? (
-            <div className="p-4">Loading...</div>
+            <Loader text="Loading accounts" subtext="Fetching balances and members" />
           ) : items.length === 0 ? (
             <div className="p-4 text-gray-600 text-sm">No accounts yet.</div>
           ) : (

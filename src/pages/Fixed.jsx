@@ -3,6 +3,7 @@ import AppLayout from "../components/layout/AppLayout";
 import api from "../services/api";
 import { getUser } from "../services/authStorage";
 import ConfirmModal from "../components/ui/ConfirmModal";
+import Loader from "../components/ui/Loader";
 
 function monthNow() {
   const d = new Date();
@@ -435,7 +436,11 @@ export default function Fixed() {
         </div>
 
         {loading ? (
-          <div className="mt-4 bg-white border rounded-xl p-4">Loading...</div>
+          <Loader
+            className="mt-4"
+            text="Loading fixed expenses"
+            subtext="Fetching templates and current month data"
+          />
         ) : tab === "templates" ? (
           <div className="mt-4">
             {filteredTemplates.length === 0 ? (

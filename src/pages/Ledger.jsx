@@ -3,6 +3,7 @@ import AppLayout from "../components/layout/AppLayout";
 import api from "../services/api";
 import { getUser } from "../services/authStorage";
 import ConfirmModal from "../components/ui/ConfirmModal";
+import Loader from "../components/ui/Loader";
 
 function monthNow() {
   const d = new Date();
@@ -60,7 +61,7 @@ function TabButton({ active, children, onClick }) {
     <button
       onClick={onClick}
       className={cn(
-        "px-3 py-2 rounded-lg text-sm border transition",
+        "px-3 py-2 rounded-lg text-sm border transition whitespace-nowrap",
         active
           ? "bg-black text-white border-black"
           : "bg-white hover:bg-gray-50 text-gray-700 border-gray-200"
@@ -87,8 +88,12 @@ function MetricCard({ title, value, subtitle, tone = "neutral" }) {
       )}
     >
       <div className="text-xs text-gray-600">{title}</div>
-      <div className="mt-1 text-2xl font-semibold tracking-tight">{value}</div>
-      {subtitle ? <div className="mt-1 text-xs text-gray-500">{subtitle}</div> : null}
+      <div className="mt-1 text-lg sm:text-2xl font-semibold tracking-tight break-words">
+        {value}
+      </div>
+      {subtitle ? (
+        <div className="mt-1 text-xs text-gray-500 leading-5">{subtitle}</div>
+      ) : null}
     </div>
   );
 }
@@ -100,7 +105,12 @@ function IconDot({ txType }) {
     transfer: "bg-sky-500",
   };
   return (
-    <span className={cn("inline-block h-2.5 w-2.5 rounded-full", map[txType] || "bg-gray-400")} />
+    <span
+      className={cn(
+        "inline-block h-2.5 w-2.5 rounded-full",
+        map[txType] || "bg-gray-400"
+      )}
+    />
   );
 }
 
@@ -108,9 +118,7 @@ export default function Ledger() {
   const me = getUser();
 
   const [month, setMonth] = useState(monthNow());
-  const [activeTab, setActiveTab] = useState("all"); // all | income | expense | transfer
-
-  // ✅ NEW: day filter like Grocery
+  const [activeTab, setActiveTab] = useState("all");
   const [day, setDay] = useState(dayNow());
 
   const [members, setMembers] = useState([]);
@@ -121,11 +129,16 @@ export default function Ledger() {
   const [memberFilter, setMemberFilter] = useState("all");
   const [q, setQ] = useState("");
 
-  const [items, setItems] = useState([]);      // tab-filtered
-  const [allItems, setAllItems] = useState([]); // full month
+  const [items, setItems] = useState([]);
+  const [allItems, setAllItems] = useState([]);
   const [ledgerItems, setLedgerItems] = useState([]);
 
-  const [totals, setTotals] = useState({ income: 0, expense: 0, transfer: 0, netCashflow: 0 });
+  const [totals, setTotals] = useState({
+    income: 0,
+    expense: 0,
+    transfer: 0,
+    netCashflow: 0,
+  });
 
   const fixedExpenseTotal = useMemo(() => {
     return (allItems || [])
@@ -137,10 +150,11 @@ export default function Ledger() {
       )
       .reduce((s, t) => s + Number(t.amount || 0), 0);
   }, [allItems]);
-  // NEW: remaining expense after fixed expenses
+
   const remainingExpense = useMemo(() => {
     return Number(totals.expense || 0) - Number(fixedExpenseTotal || 0);
   }, [totals, fixedExpenseTotal]);
+
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
 
@@ -198,7 +212,14 @@ export default function Ledger() {
 
       setItems(listRes.data.items || []);
       setAllItems(allRes.data.items || []);
-      setTotals(sumRes.data.totals || { income: 0, expense: 0, transfer: 0, netCashflow: 0 });
+      setTotals(
+        sumRes.data.totals || {
+          income: 0,
+          expense: 0,
+          transfer: 0,
+          netCashflow: 0,
+        }
+      );
       setLedgerItems(ledgerRes.data.items || []);
     } catch (e) {
       setMsg(e?.response?.data?.message || "Failed to load data");
@@ -230,8 +251,12 @@ export default function Ledger() {
 
   const ownerToMemberId = useMemo(() => {
     const out = { Mahbub: "", Mirza: "", Joint: "" };
-    const lowerMembers = (members || []).map((m) => ({ id: getId(m), name: String(m.name || "").toLowerCase() }));
-    const findByKeyword = (kw) => lowerMembers.find((x) => x.name.includes(kw.toLowerCase()))?.id || "";
+    const lowerMembers = (members || []).map((m) => ({
+      id: getId(m),
+      name: String(m.name || "").toLowerCase(),
+    }));
+    const findByKeyword = (kw) =>
+      lowerMembers.find((x) => x.name.includes(kw.toLowerCase()))?.id || "";
     out.Mahbub = findByKeyword("mahbub");
     out.Mirza = findByKeyword("mirza");
     return out;
@@ -268,8 +293,12 @@ export default function Ledger() {
       if (showCategory && !form.categoryId) return setMsg("Select a category");
       if (showFrom && !form.fromAccountId) return setMsg("Select From account");
       if (showTo && !form.toAccountId) return setMsg("Select To account");
-      if (form.txType === "transfer" && form.fromAccountId === form.toAccountId)
+      if (
+        form.txType === "transfer" &&
+        form.fromAccountId === form.toAccountId
+      ) {
         return setMsg("From and To accounts must be different");
+      }
 
       const payload = {
         txType: form.txType,
@@ -280,7 +309,8 @@ export default function Ledger() {
         fromAccountId: showFrom ? form.fromAccountId : null,
         toAccountId: showTo ? form.toAccountId : null,
         paidByUserId: form.txType === "expense" ? form.paidByUserId : null,
-        receivedByUserId: form.txType === "income" ? form.receivedByUserId : null,
+        receivedByUserId:
+          form.txType === "income" ? form.receivedByUserId : null,
       };
 
       await api.post("/api/transactions", payload);
@@ -323,8 +353,10 @@ export default function Ledger() {
     const filtered = (items || []).filter((it) => {
       if (memberFilter !== "all") {
         const filterId = String(memberFilter);
-        if (it.txType === "income" && getId(it.receivedByUserId) !== filterId) return false;
-        if (it.txType === "expense" && getId(it.paidByUserId) !== filterId) return false;
+        if (it.txType === "income" && getId(it.receivedByUserId) !== filterId)
+          return false;
+        if (it.txType === "expense" && getId(it.paidByUserId) !== filterId)
+          return false;
       }
 
       if (!needle) return true;
@@ -340,16 +372,14 @@ export default function Ledger() {
     return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [items, memberFilter, q]);
 
-  // ✅ NEW: available dates from current "rows" (already filtered by tab/member/search)
   const availableDates = useMemo(() => {
     const s = new Set();
     for (const it of rows || []) {
       s.add(toLocalYMD(it.date));
     }
-    return Array.from(s).sort((a, b) => (a < b ? 1 : -1)); // latest first
+    return Array.from(s).sort((a, b) => (a < b ? 1 : -1));
   }, [rows]);
 
-  // ✅ NEW: auto set day to latest date in this month after filters change
   useEffect(() => {
     if (!availableDates.length) return;
 
@@ -365,7 +395,6 @@ export default function Ledger() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableDates, month]);
 
-  // ✅ NEW: show only selected day’s items (like Grocery)
   const dayRows = useMemo(() => {
     return (rows || []).filter((it) => toLocalYMD(it.date) === day);
   }, [rows, day]);
@@ -374,7 +403,14 @@ export default function Ledger() {
     const by = {};
     for (const m of members || []) {
       const id = getId(m);
-      by[id] = { id, name: m.name, income: 0, expense: 0, transferIn: 0, transferOut: 0 };
+      by[id] = {
+        id,
+        name: m.name,
+        income: 0,
+        expense: 0,
+        transferIn: 0,
+        transferOut: 0,
+      };
     }
 
     for (const e of ledgerItems || []) {
@@ -463,49 +499,58 @@ export default function Ledger() {
   }, [allItems]);
 
   const typeLabel = (t) =>
-    t === "income" ? "Income" : t === "expense" ? "Expense" : t === "transfer" ? "Transfer" : t;
+    t === "income"
+      ? "Income"
+      : t === "expense"
+      ? "Expense"
+      : t === "transfer"
+      ? "Transfer"
+      : t;
 
   return (
     <AppLayout>
-      <div className="">
-        <div className="mb-5 rounded-2xl border bg-gradient-to-br from-slate-50 to-white p-5">
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-            <div>
+      <div className="w-full px-3 sm:px-4 lg:px-6">
+        <div className="mb-5 rounded-2xl border bg-gradient-to-br from-slate-50 to-white p-4 sm:p-5">
+          <div className="flex flex-col gap-4">
+            <div className="min-w-0">
               <div className="text-xs text-gray-500">HomeFinance Ledger</div>
-              <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">Transactions</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                Track <b>Income</b>, <b>Expense</b>, and <b>Transfer</b>. Individual summary uses <b>ledger entries</b>{" "}
-                (split-aware). If ledger entries are missing, rebuild once.
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight">
+                Transactions
+              </h2>
+              <p className="text-sm text-gray-600 mt-1 leading-6">
+                Track <b>Income</b>, <b>Expense</b>, and <b>Transfer</b>.
+                Individual summary uses <b>ledger entries</b> (split-aware). If
+                ledger entries are missing, rebuild once.
               </p>
             </div>
 
-            <div className="grid sm:flex-row gap-2 sm:items-center">
-              <div className="flex gap-2">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   value={month}
                   onChange={(e) => setMonth(e.target.value)}
                   type="month"
-                  className="border rounded-md px-3 py-2 text-sm bg-white"
+                  className="border rounded-md px-3 py-2 text-sm bg-white w-full sm:w-auto"
                 />
                 <button
                   onClick={openModal}
-                  className="bg-black text-white rounded-lg px-4 py-2 text-sm shadow-sm hover:opacity-95 active:opacity-90"
+                  className="bg-black text-white rounded-lg px-4 py-2 text-sm shadow-sm hover:opacity-95 active:opacity-90 w-full sm:w-auto"
                 >
                   + Add
                 </button>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  className="border rounded-lg px-3 py-2 text-sm bg-white w-full sm:w-64"
+                  className="border rounded-lg px-3 py-2 text-sm bg-white w-full"
                   placeholder="Search category, note, account…"
                 />
                 <select
                   value={memberFilter}
                   onChange={(e) => setMemberFilter(e.target.value)}
-                  className="border rounded-lg px-3 py-2 text-sm bg-white"
+                  className="border rounded-lg px-3 py-2 text-sm bg-white w-full sm:w-auto"
                   title="Filter by member"
                 >
                   <option value="all">All members</option>
@@ -519,12 +564,13 @@ export default function Ledger() {
             </div>
           </div>
 
-          <div className="mt-4 text-sm text-gray-600">
-            Biggest expense this month: <b>{topExpenseCategory.name}</b> ({money(topExpenseCategory.amount)}).
+          <div className="mt-4 text-sm text-gray-600 leading-6">
+            Biggest expense this month: <b>{topExpenseCategory.name}</b> (
+            {money(topExpenseCategory.amount)}).
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
           <TabButton active={activeTab === "all"} onClick={() => setActiveTab("all")}>
             All
           </TabButton>
@@ -541,50 +587,58 @@ export default function Ledger() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
           <div className="lg:col-span-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
               <MetricCard title="Income" value={money(totals.income)} tone="income" />
-
               <MetricCard title="Expense" value={money(totals.expense)} tone="expense" />
-
               <MetricCard
                 title="Remaining Expense"
                 value={money(remainingExpense)}
                 subtitle={`Expense - Fixed (${money(fixedExpenseTotal)})`}
                 tone="neutral"
               />
-
               <MetricCard title="Transfer" value={money(totals.transfer)} tone="transfer" />
-
               <MetricCard
                 title="Net Cashflow"
                 value={money(totals.netCashflow)}
-                subtitle={totals.netCashflow < 0 ? "Overspending this month" : "Healthy month so far"}
+                subtitle={
+                  totals.netCashflow < 0
+                    ? "Overspending this month"
+                    : "Healthy month so far"
+                }
                 tone="net"
               />
             </div>
 
             <div className="mt-4 rounded-2xl border bg-white">
-              <div className="p-4 border-b flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold">Individual summary (split-aware)</div>
-                  <div className="text-xs text-gray-500">
-                    Remaining = Income (splits) − Expense (splits). Transfers shown separately.
+              <div className="p-4 border-b flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold">
+                    Individual summary (split-aware)
                   </div>
-                  <div className="mt-2 text-xs text-gray-500">
-                    Ledger entries loaded: <b>{ledgerItems.length}</b> • Transactions loaded: <b>{allItems.length}</b>
+                  <div className="text-xs text-gray-500 leading-5">
+                    Remaining = Income (splits) − Expense (splits). Transfers
+                    shown separately.
+                  </div>
+                  <div className="mt-2 text-xs text-gray-500 leading-5">
+                    Ledger entries loaded: <b>{ledgerItems.length}</b> •
+                    Transactions loaded: <b>{allItems.length}</b>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                   <div className="text-sm text-gray-600">
                     Total Remaining:{" "}
-                    <b>{money(memberStats.reduce((s, x) => s + (x.remaining || 0), 0))}</b>
+                    <b>
+                      {money(
+                        memberStats.reduce((s, x) => s + (x.remaining || 0), 0)
+                      )}
+                    </b>
                   </div>
 
                   {ledgerItems.length === 0 && allItems.length > 0 ? (
                     <button
                       onClick={rebuildLedger}
-                      className="text-xs border rounded-lg px-3 py-2 hover:bg-gray-50"
+                      className="text-xs border rounded-lg px-3 py-2 hover:bg-gray-50 w-full sm:w-auto"
                       title="Rebuild ledger entries from transactions"
                     >
                       Rebuild Ledger
@@ -615,30 +669,48 @@ export default function Ledger() {
                     const isNeg = m.remaining < 0;
 
                     return (
-                      <div key={m.id} className="rounded-2xl border border-gray-200 p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center font-semibold text-gray-700">
+                      <div
+                        key={m.id}
+                        className="rounded-2xl border border-gray-200 p-4"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="h-10 w-10 shrink-0 rounded-xl bg-slate-100 flex items-center justify-center font-semibold text-gray-700">
                             {initials(m.name)}
                           </div>
 
-                          <div className="flex-1">
-                            <div className="text-sm font-semibold">{m.name}</div>
-                            <div className="text-xs text-gray-500">
-                              Income {money(m.income)} • Expense {money(m.expense)}
-                              <br />
-                              Transfer In {money(m.transferIn)} • Transfer Out {money(m.transferOut)}
-                            </div>
-                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold break-words">
+                                  {m.name}
+                                </div>
+                                <div className="text-xs text-gray-500 leading-5 mt-1">
+                                  Income {money(m.income)} • Expense {money(m.expense)}
+                                  <br />
+                                  Transfer In {money(m.transferIn)} • Transfer Out{" "}
+                                  {money(m.transferOut)}
+                                </div>
+                              </div>
 
-                          <div className={cn("text-sm font-semibold", isNeg ? "text-rose-600" : "text-emerald-700")}>
-                            {money(m.remaining)}
+                              <div
+                                className={cn(
+                                  "text-sm font-semibold shrink-0",
+                                  isNeg ? "text-rose-600" : "text-emerald-700"
+                                )}
+                              >
+                                {money(m.remaining)}
+                              </div>
+                            </div>
                           </div>
                         </div>
 
                         <div className="mt-3">
                           <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
                             <div
-                              className={cn("h-2", isNeg ? "bg-rose-500" : "bg-emerald-500")}
+                              className={cn(
+                                "h-2",
+                                isNeg ? "bg-rose-500" : "bg-emerald-500"
+                              )}
                               style={{ width: `${remP}%` }}
                             />
                           </div>
@@ -658,15 +730,15 @@ export default function Ledger() {
             <div className="rounded-2xl border bg-white p-4">
               <div className="text-sm font-semibold">Quick insights</div>
               <div className="mt-3 space-y-2 text-sm text-gray-700">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <span className="text-gray-600">Transactions (month)</span>
                   <b>{allItems.length}</b>
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <span className="text-gray-600">Shown now (day)</span>
                   <b>{dayRows.length}</b>
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <span className="text-gray-600">Top expense</span>
                   <b className="truncate max-w-[160px]" title={topExpenseCategory.name}>
                     {topExpenseCategory.name}
@@ -674,39 +746,42 @@ export default function Ledger() {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-gray-600">
-                Tip: Transfers are attributed using <b>account ownership</b> (Mahbub/Mirza/Joint). If an account owner is
-                wrong, transfer per-person may show 0 or split equally.
+              <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-gray-600 leading-5">
+                Tip: Transfers are attributed using <b>account ownership</b>{" "}
+                (Mahbub/Mirza/Joint). If an account owner is wrong, transfer
+                per-person may show 0 or split equally.
               </div>
             </div>
           </div>
         </div>
 
-        {/* ✅ NEW: Day-based list (like Grocery) */}
         <div className="rounded-2xl border bg-white overflow-hidden">
-          <div className="p-4 border-b flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div className="text-sm font-semibold">
+          <div className="p-4 border-b flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="text-sm font-semibold leading-6">
               {month} — {dayRows.length} item(s)
               {availableDates.length ? (
-                <span className="text-xs font-normal text-gray-500"> • (Showing {day})</span>
+                <span className="text-xs font-normal text-gray-500">
+                  {" "}
+                  • (Showing {day})
+                </span>
               ) : null}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span className="text-sm text-gray-600">Date</span>
                 <input
                   type="date"
                   value={day}
                   onChange={(e) => setDay(e.target.value)}
-                  className="border rounded-md px-3 py-2 text-sm bg-white"
+                  className="border rounded-md px-3 py-2 text-sm bg-white w-full sm:w-auto"
                 />
               </div>
 
               <button
                 type="button"
                 onClick={() => setDay(dayNow())}
-                className="border rounded-md px-3 py-2 text-sm hover:bg-gray-50"
+                className="border rounded-md px-3 py-2 text-sm hover:bg-gray-50 w-full sm:w-auto"
               >
                 Today
               </button>
@@ -717,16 +792,20 @@ export default function Ledger() {
             </div>
           </div>
 
-          {msg && <div className="px-4 py-3 text-sm text-rose-600 border-b bg-rose-50">{msg}</div>}
+          {msg && (
+            <div className="px-4 py-3 text-sm text-rose-600 border-b bg-rose-50 break-words">
+              {msg}
+            </div>
+          )}
 
           {loading ? (
-            <div className="p-5">Loading...</div>
+            <Loader text="Loading ledger" subtext="Collecting transactions and balances" />
           ) : rows.length === 0 ? (
-            <div className="p-6 text-gray-600 text-sm">
+            <div className="p-6 text-gray-600 text-sm leading-6">
               No transactions match your filters. Click <b>+ Add</b> to create one.
             </div>
           ) : dayRows.length === 0 ? (
-            <div className="p-6 text-gray-600 text-sm">
+            <div className="p-6 text-gray-600 text-sm leading-6">
               No transactions found for <b>{day}</b>. Try another date.
             </div>
           ) : (
@@ -747,36 +826,45 @@ export default function Ledger() {
                   it.txType === "income"
                     ? memberById.get(getId(it.receivedByUserId))?.name
                     : it.txType === "expense"
-                      ? memberById.get(getId(it.paidByUserId))?.name
-                      : null;
+                    ? memberById.get(getId(it.paidByUserId))?.name
+                    : null;
 
                 return (
-                  <div key={it._id} className="px-4 py-3 flex items-start gap-3">
-                    <div className="pt-1">
-                      <IconDot txType={it.txType} />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <div className="text-sm font-semibold text-gray-900">{typeLabel(it.txType)}</div>
-                        {who ? (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                            {who}
-                          </span>
-                        ) : null}
+                  <div
+                    key={it._id}
+                    className="px-4 py-3 flex flex-col sm:flex-row sm:items-start gap-3"
+                  >
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <div className="pt-1 shrink-0">
+                        <IconDot txType={it.txType} />
                       </div>
-                      <div className="text-sm text-gray-700 mt-1 break-words">{details}</div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="text-sm font-semibold text-gray-900">
+                            {typeLabel(it.txType)}
+                          </div>
+                          {who ? (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                              {who}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="text-sm text-gray-700 mt-1 break-words leading-6">
+                          {details}
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="text-right">
+                    <div className="sm:text-right flex sm:block items-center justify-between gap-3">
                       <div
                         className={cn(
-                          "text-sm font-semibold",
+                          "text-sm font-semibold whitespace-nowrap",
                           it.txType === "income"
                             ? "text-emerald-700"
                             : it.txType === "expense"
-                              ? "text-rose-700"
-                              : "text-sky-700"
+                            ? "text-rose-700"
+                            : "text-sky-700"
                         )}
                       >
                         {it.txType === "expense" ? "-" : it.txType === "income" ? "+" : ""}
@@ -784,7 +872,7 @@ export default function Ledger() {
                       </div>
                       <button
                         onClick={() => deleteTx(it._id)}
-                        className="mt-2 text-xs border rounded-lg px-3 py-1 hover:bg-gray-50"
+                        className="sm:mt-2 text-xs border rounded-lg px-3 py-1 hover:bg-gray-50 whitespace-nowrap"
                       >
                         Delete
                       </button>
@@ -805,11 +893,12 @@ export default function Ledger() {
         />
 
         {open && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
-            <div className="w-full max-w-lg bg-white rounded-2xl border p-5 shadow-sm">
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl border p-4 sm:p-5 shadow-sm max-h-[92vh] overflow-y-auto">
               <h3 className="text-lg font-semibold mb-1">Add Transaction</h3>
-              <p className="text-sm text-gray-500 mb-4">
-                Use <b>Transfer</b> for moving money between accounts (e.g., Bank → DPS).
+              <p className="text-sm text-gray-500 mb-4 leading-6">
+                Use <b>Transfer</b> for moving money between accounts
+                (e.g., Bank → DPS).
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -818,7 +907,9 @@ export default function Ledger() {
                   <select
                     className="w-full border rounded-md px-3 py-2"
                     value={form.txType}
-                    onChange={(e) => setForm({ ...form, txType: e.target.value, categoryId: "" })}
+                    onChange={(e) =>
+                      setForm({ ...form, txType: e.target.value, categoryId: "" })
+                    }
                   >
                     <option value="income">Income</option>
                     <option value="expense">Expense</option>
@@ -914,7 +1005,9 @@ export default function Ledger() {
                     <select
                       className="w-full border rounded-md px-3 py-2"
                       value={form.receivedByUserId}
-                      onChange={(e) => setForm({ ...form, receivedByUserId: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, receivedByUserId: e.target.value })
+                      }
                     >
                       <option value="">Select</option>
                       {members.map((m) => (
@@ -943,21 +1036,31 @@ export default function Ledger() {
                     className="w-full border rounded-md px-3 py-2"
                     value={form.note}
                     onChange={(e) => setForm({ ...form, note: e.target.value })}
-                    placeholder={form.txType === "transfer" ? "e.g., DPS deposit" : "e.g., Electricity bill"}
+                    placeholder={
+                      form.txType === "transfer"
+                        ? "e.g., DPS deposit"
+                        : "e.g., Electricity bill"
+                    }
                   />
                 </div>
               </div>
 
-              <div className="flex gap-2 justify-end mt-4">
-                <button onClick={closeModal} className="border rounded-lg px-4 py-2 text-sm hover:bg-gray-50">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end mt-4">
+                <button
+                  onClick={closeModal}
+                  className="border rounded-lg px-4 py-2 text-sm hover:bg-gray-50 w-full sm:w-auto"
+                >
                   Cancel
                 </button>
-                <button onClick={createTx} className="bg-black text-white rounded-lg px-4 py-2 text-sm">
+                <button
+                  onClick={createTx}
+                  className="bg-black text-white rounded-lg px-4 py-2 text-sm w-full sm:w-auto"
+                >
                   Save
                 </button>
               </div>
 
-              {msg && <div className="mt-3 text-sm text-red-600">{msg}</div>}
+              {msg && <div className="mt-3 text-sm text-red-600 break-words">{msg}</div>}
             </div>
           </div>
         )}

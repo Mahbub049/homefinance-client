@@ -266,36 +266,36 @@ export default function EMI() {
 
   return (
     <AppLayout>
-      <div>
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div>
-            <h2 className="text-2xl font-bold">EMI</h2>
+      <div className="w-full max-w-full overflow-x-hidden">
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-xl sm:text-2xl font-bold">EMI</h2>
             <p className="text-sm text-gray-600">
               Create EMI plan → generate monthly payables into ledger.
             </p>
           </div>
 
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center w-full lg:w-auto">
             <input
               type="month"
-              className="border rounded-md px-3 py-2 text-sm bg-white"
+              className="w-full sm:w-auto border rounded-md px-3 py-2 text-sm bg-white"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
             />
             <button
               onClick={openModal}
-              className="bg-black text-white rounded-md px-4 py-2 text-sm"
+              className="w-full sm:w-auto bg-black text-white rounded-md px-4 py-2 text-sm"
             >
               + Add EMI Plan
             </button>
           </div>
         </div>
 
-        {msg && <div className="mb-3 text-sm text-blue-700">{msg}</div>}
+        {msg && <div className="mb-3 text-sm text-blue-700 break-words">{msg}</div>}
 
         <div className="bg-white border rounded-lg p-4 mb-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+            <div className="min-w-0">
               <div className="font-medium">Monthly EMI Bills — {month}</div>
               <div className="text-sm text-gray-600">
                 This creates the <b>pending</b> EMI installment rows for all{" "}
@@ -309,14 +309,14 @@ export default function EMI() {
 
             <button
               onClick={generateMonth}
-              className="bg-black text-white rounded-md px-4 py-2 text-sm whitespace-nowrap"
+              className="w-full lg:w-auto bg-black text-white rounded-md px-4 py-2 text-sm whitespace-nowrap"
             >
               Create EMI Bills
             </button>
           </div>
 
           <div className="mt-3">
-            <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-gray-50 border text-sm">
+            <div className="inline-flex flex-wrap items-center gap-2 px-3 py-2 rounded-md bg-gray-50 border text-sm">
               <span className="text-gray-600">
                 Bills already created for {month}:
               </span>
@@ -331,77 +331,192 @@ export default function EMI() {
           {plans.length === 0 ? (
             <div className="p-4 text-sm text-gray-600">No EMI plans yet.</div>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr className="text-left">
-                  <th className="p-3">Product</th>
-                  <th className="p-3">Total</th>
-                  <th className="p-3">Months</th>
-                  <th className="p-3">Monthly</th>
-                  <th className="p-3">Remaining</th>
-                  <th className="p-3">Progress</th>
-                  <th className="p-3">Start-End</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3 text-right">Action</th>
-                </tr>
-              </thead>
+            <>
+              {/* Desktop table */}
+              <div className="hidden lg:block overflow-x-auto">
+                <table className="w-full text-sm min-w-[980px]">
+                  <thead className="bg-gray-50">
+                    <tr className="text-left">
+                      <th className="p-3">Product</th>
+                      <th className="p-3">Total</th>
+                      <th className="p-3">Months</th>
+                      <th className="p-3">Monthly</th>
+                      <th className="p-3">Remaining</th>
+                      <th className="p-3">Progress</th>
+                      <th className="p-3">Start-End</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3 text-right">Action</th>
+                    </tr>
+                  </thead>
 
-              <tbody>
+                  <tbody>
+                    {plans.map((p) => (
+                      <tr key={p._id} className="border-t">
+                        <td className="p-3">
+                          <div className="font-medium">{p.productName}</div>
+                          <div className="text-xs text-gray-500">
+                            {p.brand || "-"} {p.category ? `• ${p.category}` : ""}
+                          </div>
+                        </td>
+
+                        <td className="p-3">{p.totalPayable}</td>
+                        <td className="p-3">{p.months}</td>
+                        <td className="p-3">{p.monthlyAmount}</td>
+
+                        <td className="p-3">
+                          <div className="font-medium">
+                            {p?.stats?.remaining ?? "-"}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {p?.stats?.remainingMonths ?? "-"} mo left
+                          </div>
+                        </td>
+
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-28 bg-gray-200 rounded-full h-2 overflow-hidden">
+                              <div
+                                className="bg-black h-2"
+                                style={{
+                                  width: `${Math.min(
+                                    100,
+                                    Math.max(0, Number(p?.stats?.progress || 0))
+                                  )}%`,
+                                }}
+                              />
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              {p?.stats?.progress ?? 0}%
+                            </div>
+                          </div>
+
+                          {Number(p?.stats?.behindBy || 0) > 0 && (
+                            <div className="text-xs text-amber-700 mt-1">
+                              Behind: {p.stats.behindBy}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="p-3">
+                          {p.startMonth} → {p.endMonth}
+                        </td>
+
+                        <td className="p-3">{p.status}</td>
+
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-2 flex-wrap">
+                            {p.status === "active" &&
+                              month >= p.startMonth &&
+                              month <= p.endMonth && (
+                                <button
+                                  onClick={() =>
+                                    generateSinglePlan(p._id, p.productName)
+                                  }
+                                  className="bg-black text-white rounded-md px-3 py-1 hover:opacity-90"
+                                >
+                                  Create Bill
+                                </button>
+                              )}
+
+                            {p.status === "active" ? (
+                              <button
+                                onClick={() => setStatus(p._id, "closed")}
+                                className="border rounded-md px-3 py-1 hover:bg-gray-50"
+                              >
+                                Close
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setStatus(p._id, "active")}
+                                className="border rounded-md px-3 py-1 hover:bg-gray-50"
+                              >
+                                Reopen
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="lg:hidden divide-y">
                 {plans.map((p) => (
-                  <tr key={p._id} className="border-t">
-                    <td className="p-3">
-                      <div className="font-medium">{p.productName}</div>
-                      <div className="text-xs text-gray-500">
-                        {p.brand || "-"} {p.category ? `• ${p.category}` : ""}
-                      </div>
-                    </td>
-
-                    <td className="p-3">{p.totalPayable}</td>
-                    <td className="p-3">{p.months}</td>
-                    <td className="p-3">{p.monthlyAmount}</td>
-
-                    <td className="p-3">
-                      <div className="font-medium">
-                        {p?.stats?.remaining ?? "-"}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {p?.stats?.remainingMonths ?? "-"} mo left
-                      </div>
-                    </td>
-
-                    <td className="p-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-28 bg-gray-200 rounded-full h-2 overflow-hidden">
-                          <div
-                            className="bg-black h-2"
-                            style={{
-                              width: `${Math.min(
-                                100,
-                                Math.max(0, Number(p?.stats?.progress || 0))
-                              )}%`,
-                            }}
-                          />
+                  <div key={p._id} className="p-4">
+                    <div className="flex flex-col gap-3">
+                      <div>
+                        <div className="font-semibold text-sm break-words">
+                          {p.productName}
                         </div>
-                        <div className="text-xs text-gray-600">
-                          {p?.stats?.progress ?? 0}%
+                        <div className="text-xs text-gray-500 mt-1 break-words">
+                          {p.brand || "-"} {p.category ? `• ${p.category}` : ""}
                         </div>
                       </div>
 
-                      {Number(p?.stats?.behindBy || 0) > 0 && (
-                        <div className="text-xs text-amber-700 mt-1">
-                          Behind: {p.stats.behindBy}
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="border rounded-lg p-2">
+                          <div className="text-xs text-gray-500">Total</div>
+                          <div className="font-medium">{p.totalPayable}</div>
                         </div>
-                      )}
-                    </td>
+                        <div className="border rounded-lg p-2">
+                          <div className="text-xs text-gray-500">Months</div>
+                          <div className="font-medium">{p.months}</div>
+                        </div>
+                        <div className="border rounded-lg p-2">
+                          <div className="text-xs text-gray-500">Monthly</div>
+                          <div className="font-medium">{p.monthlyAmount}</div>
+                        </div>
+                        <div className="border rounded-lg p-2">
+                          <div className="text-xs text-gray-500">Remaining</div>
+                          <div className="font-medium">
+                            {p?.stats?.remaining ?? "-"}
+                          </div>
+                          <div className="text-[11px] text-gray-500">
+                            {p?.stats?.remainingMonths ?? "-"} mo left
+                          </div>
+                        </div>
+                      </div>
 
-                    <td className="p-3">
-                      {p.startMonth} → {p.endMonth}
-                    </td>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
+                            <div
+                              className="bg-black h-2"
+                              style={{
+                                width: `${Math.min(
+                                  100,
+                                  Math.max(0, Number(p?.stats?.progress || 0))
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                          <div className="text-xs text-gray-600 whitespace-nowrap">
+                            {p?.stats?.progress ?? 0}%
+                          </div>
+                        </div>
+                        {Number(p?.stats?.behindBy || 0) > 0 && (
+                          <div className="text-xs text-amber-700 mt-1">
+                            Behind: {p.stats.behindBy}
+                          </div>
+                        )}
+                      </div>
 
-                    <td className="p-3">{p.status}</td>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <div className="text-xs text-gray-500">Start-End</div>
+                          <div className="font-medium break-words">
+                            {p.startMonth} → {p.endMonth}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500">Status</div>
+                          <div className="font-medium">{p.status}</div>
+                        </div>
+                      </div>
 
-                    <td className="p-3 text-right">
-                      <div className="flex items-center justify-end gap-2 flex-wrap">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         {p.status === "active" &&
                           month >= p.startMonth &&
                           month <= p.endMonth && (
@@ -409,7 +524,7 @@ export default function EMI() {
                               onClick={() =>
                                 generateSinglePlan(p._id, p.productName)
                               }
-                              className="bg-black text-white rounded-md px-3 py-1 hover:opacity-90"
+                              className="w-full sm:w-auto bg-black text-white rounded-md px-3 py-2 text-sm"
                             >
                               Create Bill
                             </button>
@@ -418,24 +533,24 @@ export default function EMI() {
                         {p.status === "active" ? (
                           <button
                             onClick={() => setStatus(p._id, "closed")}
-                            className="border rounded-md px-3 py-1 hover:bg-gray-50"
+                            className="w-full sm:w-auto border rounded-md px-3 py-2 text-sm hover:bg-gray-50"
                           >
                             Close
                           </button>
                         ) : (
                           <button
                             onClick={() => setStatus(p._id, "active")}
-                            className="border rounded-md px-3 py-1 hover:bg-gray-50"
+                            className="w-full sm:w-auto border rounded-md px-3 py-2 text-sm hover:bg-gray-50"
                           >
                             Reopen
                           </button>
                         )}
                       </div>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </>
           )}
         </div>
 
@@ -449,38 +564,100 @@ export default function EMI() {
               No installments generated for this month.
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr className="text-left">
-                  <th className="p-3">Product</th>
-                  <th className="p-3">Amount</th>
-                  <th className="p-3">Due Date</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3 text-right">Action</th>
-                </tr>
-              </thead>
+            <>
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm min-w-[720px]">
+                  <thead className="bg-gray-50">
+                    <tr className="text-left">
+                      <th className="p-3">Product</th>
+                      <th className="p-3">Amount</th>
+                      <th className="p-3">Due Date</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3 text-right">Action</th>
+                    </tr>
+                  </thead>
 
-              <tbody>
+                  <tbody>
+                    {installments.map((i) => (
+                      <tr key={i._id} className="border-t">
+                        <td className="p-3">{i?.planId?.productName || "-"}</td>
+                        <td className="p-3">{i.amount}</td>
+                        <td className="p-3">
+                          {i.dueDate
+                            ? new Date(i.dueDate).toLocaleDateString()
+                            : "-"}
+                        </td>
+                        <td className="p-3">{i.status}</td>
+                        <td className="p-3 text-right">
+                          {i.status === "paid" ? (
+                            <button
+                              onClick={() => setInstallmentStatus(i._id, "pending")}
+                              className="border rounded-md px-3 py-1 hover:bg-gray-50 mr-2"
+                            >
+                              Mark Pending
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setInstallmentStatus(i._id, "paid")}
+                              className="bg-black text-white rounded-md px-3 py-1 mr-2"
+                            >
+                              Mark Paid
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => deleteInstallment(i._id)}
+                            className="border rounded-md px-3 py-1 hover:bg-gray-50"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="md:hidden divide-y">
                 {installments.map((i) => (
-                  <tr key={i._id} className="border-t">
-                    <td className="p-3">{i?.planId?.productName || "-"}</td>
-                    <td className="p-3">{i.amount}</td>
-                    <td className="p-3">
-                      {i.dueDate ? new Date(i.dueDate).toLocaleDateString() : "-"}
-                    </td>
-                    <td className="p-3">{i.status}</td>
-                    <td className="p-3 text-right">
+                  <div key={i._id} className="p-4">
+                    <div className="font-semibold text-sm break-words">
+                      {i?.planId?.productName || "-"}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mt-3 text-sm">
+                      <div className="border rounded-lg p-2">
+                        <div className="text-xs text-gray-500">Amount</div>
+                        <div className="font-medium">{i.amount}</div>
+                      </div>
+                      <div className="border rounded-lg p-2">
+                        <div className="text-xs text-gray-500">Status</div>
+                        <div className="font-medium">{i.status}</div>
+                      </div>
+                      <div className="border rounded-lg p-2 col-span-2">
+                        <div className="text-xs text-gray-500">Due Date</div>
+                        <div className="font-medium">
+                          {i.dueDate
+                            ? new Date(i.dueDate).toLocaleDateString()
+                            : "-"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2 mt-3">
                       {i.status === "paid" ? (
                         <button
                           onClick={() => setInstallmentStatus(i._id, "pending")}
-                          className="border rounded-md px-3 py-1 hover:bg-gray-50 mr-2"
+                          className="w-full border rounded-md px-3 py-2 text-sm hover:bg-gray-50"
                         >
                           Mark Pending
                         </button>
                       ) : (
                         <button
                           onClick={() => setInstallmentStatus(i._id, "paid")}
-                          className="bg-black text-white rounded-md px-3 py-1 mr-2"
+                          className="w-full bg-black text-white rounded-md px-3 py-2 text-sm"
                         >
                           Mark Paid
                         </button>
@@ -488,28 +665,28 @@ export default function EMI() {
 
                       <button
                         onClick={() => deleteInstallment(i._id)}
-                        className="border rounded-md px-3 py-1 hover:bg-gray-50"
+                        className="w-full border rounded-md px-3 py-2 text-sm hover:bg-gray-50"
                       >
                         Delete
                       </button>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </>
           )}
         </div>
 
         {open && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
-            <div className="w-full max-w-3xl bg-white border rounded-lg p-5">
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="w-full sm:max-w-3xl bg-white border rounded-t-2xl sm:rounded-lg p-4 sm:p-5 overflow-y-auto max-h-[95vh]">
               <h3 className="text-lg font-semibold mb-1">Add EMI Plan</h3>
               <p className="text-sm text-gray-500 mb-4">
                 Monthly amount will be auto calculated.
               </p>
 
-              <div className="grid md:grid-cols-3 gap-3">
-                <div className="md:col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
                   <label className="text-sm font-medium">Product Name</label>
                   <input
                     className="w-full border rounded-md px-3 py-2"
@@ -619,7 +796,7 @@ export default function EMI() {
                   </div>
                 </div>
 
-                <div className="md:col-span-2">
+                <div className="sm:col-span-2 md:col-span-2">
                   <label className="text-sm font-medium">Split Type</label>
                   <select
                     className="w-full border rounded-md px-3 py-2"
@@ -636,7 +813,7 @@ export default function EMI() {
                 </div>
 
                 {form.splitType === "personal" && (
-                  <div className="md:col-span-3">
+                  <div className="sm:col-span-2 md:col-span-3">
                     <label className="text-sm font-medium">Personal For</label>
                     <select
                       className="w-full border rounded-md px-3 py-2"
@@ -680,7 +857,7 @@ export default function EMI() {
                       />
                     </div>
 
-                    <div className="md:col-span-3 text-xs text-gray-500">
+                    <div className="sm:col-span-2 md:col-span-3 text-xs text-gray-500">
                       Must sum to 100.
                     </div>
                   </>
@@ -712,13 +889,13 @@ export default function EMI() {
                       />
                     </div>
 
-                    <div className="md:col-span-3 text-xs text-gray-500">
+                    <div className="sm:col-span-2 md:col-span-3 text-xs text-gray-500">
                       Must sum to monthly amount.
                     </div>
                   </>
                 )}
 
-                <div className="md:col-span-3">
+                <div className="sm:col-span-2 md:col-span-3">
                   <label className="text-sm font-medium">Note</label>
                   <input
                     className="w-full border rounded-md px-3 py-2"
@@ -728,22 +905,22 @@ export default function EMI() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 mt-5">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 mt-5">
                 <button
                   onClick={closeModal}
-                  className="border rounded-md px-4 py-2 text-sm hover:bg-gray-50"
+                  className="w-full sm:w-auto border rounded-md px-4 py-2 text-sm hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={createPlan}
-                  className="bg-black text-white rounded-md px-4 py-2 text-sm"
+                  className="w-full sm:w-auto bg-black text-white rounded-md px-4 py-2 text-sm"
                 >
                   Save Plan
                 </button>
               </div>
 
-              {msg && <div className="mt-3 text-sm text-red-600">{msg}</div>}
+              {msg && <div className="mt-3 text-sm text-red-600 break-words">{msg}</div>}
             </div>
           </div>
         )}
