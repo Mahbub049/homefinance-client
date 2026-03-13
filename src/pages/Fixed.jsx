@@ -567,8 +567,8 @@ export default function Fixed() {
 
         {/* Modal */}
         {open && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-            <div className="w-full max-w-xl bg-white border rounded-2xl p-5 shadow-xl">
+          <div className="app-modal-overlay--center">
+            <div className="app-modal-panel max-w-xl rounded-2xl p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h3 className="text-lg font-semibold">Add Template</h3>

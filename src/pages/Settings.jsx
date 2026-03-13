@@ -217,10 +217,10 @@ export default function Settings() {
     active === "incomeCats"
       ? incomeCats
       : active === "expenseCats"
-      ? expenseCats
-      : active === "methods"
-      ? methods
-      : cards;
+        ? expenseCats
+        : active === "methods"
+          ? methods
+          : cards;
 
   const filteredList = useMemo(() => {
     if (isAccountsTab) return [];
@@ -422,8 +422,8 @@ export default function Settings() {
 
         {/* Modal (not used for Accounts) */}
         {modal.open && !isAccountsTab && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-            <div className="w-full max-w-md overflow-hidden rounded-xl border bg-white shadow-xl">
+          <div className="app-modal-overlay--center">
+            <div className="app-modal-panel max-w-md overflow-hidden rounded-xl">
               <div className="border-b p-4">
                 <div className="text-lg font-semibold">
                   {modal.mode === "add" ? "Add" : "Edit"}{" "}
@@ -438,20 +438,20 @@ export default function Settings() {
                 {(modal.type === "incomeCats" ||
                   modal.type === "expenseCats" ||
                   modal.type === "methods") && (
-                  <>
-                    <label className="text-sm font-medium text-gray-800">
-                      Name
-                    </label>
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-black/10"
-                      value={form.name}
-                      onChange={(e) =>
-                        setForm({ ...form, name: e.target.value })
-                      }
-                      placeholder="e.g., Salary / Utilities / Cash"
-                    />
-                  </>
-                )}
+                    <>
+                      <label className="text-sm font-medium text-gray-800">
+                        Name
+                      </label>
+                      <input
+                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-black/10"
+                        value={form.name}
+                        onChange={(e) =>
+                          setForm({ ...form, name: e.target.value })
+                        }
+                        placeholder="e.g., Salary / Utilities / Cash"
+                      />
+                    </>
+                  )}
 
                 {modal.type === "cards" && (
                   <>

@@ -194,7 +194,7 @@ export default function EMI() {
 
       setMsg(
         `Created ${res.data.createdCount} EMI bill(s) for ${month}` +
-          (catName ? ` (Category: ${catName})` : "")
+        (catName ? ` (Category: ${catName})` : "")
       );
 
       await loadInstallments();
@@ -218,7 +218,7 @@ export default function EMI() {
       setMsg(
         createdCount > 0
           ? `Created EMI bill for ${productName} in ${month}` +
-              (catName ? ` (Category: ${catName})` : "")
+          (catName ? ` (Category: ${catName})` : "")
           : `EMI bill already exists for ${productName} in ${month}`
       );
 
@@ -678,8 +678,8 @@ export default function EMI() {
         </div>
 
         {open && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="w-full sm:max-w-3xl bg-white border rounded-t-2xl sm:rounded-lg p-4 sm:p-5 overflow-y-auto max-h-[95vh]">
+          <div className="app-modal-overlay">
+            <div className="app-modal-panel max-w-3xl rounded-2xl p-4 sm:p-5">
               <h3 className="text-lg font-semibold mb-1">Add EMI Plan</h3>
               <p className="text-sm text-gray-500 mb-4">
                 Monthly amount will be auto calculated.

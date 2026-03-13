@@ -14,7 +14,7 @@ export default function ConfirmModal({ open, title, message, onConfirm, onCancel
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="app-modal-overlay--center">
       {/* Backdrop */}
       <button
         type="button"
@@ -24,7 +24,7 @@ export default function ConfirmModal({ open, title, message, onConfirm, onCancel
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md rounded-xl bg-white shadow-2xl border">
+      <div className="app-modal-panel relative max-w-md rounded-xl">
         <div className="p-5">
           <h3 className="text-base font-semibold text-gray-900">{title}</h3>
           <p className="mt-2 text-sm text-gray-600 leading-relaxed">{message}</p>

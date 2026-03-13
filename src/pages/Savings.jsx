@@ -314,8 +314,8 @@ export default function Savings() {
 
         {/* Deposit modal */}
         {modalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-xl border p-4 sm:p-5 max-h-[92vh] overflow-y-auto">
+          <div className="app-modal-overlay">
+            <div className="app-modal-panel max-w-md rounded-2xl p-4 sm:p-5">
               <h3 className="text-lg font-semibold mb-1">Add Savings Transfer</h3>
               <p className="text-sm text-gray-500 mb-4">
                 This will create a <b>Transfer</b> transaction.

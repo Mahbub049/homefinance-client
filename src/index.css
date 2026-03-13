@@ -5,3 +5,41 @@
 html, body, #root {
   height: 100%;
 }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  background: #f8fafc;
+}
+
+@layer components {
+  .app-modal-overlay {
+    @apply fixed inset-0 z-50 flex justify-center bg-black/40 px-3 py-4 sm:px-4;
+    align-items: flex-end;
+  }
+
+  .app-modal-overlay--center {
+    @apply fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3 py-4 sm:px-4;
+  }
+
+  .app-modal-panel {
+    width: min(100%, calc(100vw - 24px));
+    max-height: min(92dvh, 92vh);
+    @apply overflow-y-auto border bg-white shadow-xl;
+  }
+
+  @screen sm {
+    .app-modal-overlay {
+      align-items: center;
+    }
+
+    .app-modal-panel {
+      width: 100%;
+    }
+  }
+}
