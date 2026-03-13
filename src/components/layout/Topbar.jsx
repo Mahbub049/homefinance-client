@@ -1,8 +1,9 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { clearAuth, getUser } from "../../services/authStorage";
 
 export default function Topbar({ onToggleSidebar, onOpenDrawer }) {
   const nav = useNavigate();
+  const location = useLocation();
   const user = getUser();
 
   function logout() {
@@ -12,38 +13,66 @@ export default function Topbar({ onToggleSidebar, onOpenDrawer }) {
 
   const firstName = user?.name?.split(" ")[0] || "Guest";
 
+  const pageTitles = {
+    "/": "Dashboard",
+    "/dashboard": "Dashboard",
+    "/settings": "Settings",
+    "/ledger": "Ledger",
+    "/fixed": "Fixed Expenses",
+    "/grocery": "Grocery",
+    "/emi": "EMI",
+    "/savings": "Savings",
+    "/wallet": "Wallet",
+    "/carry-forward": "Carry Forward",
+    "/year-overview": "Year Overview",
+    "/family": "Family Setup",
+    "/login": "Login",
+    "/register": "Register",
+  };
+
+  const pageTitle = pageTitles[location.pathname] || "HomeFinance";
+
   return (
     <header className="h-16 bg-white border-b sticky top-0 z-30">
       <div className="h-full flex items-center justify-between px-4 md:px-6">
         <div className="flex items-center gap-2">
-          {/* Mobile menu */}
           {onOpenDrawer && (
             <button
               onClick={onOpenDrawer}
               className="md:hidden p-2 rounded-md border hover:bg-gray-100"
               aria-label="Open menu"
             >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
                 <path d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
           )}
 
-          {/* Desktop collapse */}
           {onToggleSidebar && (
             <button
               onClick={onToggleSidebar}
               className="hidden md:inline-flex p-2 rounded-md border hover:bg-gray-100"
               aria-label="Toggle sidebar"
             >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
                 <path d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
           )}
 
-          {/* Page area (keep simple) */}
-          <div className="font-semibold text-gray-900">Dashboard</div>
+          <div className="font-semibold text-gray-900">{pageTitle}</div>
         </div>
 
         <div className="flex items-center gap-3">
