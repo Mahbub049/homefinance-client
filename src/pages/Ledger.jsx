@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import AppLayout from "../components/layout/AppLayout";
 import api from "../services/api";
 import { getUser } from "../services/authStorage";
@@ -31,6 +33,22 @@ function toLocalYMD(dateLike) {
 function money(n) {
   const v = Number(n || 0);
   return `৳ ${v.toLocaleString("en-BD")}`;
+}
+
+function moneyPdf(n) {
+  const v = Number(n || 0);
+  return `Tk ${v.toLocaleString("en-BD", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function formatPdfDate(dateLike) {
+  const d = new Date(dateLike);
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
 }
 
 function cn(...xs) {
@@ -502,10 +520,159 @@ export default function Ledger() {
     t === "income"
       ? "Income"
       : t === "expense"
-      ? "Expense"
-      : t === "transfer"
-      ? "Transfer"
-      : t;
+        ? "Expense"
+        : t === "transfer"
+          ? "Transfer"
+          : t;
+
+  async function exportTransactionsPdf() {
+    try {
+      const doc = new jsPDF("p", "mm", "a4");
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      const exportRows = [...rows].sort(
+        (a, b) => new Date(a.date) - new Date(b.date)
+      );
+
+      const title = "HomeFinance Transaction Statement";
+      const subtitle = `Month: ${month}`;
+      const filterLine = `Type: ${activeTab === "all" ? "All" : typeLabel(activeTab)} | Member: ${memberFilter === "all"
+        ? "All members"
+        : members.find((m) => getId(m) === memberFilter)?.name || "All members"
+        }`;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text(title, 14, 16);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.text(subtitle, 14, 23);
+      doc.text(filterLine, 14, 28);
+
+      doc.setFont("helvetica", "bold");
+      doc.text(`Generated: ${formatPdfDate(new Date())}`, pageWidth - 14, 16, {
+        align: "right",
+      });
+
+      autoTable(doc, {
+        startY: 34,
+        theme: "grid",
+        head: [["Summary", "Amount"]],
+        body: [
+          ["Income", moneyPdf(totals.income)],
+          ["Expense", moneyPdf(totals.expense)],
+          ["Transfer", moneyPdf(totals.transfer)],
+          ["Net Cashflow", moneyPdf(totals.netCashflow)],
+          ["Remaining Expense", moneyPdf(remainingExpense)],
+          ["Transactions Count", String(exportRows.length)],
+        ],
+        styles: {
+          fontSize: 9,
+          cellPadding: 2.5,
+        },
+        headStyles: {
+          fillColor: [240, 240, 240],
+          textColor: 20,
+        },
+      });
+
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 6,
+        theme: "grid",
+        head: [["Member", "Income", "Expense", "Transfer In", "Transfer Out", "Remaining"]],
+        body: memberStats.map((m) => [
+          m.name || "-",
+          moneyPdf(m.income),
+          moneyPdf(m.expense),
+          moneyPdf(m.transferIn),
+          moneyPdf(m.transferOut),
+          moneyPdf(m.remaining),
+        ]),
+        styles: {
+          fontSize: 8.5,
+          cellPadding: 2.2,
+        },
+        headStyles: {
+          fillColor: [240, 240, 240],
+          textColor: 20,
+        },
+      });
+
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 6,
+        theme: "grid",
+        head: [[
+          "Date",
+          "Type",
+          "Member",
+          "Category / Details",
+          "From",
+          "To",
+          "Amount",
+          "Note",
+        ]],
+        body: exportRows.map((it) => {
+          const who =
+            it.txType === "income"
+              ? memberById.get(getId(it.receivedByUserId))?.name || "-"
+              : it.txType === "expense"
+                ? memberById.get(getId(it.paidByUserId))?.name || "-"
+                : "-";
+
+          return [
+            formatPdfDate(it.date),
+            typeLabel(it.txType),
+            who,
+            it.categoryId?.name || (it.txType === "transfer" ? "Transfer" : "-"),
+            it.fromAccountId?.name || "-",
+            it.toAccountId?.name || "-",
+            `${it.txType === "expense" ? "-" : it.txType === "income" ? "+" : ""}${moneyPdf(it.amount)}`,
+            it.note || "-",
+          ];
+        }),
+        styles: {
+          fontSize: 7.8,
+          cellPadding: 1.8,
+          overflow: "linebreak",
+          valign: "middle",
+        },
+        headStyles: {
+          fillColor: [240, 240, 240],
+          textColor: 20,
+          fontSize: 8,
+        },
+        columnStyles: {
+          0: { cellWidth: 18 },
+          1: { cellWidth: 16 },
+          2: { cellWidth: 24 },
+          3: { cellWidth: 34 },
+          4: { cellWidth: 24 },
+          5: { cellWidth: 24 },
+          6: { cellWidth: 24 },
+          7: { cellWidth: 28 },
+        },
+        didDrawPage: () => {
+          const pageCount = doc.getNumberOfPages();
+          const pageSize = doc.internal.pageSize;
+          const pageHeight = pageSize.height || pageSize.getHeight();
+
+          doc.setFontSize(9);
+          doc.text(
+            `Page ${doc.internal.getCurrentPageInfo().pageNumber} of ${pageCount}`,
+            pageWidth - 14,
+            pageHeight - 8,
+            { align: "right" }
+          );
+        },
+      });
+
+      doc.save(`Transactions_${month}.pdf`);
+    } catch (error) {
+      console.error(error);
+      setMsg("PDF export failed");
+    }
+  }
 
   return (
     <AppLayout>
@@ -537,6 +704,12 @@ export default function Ledger() {
                   className="bg-black text-white rounded-lg px-4 py-2 text-sm shadow-sm hover:opacity-95 active:opacity-90 w-full sm:w-auto"
                 >
                   + Add
+                </button>
+                <button
+                  onClick={exportTransactionsPdf}
+                  className="border rounded-lg px-4 py-2 text-sm bg-white hover:bg-gray-50 shadow-sm w-full sm:w-auto"
+                >
+                  Export PDF
                 </button>
               </div>
 
@@ -826,8 +999,8 @@ export default function Ledger() {
                   it.txType === "income"
                     ? memberById.get(getId(it.receivedByUserId))?.name
                     : it.txType === "expense"
-                    ? memberById.get(getId(it.paidByUserId))?.name
-                    : null;
+                      ? memberById.get(getId(it.paidByUserId))?.name
+                      : null;
 
                 return (
                   <div
@@ -863,8 +1036,8 @@ export default function Ledger() {
                           it.txType === "income"
                             ? "text-emerald-700"
                             : it.txType === "expense"
-                            ? "text-rose-700"
-                            : "text-sky-700"
+                              ? "text-rose-700"
+                              : "text-sky-700"
                         )}
                       >
                         {it.txType === "expense" ? "-" : it.txType === "income" ? "+" : ""}
@@ -893,8 +1066,8 @@ export default function Ledger() {
         />
 
         {open && (
-<div className="app-modal-overlay">
-  <div className="app-modal-panel max-w-lg rounded-2xl p-4 sm:p-5">
+          <div className="app-modal-overlay">
+            <div className="app-modal-panel max-w-lg rounded-2xl p-4 sm:p-5">
               <h3 className="text-lg font-semibold mb-1">Add Transaction</h3>
               <p className="text-sm text-gray-500 mb-4 leading-6">
                 Use <b>Transfer</b> for moving money between accounts

@@ -22,8 +22,8 @@ export default function EMI() {
   const [msg, setMsg] = useState("");
 
   const [members, setMembers] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [expenseCats, setExpenseCats] = useState([]);
-
   const [plans, setPlans] = useState([]);
   const [installments, setInstallments] = useState([]);
 
@@ -49,10 +49,22 @@ export default function EMI() {
   });
 
   const [emiExpenseCategoryId, setEmiExpenseCategoryId] = useState("");
+  const [payModalOpen, setPayModalOpen] = useState(false);
+  const [selectedInstallment, setSelectedInstallment] = useState(null);
+  const [payForm, setPayForm] = useState({
+    paidByUserId: me?.id || "",
+    fromAccountId: "",
+    paidDate: new Date().toISOString().slice(0, 10),
+  });
 
   const otherMember = useMemo(
     () => members.find((m) => m.id !== me?.id) || null,
     [members, me]
+  );
+
+  const payableAccounts = useMemo(
+    () => accounts.filter((a) => ["cash", "bank", "wallet"].includes(a.type)),
+    [accounts]
   );
 
   function calcTotalPayable(originalPrice, emiChargePercent) {
@@ -63,12 +75,14 @@ export default function EMI() {
   }
 
   async function loadBasics() {
-    const [mRes, exp] = await Promise.all([
+    const [mRes, accRes, exp] = await Promise.all([
       api.get("/api/family/members"),
+      api.get("/api/accounts"),
       api.get("/api/categories", { params: { kind: "expense" } }),
     ]);
 
     setMembers(mRes.data.members || []);
+    setAccounts((accRes.data.items || []).filter((a) => a.isActive !== false));
 
     const items = exp.data.items || [];
     setExpenseCats(items);
@@ -238,14 +252,51 @@ export default function EMI() {
     }
   }
 
-  async function setInstallmentStatus(id, status) {
+  function openPayModalForInstallment(item) {
+    const defaultAccount = payableAccounts[0]?._id || "";
+    setSelectedInstallment(item);
+    setPayForm({
+      paidByUserId: me?.id || members[0]?.id || "",
+      fromAccountId: defaultAccount,
+      paidDate: item?.dueDate
+        ? new Date(item.dueDate).toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10),
+    });
+    setPayModalOpen(true);
+  }
+
+  function closePayModal() {
+    setPayModalOpen(false);
+    setSelectedInstallment(null);
+  }
+
+  async function confirmMarkPaid() {
+    if (!selectedInstallment?._id) return;
+    if (!payForm.paidByUserId) return setMsg("Select who is paying");
+    if (!payForm.fromAccountId) return setMsg("Select which account is paying");
+
     try {
-      await api.put(`/api/emi/installments/${id}/status`, {
-        status,
-        paidByUserId: me?.id,
+      await api.put(`/api/emi/installments/${selectedInstallment._id}/status`, {
+        status: "paid",
+        paidByUserId: payForm.paidByUserId,
+        fromAccountId: payForm.fromAccountId,
+        paidDate: payForm.paidDate,
       });
+      closePayModal();
       await loadInstallments();
       await loadPlans();
+      setMsg("EMI marked paid and deducted from selected account");
+    } catch (e) {
+      setMsg(e?.response?.data?.message || "Update failed");
+    }
+  }
+
+  async function setInstallmentStatus(id, status) {
+    try {
+      await api.put(`/api/emi/installments/${id}/status`, { status });
+      await loadInstallments();
+      await loadPlans();
+      setMsg("EMI moved back to pending and the payment transaction was removed");
     } catch (e) {
       setMsg(e?.response?.data?.message || "Update failed");
     }
@@ -599,7 +650,7 @@ export default function EMI() {
                             </button>
                           ) : (
                             <button
-                              onClick={() => setInstallmentStatus(i._id, "paid")}
+                              onClick={() => openPayModalForInstallment(i)}
                               className="bg-black text-white rounded-md px-3 py-1 mr-2"
                             >
                               Mark Paid
@@ -656,7 +707,7 @@ export default function EMI() {
                         </button>
                       ) : (
                         <button
-                          onClick={() => setInstallmentStatus(i._id, "paid")}
+                          onClick={() => openPayModalForInstallment(i)}
                           className="w-full bg-black text-white rounded-md px-3 py-2 text-sm"
                         >
                           Mark Paid
@@ -676,6 +727,93 @@ export default function EMI() {
             </>
           )}
         </div>
+
+        {payModalOpen && (
+          <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="w-full sm:max-w-lg bg-white border rounded-t-2xl sm:rounded-lg p-4 sm:p-5">
+              <h3 className="text-lg font-semibold">Mark EMI as Paid</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {selectedInstallment?.planId?.productName || "This installment"} will
+                create an expense transaction and deduct the amount from the selected
+                account.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                <div className="sm:col-span-2">
+                  <label className="text-sm font-medium">Who is paying</label>
+                  <select
+                    className="w-full border rounded-md px-3 py-2"
+                    value={payForm.paidByUserId}
+                    onChange={(e) =>
+                      setPayForm((p) => ({ ...p, paidByUserId: e.target.value }))
+                    }
+                  >
+                    <option value="">Select member</option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-sm font-medium">From which account</label>
+                  <select
+                    className="w-full border rounded-md px-3 py-2"
+                    value={payForm.fromAccountId}
+                    onChange={(e) =>
+                      setPayForm((p) => ({ ...p, fromAccountId: e.target.value }))
+                    }
+                  >
+                    <option value="">Select account</option>
+                    {payableAccounts.map((a) => (
+                      <option key={a._id} value={a._id}>
+                        {a.name} ({a.type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-sm font-medium">Payment Date</label>
+                  <input
+                    type="date"
+                    className="w-full border rounded-md px-3 py-2"
+                    value={payForm.paidDate}
+                    onChange={(e) =>
+                      setPayForm((p) => ({ ...p, paidDate: e.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="sm:col-span-2 rounded-lg border bg-gray-50 p-3 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-600">Amount</span>
+                    <span className="font-semibold">
+                      {selectedInstallment?.amount || 0}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-5">
+                <button
+                  onClick={closePayModal}
+                  className="w-full sm:w-auto border rounded-md px-4 py-2 text-sm hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmMarkPaid}
+                  className="w-full sm:w-auto bg-black text-white rounded-md px-4 py-2 text-sm"
+                >
+                  Confirm Payment
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {open && (
           <div className="app-modal-overlay">
