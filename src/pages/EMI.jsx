@@ -82,6 +82,18 @@ export default function EMI() {
     ]);
 
     setMembers(mRes.data.members || []);
+
+    const memberItems = mRes.data.members || [];
+    setMembers(memberItems);
+
+    if (memberItems.length > 0) {
+      const defaultPersonalId = me?.id || memberItems[0]?.id || "";
+      setForm((prev) => ({
+        ...prev,
+        personalUserId: prev.personalUserId || defaultPersonalId,
+      }));
+    }
+
     setAccounts((accRes.data.items || []).filter((a) => a.isActive !== false));
 
     const items = exp.data.items || [];
@@ -137,7 +149,7 @@ export default function EMI() {
       months: 6,
       startMonth: month,
       splitType: "equal",
-      personalUserId: "",
+      personalUserId: me?.id || members[0]?.id || "",
       ratioMe: 50,
       ratioOther: 50,
       fixedMe: "",
@@ -167,12 +179,20 @@ export default function EMI() {
       }
       if (!form.startMonth) return setMsg("Start month required");
 
+      if (form.splitType === "personal" && !form.personalUserId) {
+        return setMsg("Please select who this personal EMI belongs to");
+      }
+
       let payload = {
         ...form,
         originalPrice: Number(form.originalPrice),
         emiCharge: Number(form.emiCharge || 0),
         months: Number(form.months),
       };
+
+      if (form.splitType === "personal") {
+        payload.personalUserId = form.personalUserId;
+      }
 
       if (form.splitType === "ratio" && otherMember) {
         payload.ratios = [
@@ -939,9 +959,17 @@ export default function EMI() {
                   <select
                     className="w-full border rounded-md px-3 py-2"
                     value={form.splitType}
-                    onChange={(e) =>
-                      setForm({ ...form, splitType: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const nextType = e.target.value;
+                      setForm((prev) => ({
+                        ...prev,
+                        splitType: nextType,
+                        personalUserId:
+                          nextType === "personal"
+                            ? (prev.personalUserId || me?.id || members[0]?.id || "")
+                            : prev.personalUserId,
+                      }));
+                    }}
                   >
                     <option value="equal">Equal</option>
                     <option value="personal">Personal</option>
