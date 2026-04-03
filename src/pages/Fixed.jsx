@@ -12,6 +12,10 @@ function monthNow() {
   return `${y}-${m}`;
 }
 
+function todayDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function classNames(...xs) {
   return xs.filter(Boolean).join(" ");
 }
@@ -24,6 +28,7 @@ function Pill({ children, tone = "gray" }) {
     blue: "bg-blue-50 text-blue-700 border-blue-200",
     red: "bg-red-50 text-red-700 border-red-200",
   };
+
   return (
     <span className={classNames("inline-flex items-center px-2 py-0.5 rounded-full text-xs border", tones[tone])}>
       {children}
@@ -101,7 +106,8 @@ function Switch({ checked, onChange, label, desc }) {
 
 export default function Fixed() {
   const me = getUser();
-  const [tab, setTab] = useState("templates"); // templates | instances
+
+  const [tab, setTab] = useState("templates");
   const [month, setMonth] = useState(monthNow());
   const [msg, setMsg] = useState("");
 
@@ -116,21 +122,18 @@ export default function Fixed() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
-  const [deleteKind, setDeleteKind] = useState(""); // "template" | "instance"
+  const [deleteKind, setDeleteKind] = useState("");
   const [confirmTitle, setConfirmTitle] = useState("");
   const [confirmMessage, setConfirmMessage] = useState("");
 
-  // UI helpers
   const [q, setQ] = useState("");
-  const [filterVar, setFilterVar] = useState("all"); // all | variable | fixed
-  const [filterStatus, setFilterStatus] = useState("all"); // all | pending | posted
+  const [filterVar, setFilterVar] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
 
-  // modal for template
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [templateForm, setTemplateForm] = useState({
     name: "",
     categoryId: "",
-    fromAccountId: "",
     isVariable: false,
     defaultAmount: "",
     defaultSplitType: "equal",
@@ -139,6 +142,18 @@ export default function Fixed() {
     ratioOther: 50,
     fixedMe: "",
     fixedOther: "",
+  });
+
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paymentMode, setPaymentMode] = useState("template");
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [selectedInstance, setSelectedInstance] = useState(null);
+  const [paymentForm, setPaymentForm] = useState({
+    paidByUserId: "",
+    fromAccountId: "",
+    paymentDate: todayDate(),
+    amount: "",
+    note: "",
   });
 
   const otherMember = useMemo(() => {
@@ -152,6 +167,7 @@ export default function Fixed() {
       api.get("/api/categories", { params: { kind: "expense" } }),
       api.get("/api/accounts"),
     ]);
+
     setMembers(mRes.data.members || []);
     setExpenseCats(exp.data.items || []);
     setAccounts(acc.data.items || []);
@@ -188,90 +204,154 @@ export default function Fixed() {
     loadInstances();
   }, [month]);
 
-  // ✅ ONLY NEW FUNCTION YOU NEED
-  async function addTemplateToMonth(templateId) {
+  function openTemplateModal() {
     setMsg("");
-    try {
-      await api.post(`/api/fixed/templates/${templateId}/add`, { month });
-      // switch to This Month and refresh
-      setTab("instances");
-      await loadInstances();
-    } catch (e) {
-      setMsg(e?.response?.data?.message || "Add failed");
-    }
-  }
-
-  function openModal() {
-    setMsg("");
-    const defaultUser = members?.[0]?.id || "";
-    const defaultAcc = accounts?.[0]?._id || "";
-    setForm((f) => ({
-      ...f,
-      personalUserId: f.personalUserId || defaultUser,
-      fromAccountId: f.fromAccountId || defaultAcc,
+    setTemplateForm((prev) => ({
+      ...prev,
+      personalUserId: prev.personalUserId || members?.[0]?.id || "",
     }));
-    setOpen(true);
+    setTemplateOpen(true);
   }
 
-  function closeModal() {
-    setOpen(false);
+  function closeTemplateModal() {
+    setTemplateOpen(false);
   }
 
   async function createTemplate() {
     setMsg("");
+
     try {
-      if (!form.name.trim()) return setMsg("Name required");
-      if (!form.categoryId) return setMsg("Select category");
-      if (!form.fromAccountId) return setMsg("Select pay-from account");
-      const amt = form.defaultAmount === "" ? null : Number(form.defaultAmount);
-      if (!form.isVariable && (!amt || amt <= 0)) return setMsg("Amount must be > 0 (or mark Variable)");
+      if (!templateForm.name.trim()) return setMsg("Name required");
+      if (!templateForm.categoryId) return setMsg("Select category");
 
-      const payload = {
-        name: form.name,
-        categoryId: form.categoryId,
-        fromAccountId: form.fromAccountId,
-        isVariable: !!form.isVariable,
-        defaultAmount: form.isVariable ? null : amt,
-        defaultSplitType: form.defaultSplitType,
-      };
+      const amt =
+        templateForm.defaultAmount === "" ? null : Number(templateForm.defaultAmount);
 
-      if (form.defaultSplitType === "personal") {
-        payload.personalUserId = form.personalUserId;
+      if (!templateForm.isVariable && (!amt || amt <= 0)) {
+        return setMsg("Amount must be > 0 (or mark Variable)");
       }
 
-      if (form.defaultSplitType === "ratio") {
+      const payload = {
+        name: templateForm.name,
+        categoryId: templateForm.categoryId,
+        isVariable: !!templateForm.isVariable,
+        defaultAmount: templateForm.isVariable ? null : amt,
+        defaultSplitType: templateForm.defaultSplitType,
+      };
+
+      if (templateForm.defaultSplitType === "personal") {
+        payload.personalUserId = templateForm.personalUserId;
+      }
+
+      if (templateForm.defaultSplitType === "ratio") {
         if (!otherMember) return setMsg("Need 2 members for ratio");
+
         payload.ratios = [
-          { userId: me.id, ratio: Number(form.ratioMe) },
-          { userId: otherMember.id, ratio: Number(form.ratioOther) },
+          { userId: me.id, ratio: Number(templateForm.ratioMe) },
+          { userId: otherMember.id, ratio: Number(templateForm.ratioOther) },
         ];
       }
 
-      if (form.defaultSplitType === "fixed") {
+      if (templateForm.defaultSplitType === "fixed") {
         if (!otherMember) return setMsg("Need 2 members for fixed");
+
         payload.fixed = [
-          { userId: me.id, amount: Number(form.fixedMe || 0) },
-          { userId: otherMember.id, amount: Number(form.fixedOther || 0) },
+          { userId: me.id, amount: Number(templateForm.fixedMe || 0) },
+          { userId: otherMember.id, amount: Number(templateForm.fixedOther || 0) },
         ];
       }
 
       await api.post("/api/fixed/templates", payload);
-      closeModal();
+      closeTemplateModal();
       await loadTemplates();
     } catch (e) {
       setMsg(e?.response?.data?.message || "Create template failed");
     }
   }
 
-  async function postVariableInstance(instanceId, amount) {
+  function openPaymentModalForTemplate(template) {
     setMsg("");
+    setPaymentMode("template");
+    setSelectedTemplate(template);
+    setSelectedInstance(null);
+
+    setPaymentForm({
+      paidByUserId: members?.[0]?.id || "",
+      fromAccountId: accounts?.[0]?._id || "",
+      paymentDate: todayDate(),
+      amount: template?.isVariable ? "" : String(template?.defaultAmount || ""),
+      note: "",
+    });
+
+    setPaymentOpen(true);
+  }
+
+  function openPaymentModalForInstance(instance) {
+    setMsg("");
+    setPaymentMode("instance");
+    setSelectedTemplate(instance.templateId || null);
+    setSelectedInstance(instance);
+
+    setPaymentForm({
+      paidByUserId: members?.[0]?.id || "",
+      fromAccountId: accounts?.[0]?._id || "",
+      paymentDate: todayDate(),
+      amount:
+        instance?.templateId?.isVariable
+          ? String(instance?.amount || "")
+          : String(instance?.templateId?.defaultAmount || ""),
+      note: instance?.note || "",
+    });
+
+    setPaymentOpen(true);
+  }
+
+  function closePaymentModal() {
+    setPaymentOpen(false);
+    setSelectedTemplate(null);
+    setSelectedInstance(null);
+  }
+
+  async function submitPaymentModal() {
+    setMsg("");
+
     try {
-      const amt = Number(amount);
-      if (!amt || amt <= 0) return setMsg("Amount must be > 0");
-      await api.post(`/api/fixed/instances/${instanceId}/post`, { amount: amt });
+      if (!paymentForm.paidByUserId) return setMsg("Select who is paying");
+      if (!paymentForm.fromAccountId) return setMsg("Select account");
+      if (!paymentForm.paymentDate) return setMsg("Select payment date");
+
+      const isVariable = !!selectedTemplate?.isVariable;
+      if (isVariable) {
+        const amt = Number(paymentForm.amount);
+        if (!amt || amt <= 0) return setMsg("Amount must be > 0");
+      }
+
+      if (paymentMode === "template" && selectedTemplate?._id) {
+        await api.post(`/api/fixed/templates/${selectedTemplate._id}/add`, {
+          month,
+          paidByUserId: paymentForm.paidByUserId,
+          fromAccountId: paymentForm.fromAccountId,
+          paymentDate: paymentForm.paymentDate,
+          amount: isVariable ? Number(paymentForm.amount) : undefined,
+          note: paymentForm.note,
+        });
+      }
+
+      if (paymentMode === "instance" && selectedInstance?._id) {
+        await api.post(`/api/fixed/instances/${selectedInstance._id}/post`, {
+          paidByUserId: paymentForm.paidByUserId,
+          fromAccountId: paymentForm.fromAccountId,
+          paymentDate: paymentForm.paymentDate,
+          amount: isVariable ? Number(paymentForm.amount) : undefined,
+          note: paymentForm.note,
+        });
+      }
+
+      closePaymentModal();
+      setTab("instances");
       await loadInstances();
     } catch (e) {
-      setMsg(e?.response?.data?.message || "Post failed");
+      setMsg(e?.response?.data?.message || "Action failed");
     }
   }
 
@@ -280,6 +360,14 @@ export default function Fixed() {
     setDeleteId(id);
     setConfirmTitle("Delete Template");
     setConfirmMessage("Are you sure you want to delete this template?");
+    setConfirmOpen(true);
+  }
+
+  function deleteInstance(id) {
+    setDeleteKind("instance");
+    setDeleteId(id);
+    setConfirmTitle("Delete Month Item");
+    setConfirmMessage("Are you sure you want to delete this month item?");
     setConfirmOpen(true);
   }
 
@@ -308,30 +396,23 @@ export default function Fixed() {
     setMsg("");
     try {
       const res = await api.post("/api/fixed/generate", { month });
-      setMsg(`Generated: ${res.data.createdCount} items for ${month}`);
+      setMsg(`Generated: ${res.data.createdCount} pending items for ${month}`);
+      setTab("instances");
       await loadInstances();
     } catch (e) {
       setMsg(e?.response?.data?.message || "Generate failed");
     }
   }
 
-  function deleteInstance(id) {
-    setDeleteKind("instance");
-    setDeleteId(id);
-    setConfirmTitle("Delete Month Item");
-    setConfirmMessage("Are you sure you want to delete this month item?");
-    setConfirmOpen(true);
-  }
-
   const filteredTemplates = useMemo(() => {
     const qq = q.trim().toLowerCase();
+
     return templates
       .filter((t) => {
         if (!qq) return true;
         const a = t.name?.toLowerCase() || "";
         const b = t.categoryId?.name?.toLowerCase() || "";
-        const c = t.fromAccountId?.name?.toLowerCase() || "";
-        return a.includes(qq) || b.includes(qq) || c.includes(qq);
+        return a.includes(qq) || b.includes(qq);
       })
       .filter((t) => {
         if (filterVar === "all") return true;
@@ -341,12 +422,20 @@ export default function Fixed() {
 
   const filteredInstances = useMemo(() => {
     const qq = q.trim().toLowerCase();
+
     return instances
       .filter((i) => {
         if (!qq) return true;
         const name = i.templateId?.name?.toLowerCase() || "";
         const note = (i.note || "").toLowerCase();
-        return name.includes(qq) || note.includes(qq);
+        const paidBy = i.paidByUserId?.name?.toLowerCase() || "";
+        const account = i.fromAccountId?.name?.toLowerCase() || "";
+        return (
+          name.includes(qq) ||
+          note.includes(qq) ||
+          paidBy.includes(qq) ||
+          account.includes(qq)
+        );
       })
       .filter((i) => {
         if (filterStatus === "all") return true;
@@ -357,13 +446,12 @@ export default function Fixed() {
   return (
     <AppLayout>
       <div className="mx-auto">
-        {/* Sticky header */}
         <div className="sticky top-0 z-10 bg-[#f6f7f9] pt-2">
           <div className="bg-white border rounded-xl px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 shadow-sm">
             <div>
               <h2 className="text-xl md:text-2xl font-bold">Fixed Expenses</h2>
               <p className="text-sm text-gray-600">
-                Templates = recurring rules. This Month = generated items you can post.
+                Templates store only rules. Payment details are selected when adding to a month.
               </p>
             </div>
 
@@ -376,18 +464,23 @@ export default function Fixed() {
               />
 
               {tab === "templates" ? (
-                <button onClick={openModal} className="bg-black text-white rounded-md px-4 py-2 text-sm">
+                <button
+                  onClick={openTemplateModal}
+                  className="bg-black text-white rounded-md px-4 py-2 text-sm"
+                >
                   + Add Template
                 </button>
               ) : (
-                <button onClick={generateMonth} className="bg-black text-white rounded-md px-4 py-2 text-sm">
+                <button
+                  onClick={generateMonth}
+                  className="bg-black text-white rounded-md px-4 py-2 text-sm"
+                >
                   Generate Month
                 </button>
               )}
             </div>
           </div>
 
-          {/* Tabs + search + filters */}
           <div className="mt-3 bg-white border rounded-xl p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div className="flex gap-2">
               <Tab active={tab === "templates"} onClick={() => setTab("templates")}>
@@ -446,7 +539,7 @@ export default function Fixed() {
             {filteredTemplates.length === 0 ? (
               <div className="bg-white border rounded-xl p-6 text-sm text-gray-600">
                 <div className="font-medium mb-1">No templates found.</div>
-                <div>Create your first template (Rent, Internet, Electricity as Variable, etc.).</div>
+                <div>Create your first template like Rent, Internet, Electricity Bill, etc.</div>
               </div>
             ) : (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -456,10 +549,12 @@ export default function Fixed() {
                       <div>
                         <div className="font-semibold">{t.name}</div>
                         <div className="text-xs text-gray-500 mt-0.5">
-                          {t.categoryId?.name || "—"} • Pay from: {t.fromAccountId?.name || "—"}
+                          {t.categoryId?.name || "—"}
                         </div>
                       </div>
-                      <Pill tone={t.isVariable ? "yellow" : "green"}>{t.isVariable ? "Variable" : "Fixed"}</Pill>
+                      <Pill tone={t.isVariable ? "yellow" : "green"}>
+                        {t.isVariable ? "Variable" : "Fixed"}
+                      </Pill>
                     </div>
 
                     <div className="mt-3 flex items-center justify-between">
@@ -478,9 +573,8 @@ export default function Fixed() {
                       </div>
                     </div>
 
-                    {/* ✅ ONLY UI CHANGE: Add button beside delete */}
                     <div className="mt-4 flex justify-end gap-2">
-                      <IconButton onClick={() => addTemplateToMonth(t._id)}>
+                      <IconButton onClick={() => openPaymentModalForTemplate(t)}>
                         Add to this month
                       </IconButton>
 
@@ -499,51 +593,40 @@ export default function Fixed() {
               <div className="bg-white border rounded-xl p-6 text-sm text-gray-600">
                 <div className="font-medium mb-1">No items for this month.</div>
                 <div>
-                  Click <b>Generate Month</b> to create month items from templates.
+                  You can generate pending month items or directly add from template.
                 </div>
               </div>
             ) : (
               <div className="space-y-3">
                 {filteredInstances.map((i) => (
-                  <div key={i._id} className="bg-white border rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div
+                    key={i._id}
+                    className="bg-white border rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                  >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <div className="font-semibold truncate">{i.templateId?.name || "—"}</div>
                         <Pill tone={i.status === "pending" ? "yellow" : "green"}>{i.status}</Pill>
+                        {i.templateId?.isVariable ? <Pill tone="yellow">Variable</Pill> : <Pill tone="green">Fixed</Pill>}
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {i.note ? `Note: ${i.note}` : "No note"}
+
+                      <div className="text-xs text-gray-500 mt-1 space-y-0.5">
+                        <div>Amount: {i.status === "posted" ? i.amount : "—"}</div>
+                        <div>Paid By: {i.paidByUserId?.name || "—"}</div>
+                        <div>Account: {i.fromAccountId?.name || "—"}</div>
+                        <div>Date: {i.date ? new Date(i.date).toLocaleDateString() : "—"}</div>
+                        {i.note ? <div>Note: {i.note}</div> : null}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 justify-end">
-                      <div className="text-right">
-                        <div className="text-xs text-gray-500">Amount</div>
-                        <div className="font-medium">{i.status === "posted" ? i.amount : "—"}</div>
-                      </div>
-
+                    <div className="flex items-center gap-2 justify-end">
                       {i.status === "pending" && (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            min="0"
-                            className="w-28 border rounded-md px-2 py-2 text-sm"
-                            placeholder="Amount"
-                            value={i._draftAmount || ""}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setInstances((prev) =>
-                                prev.map((x) => (x._id === i._id ? { ...x, _draftAmount: v } : x))
-                              );
-                            }}
-                          />
-                          <button
-                            className="bg-black text-white rounded-md px-3 py-2 text-sm"
-                            onClick={() => postVariableInstance(i._id, i._draftAmount)}
-                          >
-                            Post
-                          </button>
-                        </div>
+                        <button
+                          className="bg-black text-white rounded-md px-3 py-2 text-sm"
+                          onClick={() => openPaymentModalForInstance(i)}
+                        >
+                          Post Now
+                        </button>
                       )}
 
                       <IconButton danger onClick={() => deleteInstance(i._id)}>
@@ -565,16 +648,20 @@ export default function Fixed() {
           onConfirm={handleConfirmDelete}
         />
 
-        {/* Modal */}
-        {open && (
+        {templateOpen && (
           <div className="app-modal-overlay--center">
             <div className="app-modal-panel max-w-xl rounded-2xl p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h3 className="text-lg font-semibold">Add Template</h3>
-                  <p className="text-sm text-gray-500">Fixed = auto amount. Variable = you enter amount monthly.</p>
+                  <p className="text-sm text-gray-500">
+                    Template stores only recurring rule. Payment details will be selected later.
+                  </p>
                 </div>
-                <button onClick={closeModal} className="text-sm border rounded-md px-3 py-1.5 hover:bg-gray-50">
+                <button
+                  onClick={closeTemplateModal}
+                  className="text-sm border rounded-md px-3 py-1.5 hover:bg-gray-50"
+                >
                   Close
                 </button>
               </div>
@@ -584,8 +671,8 @@ export default function Fixed() {
                   <Field label="Name" hint="Example: House Rent / Electricity Bill">
                     <input
                       className="w-full border rounded-md px-3 py-2"
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      value={templateForm.name}
+                      onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
                       placeholder="e.g., Electricity Bill"
                     />
                   </Field>
@@ -594,8 +681,8 @@ export default function Fixed() {
                 <Field label="Category">
                   <select
                     className="w-full border rounded-md px-3 py-2"
-                    value={form.categoryId}
-                    onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+                    value={templateForm.categoryId}
+                    onChange={(e) => setTemplateForm({ ...templateForm, categoryId: e.target.value })}
                   >
                     <option value="">Select</option>
                     {expenseCats.map((c) => (
@@ -606,45 +693,30 @@ export default function Fixed() {
                   </select>
                 </Field>
 
-                <Field label="Pay From Account">
-                  <select
-                    className="w-full border rounded-md px-3 py-2"
-                    value={form.fromAccountId}
-                    onChange={(e) => setForm({ ...form, fromAccountId: e.target.value })}
-                  >
-                    <option value="">Select</option>
-                    {accounts.map((a) => (
-                      <option key={a._id} value={a._id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
                 <div className="md:col-span-2">
                   <Switch
-                    checked={form.isVariable}
-                    onChange={(v) => setForm({ ...form, isVariable: v, defaultAmount: "" })}
+                    checked={templateForm.isVariable}
+                    onChange={(v) => setTemplateForm({ ...templateForm, isVariable: v, defaultAmount: "" })}
                     label="Variable amount"
-                    desc="For bills like Electricity/Gas. Generates as Pending each month and you enter amount when paying."
+                    desc="For bills like electricity/gas/water where amount changes monthly."
                   />
                 </div>
 
-                <Field label="Default Amount" hint={form.isVariable ? "Disabled for Variable templates" : ""}>
+                <Field label="Default Amount" hint={templateForm.isVariable ? "Disabled for variable templates" : ""}>
                   <input
                     className="w-full border rounded-md px-3 py-2"
-                    value={form.defaultAmount}
-                    onChange={(e) => setForm({ ...form, defaultAmount: e.target.value })}
+                    value={templateForm.defaultAmount}
+                    onChange={(e) => setTemplateForm({ ...templateForm, defaultAmount: e.target.value })}
                     placeholder="e.g., 20000"
-                    disabled={form.isVariable}
+                    disabled={templateForm.isVariable}
                   />
                 </Field>
 
                 <Field label="Split Type" hint="How to split between members">
                   <select
                     className="w-full border rounded-md px-3 py-2"
-                    value={form.defaultSplitType}
-                    onChange={(e) => setForm({ ...form, defaultSplitType: e.target.value })}
+                    value={templateForm.defaultSplitType}
+                    onChange={(e) => setTemplateForm({ ...templateForm, defaultSplitType: e.target.value })}
                   >
                     <option value="equal">Equal</option>
                     <option value="personal">Personal</option>
@@ -653,14 +725,15 @@ export default function Fixed() {
                   </select>
                 </Field>
 
-                {form.defaultSplitType === "personal" && (
+                {templateForm.defaultSplitType === "personal" && (
                   <div className="md:col-span-2">
                     <Field label="Personal For">
                       <select
                         className="w-full border rounded-md px-3 py-2"
-                        value={form.personalUserId}
-                        onChange={(e) => setForm({ ...form, personalUserId: e.target.value })}
+                        value={templateForm.personalUserId}
+                        onChange={(e) => setTemplateForm({ ...templateForm, personalUserId: e.target.value })}
                       >
+                        <option value="">Select member</option>
                         {members.map((m) => (
                           <option key={m.id} value={m.id}>
                             {m.name}
@@ -671,45 +744,43 @@ export default function Fixed() {
                   </div>
                 )}
 
-                {form.defaultSplitType === "ratio" && otherMember && (
+                {templateForm.defaultSplitType === "ratio" && otherMember && (
                   <>
                     <Field label="My %">
                       <input
                         className="w-full border rounded-md px-3 py-2"
-                        value={form.ratioMe}
-                        onChange={(e) => setForm({ ...form, ratioMe: e.target.value })}
+                        value={templateForm.ratioMe}
+                        onChange={(e) => setTemplateForm({ ...templateForm, ratioMe: e.target.value })}
                       />
                     </Field>
                     <Field label={`${otherMember.name} %`}>
                       <input
                         className="w-full border rounded-md px-3 py-2"
-                        value={form.ratioOther}
-                        onChange={(e) => setForm({ ...form, ratioOther: e.target.value })}
+                        value={templateForm.ratioOther}
+                        onChange={(e) => setTemplateForm({ ...templateForm, ratioOther: e.target.value })}
                       />
                     </Field>
-                    <div className="md:col-span-2 text-xs text-gray-500">Tip: Make sure total is 100.</div>
                   </>
                 )}
 
-                {form.defaultSplitType === "fixed" && otherMember && (
+                {templateForm.defaultSplitType === "fixed" && otherMember && (
                   <>
                     <Field label="My Amount">
                       <input
                         className="w-full border rounded-md px-3 py-2"
-                        value={form.fixedMe}
-                        onChange={(e) => setForm({ ...form, fixedMe: e.target.value })}
+                        value={templateForm.fixedMe}
+                        onChange={(e) => setTemplateForm({ ...templateForm, fixedMe: e.target.value })}
                         placeholder="e.g., 10000"
                       />
                     </Field>
                     <Field label={`${otherMember.name} Amount`}>
                       <input
                         className="w-full border rounded-md px-3 py-2"
-                        value={form.fixedOther}
-                        onChange={(e) => setForm({ ...form, fixedOther: e.target.value })}
+                        value={templateForm.fixedOther}
+                        onChange={(e) => setTemplateForm({ ...templateForm, fixedOther: e.target.value })}
                         placeholder="e.g., 6000"
                       />
                     </Field>
-                    <div className="md:col-span-2 text-xs text-gray-500">Tip: Total should match the final amount you expect.</div>
                   </>
                 )}
               </div>
@@ -717,11 +788,126 @@ export default function Fixed() {
               {msg && <div className="mt-3 text-sm text-red-600">{msg}</div>}
 
               <div className="flex justify-end gap-2 mt-5">
-                <button onClick={closeModal} className="border rounded-md px-4 py-2 text-sm hover:bg-gray-50">
+                <button
+                  onClick={closeTemplateModal}
+                  className="border rounded-md px-4 py-2 text-sm hover:bg-gray-50"
+                >
                   Cancel
                 </button>
-                <button onClick={createTemplate} className="bg-black text-white rounded-md px-4 py-2 text-sm">
+                <button
+                  onClick={createTemplate}
+                  className="bg-black text-white rounded-md px-4 py-2 text-sm"
+                >
                   Save Template
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {paymentOpen && (
+          <div className="app-modal-overlay--center">
+            <div className="app-modal-panel max-w-lg rounded-2xl p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold">
+                    {paymentMode === "template" ? "Add to This Month" : "Post Month Item"}
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    {selectedTemplate?.name || "Fixed Expense"}
+                  </p>
+                </div>
+                <button
+                  onClick={closePaymentModal}
+                  className="text-sm border rounded-md px-3 py-1.5 hover:bg-gray-50"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-3">
+                <Field label="Who is paying">
+                  <select
+                    className="w-full border rounded-md px-3 py-2"
+                    value={paymentForm.paidByUserId}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, paidByUserId: e.target.value })}
+                  >
+                    <option value="">Select member</option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="From which account">
+                  <select
+                    className="w-full border rounded-md px-3 py-2"
+                    value={paymentForm.fromAccountId}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, fromAccountId: e.target.value })}
+                  >
+                    <option value="">Select account</option>
+                    {accounts.map((a) => (
+                      <option key={a._id} value={a._id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Payment Date">
+                  <input
+                    type="date"
+                    className="w-full border rounded-md px-3 py-2"
+                    value={paymentForm.paymentDate}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
+                  />
+                </Field>
+
+                {selectedTemplate?.isVariable && (
+                  <Field label="Amount">
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-full border rounded-md px-3 py-2"
+                      value={paymentForm.amount}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                      placeholder="Enter amount"
+                    />
+                  </Field>
+                )}
+
+                {!selectedTemplate?.isVariable && (
+                  <div className="rounded-lg border bg-gray-50 px-3 py-2 text-sm">
+                    Fixed Amount: <span className="font-semibold">{selectedTemplate?.defaultAmount || 0}</span>
+                  </div>
+                )}
+
+                <Field label="Note (optional)">
+                  <input
+                    className="w-full border rounded-md px-3 py-2"
+                    value={paymentForm.note}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, note: e.target.value })}
+                    placeholder="Optional note"
+                  />
+                </Field>
+              </div>
+
+              {msg && <div className="mt-3 text-sm text-red-600">{msg}</div>}
+
+              <div className="flex justify-end gap-2 mt-5">
+                <button
+                  onClick={closePaymentModal}
+                  className="border rounded-md px-4 py-2 text-sm hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitPaymentModal}
+                  className="bg-black text-white rounded-md px-4 py-2 text-sm"
+                >
+                  Confirm
                 </button>
               </div>
             </div>
