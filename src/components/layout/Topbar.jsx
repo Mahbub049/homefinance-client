@@ -28,6 +28,7 @@ export default function Topbar({ onToggleSidebar, onOpenDrawer }) {
     "/family": "Family Setup",
     "/login": "Login",
     "/register": "Register",
+    "/planned-purchases": "Planned Purchases",
   };
 
   const pageTitle = pageTitles[location.pathname] || "HomeFinance";

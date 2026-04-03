@@ -90,6 +90,13 @@ function Icon({ name, className = "h-5 w-5" }) {
           <path d="M17 14h4" />
         </svg>
       );
+    case "planned":
+      return (
+        <svg {...common} viewBox="0 0 24 24">
+          <path d="M9 11l3 3L22 4" />
+          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+        </svg>
+      );
     case "reports":
       return (
         <svg {...common} viewBox="0 0 24 24">
@@ -166,7 +173,7 @@ export default function Sidebar({
         title: "Main",
         items: [
           { to: "/dashboard", label: "Dashboard", icon: <Icon name="dashboard" /> },
-        //   { to: "/family", label: "Family", icon: <Icon name="family" /> },
+          //   { to: "/family", label: "Family", icon: <Icon name="family" /> },
           { to: "/settings", label: "Settings", icon: <Icon name="settings" /> },
         ],
       },
@@ -179,6 +186,7 @@ export default function Sidebar({
           { to: "/emi", label: "EMI", icon: <Icon name="emi" /> },
           { to: "/savings", label: "Savings", icon: <Icon name="savings" /> },
           { to: "/wallet", label: "Wallet", icon: <Icon name="wallet" /> },
+          { to: "/planned-purchases", label: "Planned Purchases", icon: <Icon name="planned" /> },
         ],
       },
       {

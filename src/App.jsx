@@ -14,6 +14,7 @@ import Savings from "./pages/Savings";
 import Wallet from "./pages/Wallet";
 import CarryForward from "./pages/CarryForward";
 import YearOverview from "./pages/YearOverview";
+import PlannedPurchases from "./pages/PlannedPurchases";
 
 export default function App() {
   return (
@@ -108,6 +109,15 @@ export default function App() {
         <Route path="/carry-forward" element={<ProtectedRoute><CarryForward /></ProtectedRoute>} />
 
         <Route path="/year-overview" element={<ProtectedRoute><YearOverview /></ProtectedRoute>} />
+
+        <Route
+          path="/planned-purchases"
+          element={
+            <ProtectedRoute>
+              <PlannedPurchases />
+            </ProtectedRoute>
+          }
+        />
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
