@@ -15,6 +15,7 @@ html, body {
 
 body {
   background: #f8fafc;
+  /* font-family: 'Montserrat', sans-serif; */
 }
 
 @layer components {

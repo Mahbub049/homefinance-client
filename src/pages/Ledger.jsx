@@ -177,6 +177,8 @@ export default function Ledger() {
   const [msg, setMsg] = useState("");
 
   const [open, setOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editId, setEditId] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
@@ -284,26 +286,62 @@ export default function Ledger() {
   const showFrom = form.txType === "expense" || form.txType === "transfer";
   const showTo = form.txType === "income" || form.txType === "transfer";
 
-  function openModal() {
-    setMsg("");
+  function getDefaultForm(next = {}) {
     const defaultUser = getId(members?.[0]) || "";
     const defaultAccount = accounts?.[0]?._id || "";
 
-    setForm((f) => ({
-      ...f,
-      paidByUserId: f.paidByUserId || defaultUser,
-      receivedByUserId: f.receivedByUserId || defaultUser,
-      fromAccountId: f.fromAccountId || defaultAccount,
-      toAccountId: f.toAccountId || defaultAccount,
-    }));
+    return {
+      txType: next.txType || "expense",
+      date: next.date || new Date().toISOString().slice(0, 10),
+      categoryId: next.categoryId || "",
+      amount:
+        next.amount === 0 || next.amount
+          ? String(next.amount)
+          : "",
+      note: next.note || "",
+      fromAccountId: next.fromAccountId || defaultAccount,
+      toAccountId: next.toAccountId || defaultAccount,
+      paidByUserId: next.paidByUserId || defaultUser,
+      receivedByUserId: next.receivedByUserId || defaultUser,
+    };
+  }
+
+  function openModal() {
+    setMsg("");
+    setIsEditing(false);
+    setEditId(null);
+    setForm(getDefaultForm());
+    setOpen(true);
+  }
+
+  function openEditModal(item) {
+    setMsg("");
+    setIsEditing(true);
+    setEditId(item._id);
+    setForm(
+      getDefaultForm({
+        txType: item.txType || "expense",
+        date: toLocalYMD(item.date),
+        categoryId: getId(item.categoryId),
+        amount: item.amount,
+        note: item.note || "",
+        fromAccountId: getId(item.fromAccountId),
+        toAccountId: getId(item.toAccountId),
+        paidByUserId: getId(item.paidByUserId),
+        receivedByUserId: getId(item.receivedByUserId),
+      })
+    );
     setOpen(true);
   }
 
   function closeModal() {
     setOpen(false);
+    setIsEditing(false);
+    setEditId(null);
+    setMsg("");
   }
 
-  async function createTx() {
+  async function saveTx() {
     setMsg("");
     try {
       const amt = Number(form.amount);
@@ -331,11 +369,19 @@ export default function Ledger() {
           form.txType === "income" ? form.receivedByUserId : null,
       };
 
-      await api.post("/api/transactions", payload);
+      if (isEditing && editId) {
+        await api.put(`/api/transactions/${editId}`, payload);
+      } else {
+        await api.post("/api/transactions", payload);
+      }
+
       closeModal();
       await loadTransactions();
     } catch (e) {
-      setMsg(e?.response?.data?.message || "Create failed");
+      setMsg(
+        e?.response?.data?.message ||
+          (isEditing ? "Update failed" : "Create failed")
+      );
     }
   }
 
@@ -677,89 +723,53 @@ export default function Ledger() {
   return (
     <AppLayout>
       <div className="w-full px-3 sm:px-4 lg:px-6">
-        <div className="mb-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div className="bg-gradient-to-r from-slate-50 via-white to-slate-50 px-4 py-5 sm:px-6">
-            <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-              {/* Left: Heading */}
-              <div className="min-w-0 flex-1">
-                <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
-                  HomeFinance Ledger
-                </div>
-
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
-                  Transactions
-                </h2>
-
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                  Track <span className="font-semibold text-slate-800">Income</span>,{" "}
-                  <span className="font-semibold text-slate-800">Expense</span>, and{" "}
-                  <span className="font-semibold text-slate-800">Transfer</span>.
-                  Individual summary uses{" "}
-                  <span className="font-semibold text-slate-800">ledger entries</span>{" "}
-                  (split-aware). If ledger entries are missing, rebuild once.
-                </p>
-              </div>
-
-              {/* Right: Quick Insight Card */}
-              <div className="w-full xl:max-w-sm">
-                <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4">
-                  <div className="text-xs font-medium uppercase tracking-wide text-rose-500">
-                    Monthly Insight
-                  </div>
-                  <div className="mt-2 text-sm text-slate-600">Biggest expense category</div>
-                  <div className="mt-1 text-base font-semibold text-slate-900">
-                    {topExpenseCategory.name}
-                  </div>
-                  <div className="mt-1 text-sm font-medium text-rose-600">
-                    {money(topExpenseCategory.amount)}
-                  </div>
-                </div>
-              </div>
+        <div className="mb-5 rounded-2xl border bg-gradient-to-br from-slate-50 to-white p-4 sm:p-5">
+          <div className="flex flex-col gap-4">
+            <div className="min-w-0">
+              <div className="text-xs text-gray-500">HomeFinance Ledger</div>
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight">
+                Transactions
+              </h2>
+              <p className="text-sm text-gray-600 mt-1 leading-6">
+                Track <b>Income</b>, <b>Expense</b>, and <b>Transfer</b>.
+                Individual summary uses <b>ledger entries</b> (split-aware). If
+                ledger entries are missing, rebuild once.
+              </p>
             </div>
-          </div>
 
-          {/* Controls */}
-          <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-4 sm:px-6">
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              {/* Left controls */}
-              <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   value={month}
                   onChange={(e) => setMonth(e.target.value)}
                   type="month"
-                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100 w-full sm:w-auto"
+                  className="border rounded-md px-3 py-2 text-sm bg-white w-full sm:w-auto"
                 />
-
                 <button
                   onClick={openModal}
-                  className="h-11 rounded-xl bg-black px-4 text-sm font-medium text-white shadow-sm transition hover:opacity-95 active:scale-[0.99] w-full sm:w-auto"
+                  className="bg-black text-white rounded-lg px-4 py-2 text-sm shadow-sm hover:opacity-95 active:opacity-90 w-full sm:w-auto"
                 >
-                  + Add Transaction
+                  + Add
                 </button>
-
                 <button
                   onClick={exportTransactionsPdf}
-                  className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-[0.99] w-full sm:w-auto"
+                  className="border rounded-lg px-4 py-2 text-sm bg-white hover:bg-gray-50 shadow-sm w-full sm:w-auto"
                 >
                   Export PDF
                 </button>
               </div>
 
-              {/* Right controls */}
-              <div className="flex flex-col gap-2 sm:flex-row lg:justify-end">
-                <div className="relative w-full">
-                  <input
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
-                    placeholder="Search category, note, account…"
-                  />
-                </div>
-
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  className="border rounded-lg px-3 py-2 text-sm bg-white w-full"
+                  placeholder="Search category, note, account…"
+                />
                 <select
                   value={memberFilter}
                   onChange={(e) => setMemberFilter(e.target.value)}
-                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100 w-full sm:w-[180px]"
+                  className="border rounded-lg px-3 py-2 text-sm bg-white w-full sm:w-auto"
                   title="Filter by member"
                 >
                   <option value="all">All members</option>
@@ -771,6 +781,11 @@ export default function Ledger() {
                 </select>
               </div>
             </div>
+          </div>
+
+          <div className="mt-4 text-sm text-gray-600 leading-6">
+            Biggest expense this month: <b>{topExpenseCategory.name}</b> (
+            {money(topExpenseCategory.amount)}).
           </div>
         </div>
 
@@ -1074,12 +1089,20 @@ export default function Ledger() {
                         {it.txType === "expense" ? "-" : it.txType === "income" ? "+" : ""}
                         {money(it.amount)}
                       </div>
-                      <button
-                        onClick={() => deleteTx(it._id)}
-                        className="sm:mt-2 text-xs border rounded-lg px-3 py-1 hover:bg-gray-50 whitespace-nowrap"
-                      >
-                        Delete
-                      </button>
+                      <div className="sm:mt-2 flex items-center gap-2 justify-end">
+                        <button
+                          onClick={() => openEditModal(it)}
+                          className="text-xs border rounded-lg px-3 py-1 hover:bg-gray-50 whitespace-nowrap"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteTx(it._id)}
+                          className="text-xs border rounded-lg px-3 py-1 hover:bg-gray-50 whitespace-nowrap"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1099,7 +1122,7 @@ export default function Ledger() {
         {open && (
           <div className="app-modal-overlay">
             <div className="app-modal-panel max-w-lg rounded-2xl p-4 sm:p-5">
-              <h3 className="text-lg font-semibold mb-1">Add Transaction</h3>
+              <h3 className="text-lg font-semibold mb-1">{isEditing ? "Edit Transaction" : "Add Transaction"}</h3>
               <p className="text-sm text-gray-500 mb-4 leading-6">
                 Use <b>Transfer</b> for moving money between accounts
                 (e.g., Bank → DPS).
@@ -1257,10 +1280,10 @@ export default function Ledger() {
                   Cancel
                 </button>
                 <button
-                  onClick={createTx}
+                  onClick={saveTx}
                   className="bg-black text-white rounded-lg px-4 py-2 text-sm w-full sm:w-auto"
                 >
-                  Save
+                  {isEditing ? "Update" : "Save"}
                 </button>
               </div>
 
