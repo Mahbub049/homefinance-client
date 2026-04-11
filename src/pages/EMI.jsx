@@ -15,6 +15,117 @@ function toNum(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function monthInRange(targetMonth, startMonth, endMonth) {
+  if (!targetMonth || !startMonth || !endMonth) return false;
+  return targetMonth >= startMonth && targetMonth <= endMonth;
+}
+
+function money(v) {
+  const n = Number(v || 0);
+  if (!Number.isFinite(n)) return "0";
+  return n.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+}
+
+function normalizeId(v) {
+  if (!v) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "object") return String(v._id || v.id || "");
+  return String(v);
+}
+
+function splitMonthlyAmount(plan, members) {
+  const total = Number(plan?.monthlyAmount || 0);
+  const splitType = String(plan?.splitType || "equal").toLowerCase();
+
+  if (!total || !Array.isArray(members) || members.length === 0) return [];
+
+  if (splitType === "personal") {
+    const userId = normalizeId(plan?.personalUserId);
+    const person = members.find((m) => normalizeId(m.id || m._id) === userId);
+
+    return [
+      {
+        key: userId || "personal",
+        userId,
+        name: person?.name || "Personal",
+        amount: total,
+      },
+    ];
+  }
+
+  if (splitType === "ratio") {
+    const ratios = Array.isArray(plan?.ratios) ? plan.ratios : [];
+    const validRatios = ratios
+      .map((r) => ({
+        userId: normalizeId(r?.userId),
+        ratio: Number(r?.ratio || 0),
+      }))
+      .filter((r) => r.userId && r.ratio > 0);
+
+    const ratioSum = validRatios.reduce((s, r) => s + r.ratio, 0);
+    if (!validRatios.length || ratioSum <= 0) return [];
+
+    return validRatios.map((r, index) => {
+      const person = members.find((m) => normalizeId(m.id || m._id) === r.userId);
+      const raw = (total * r.ratio) / ratioSum;
+
+      return {
+        key: `${r.userId}-${index}`,
+        userId: r.userId,
+        name: person?.name || "Unknown",
+        amount: Math.round(raw * 100) / 100,
+      };
+    });
+  }
+
+  if (splitType === "fixed") {
+    const fixed = Array.isArray(plan?.fixed) ? plan.fixed : [];
+    const validFixed = fixed
+      .map((f) => ({
+        userId: normalizeId(f?.userId),
+        amount: Number(f?.amount || 0),
+      }))
+      .filter((f) => f.userId && f.amount > 0);
+
+    if (!validFixed.length) return [];
+
+    return validFixed.map((f, index) => {
+      const person = members.find((m) => normalizeId(m.id || m._id) === f.userId);
+
+      return {
+        key: `${f.userId}-${index}`,
+        userId: f.userId,
+        name: person?.name || "Unknown",
+        amount: Math.round(f.amount * 100) / 100,
+      };
+    });
+  }
+
+  const activeMembers = members.filter(Boolean);
+  const base = Math.floor((total / activeMembers.length) * 100) / 100;
+  let used = 0;
+
+  return activeMembers.map((m, index) => {
+    const userId = normalizeId(m.id || m._id);
+    const isLast = index === activeMembers.length - 1;
+    const amount = isLast
+      ? Math.round((total - used) * 100) / 100
+      : base;
+
+    used += base;
+
+    return {
+      key: userId || index,
+      userId,
+      name: m.name || "Member",
+      amount,
+    };
+  });
+}
+
 export default function EMI() {
   const me = getUser();
   const [month, setMonth] = useState(monthNow());
@@ -216,6 +327,50 @@ export default function EMI() {
     }
   }
 
+  const monthlyPersonTotals = useMemo(() => {
+    const map = new Map();
+
+    members.forEach((m) => {
+      const id = normalizeId(m.id || m._id);
+      map.set(id, {
+        userId: id,
+        name: m.name || "Member",
+        amount: 0,
+      });
+    });
+
+    plans.forEach((plan) => {
+      const isActive = String(plan?.status || "") === "active";
+      const inThisMonth = monthInRange(month, plan?.startMonth, plan?.endMonth);
+
+      if (!isActive || !inThisMonth) return;
+
+      const parts = splitMonthlyAmount(plan, members);
+
+      parts.forEach((part) => {
+        const partUserId = normalizeId(part.userId || part.key);
+        if (!partUserId) return;
+
+        const existing = map.get(partUserId) || {
+          userId: partUserId,
+          name: part.name || "Member",
+          amount: 0,
+        };
+
+        existing.amount =
+          Math.round((existing.amount + Number(part.amount || 0)) * 100) / 100;
+
+        if (!existing.name && part.name) existing.name = part.name;
+
+        map.set(partUserId, existing);
+      });
+    });
+
+    return Array.from(map.values())
+      .filter((x) => Number(x.amount || 0) > 0)
+      .sort((a, b) => b.amount - a.amount);
+  }, [plans, members, month]);
+
   async function generateMonth() {
     setMsg("");
     try {
@@ -335,6 +490,28 @@ export default function EMI() {
     }
   }
 
+  function renderMonthlySplit(plan) {
+    const items = splitMonthlyAmount(plan, members);
+
+    if (!items.length) {
+      return <div className="text-xs text-gray-500">Split info missing</div>;
+    }
+
+    return (
+      <div className="space-y-1">
+        {items.map((item) => (
+          <div
+            key={item.key}
+            className="flex items-center justify-between gap-3 text-xs"
+          >
+            <span className="text-gray-600 truncate">{item.name}</span>
+            <span className="font-medium text-gray-900">৳ {money(item.amount)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="w-full max-w-full overflow-x-hidden">
@@ -396,6 +573,40 @@ export default function EMI() {
           </div>
         </div>
 
+        <div className="bg-white border rounded-lg p-4 mb-4">
+          <div className="mb-3">
+            <div className="font-medium">EMI Liability by Person — {month}</div>
+            <div className="text-sm text-gray-600">
+              Total EMI amount each person has to pay in this selected month.
+            </div>
+          </div>
+
+          {monthlyPersonTotals.length === 0 ? (
+            <div className="text-sm text-gray-600">
+              No active EMI liability for this month.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {monthlyPersonTotals.map((item) => (
+                <div
+                  key={item.userId}
+                  className="rounded-xl border bg-gray-50 p-4"
+                >
+                  <div className="text-xs uppercase tracking-wide text-gray-500">
+                    EMI To Pay
+                  </div>
+                  <div className="mt-1 text-base font-semibold text-gray-900 break-words">
+                    {item.name}
+                  </div>
+                  <div className="mt-2 text-2xl font-bold text-black">
+                    ৳ {money(item.amount)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="bg-white border rounded-lg overflow-hidden mb-4">
           <div className="p-3 border-b font-medium text-sm">EMI Plans</div>
 
@@ -412,6 +623,7 @@ export default function EMI() {
                       <th className="p-3">Total</th>
                       <th className="p-3">Months</th>
                       <th className="p-3">Monthly</th>
+                      <th className="p-3">Who Pays</th>
                       <th className="p-3">Remaining</th>
                       <th className="p-3">Progress</th>
                       <th className="p-3">Start-End</th>
@@ -432,11 +644,20 @@ export default function EMI() {
 
                         <td className="p-3">{p.totalPayable}</td>
                         <td className="p-3">{p.months}</td>
-                        <td className="p-3">{p.monthlyAmount}</td>
+                        <td className="p-3">৳ {money(p.monthlyAmount)}</td>
+
+                        <td className="p-3 min-w-[220px]">
+                          <div className="rounded-lg border border-gray-200 bg-gray-50 p-2">
+                            <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+                              {String(p?.splitType || "equal")}
+                            </div>
+                            {renderMonthlySplit(p)}
+                          </div>
+                        </td>
 
                         <td className="p-3">
                           <div className="font-medium">
-                            {p?.stats?.remaining ?? "-"}
+                            ৳ {money(p?.stats?.remaining ?? 0)}
                           </div>
                           <div className="text-xs text-gray-500">
                             {p?.stats?.remainingMonths ?? "-"} mo left
@@ -463,7 +684,7 @@ export default function EMI() {
 
                           {Number(p?.stats?.behindBy || 0) > 0 && (
                             <div className="text-xs text-amber-700 mt-1">
-                              Behind: {p.stats.behindBy}
+                              Behind: ৳ {money(p.stats.behindBy)}
                             </div>
                           )}
                         </td>
@@ -537,12 +758,12 @@ export default function EMI() {
                         </div>
                         <div className="border rounded-lg p-2">
                           <div className="text-xs text-gray-500">Monthly</div>
-                          <div className="font-medium">{p.monthlyAmount}</div>
+                          <div className="font-medium">৳ {money(p.monthlyAmount)}</div>
                         </div>
                         <div className="border rounded-lg p-2">
                           <div className="text-xs text-gray-500">Remaining</div>
                           <div className="font-medium">
-                            {p?.stats?.remaining ?? "-"}
+                            ৳ {money(p?.stats?.remaining ?? 0)}
                           </div>
                           <div className="text-[11px] text-gray-500">
                             {p?.stats?.remainingMonths ?? "-"} mo left
@@ -569,7 +790,7 @@ export default function EMI() {
                         </div>
                         {Number(p?.stats?.behindBy || 0) > 0 && (
                           <div className="text-xs text-amber-700 mt-1">
-                            Behind: {p.stats.behindBy}
+                            Behind: ৳ {money(p.stats.behindBy)}
                           </div>
                         )}
                       </div>
@@ -585,6 +806,13 @@ export default function EMI() {
                           <div className="text-xs text-gray-500">Status</div>
                           <div className="font-medium">{p.status}</div>
                         </div>
+                      </div>
+
+                      <div className="border rounded-xl bg-gray-50 p-3">
+                        <div className="text-xs font-medium uppercase tracking-wide text-gray-500 mb-2">
+                          Who Pays • {String(p?.splitType || "equal")}
+                        </div>
+                        {renderMonthlySplit(p)}
                       </div>
 
                       <div className="flex flex-col sm:flex-row gap-2">
