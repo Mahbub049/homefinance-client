@@ -20,6 +20,38 @@ function classNames(...xs) {
   return xs.filter(Boolean).join(" ");
 }
 
+function getId(value) {
+  return String(value?._id || value?.id || value || "");
+}
+
+function toDateInput(value) {
+  if (!value) return todayDate();
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return todayDate();
+  return d.toISOString().slice(0, 10);
+}
+
+function findByUserId(rows = [], userId, key, fallback = "") {
+  const target = getId(userId);
+  const row = rows.find((r) => getId(r.userId) === target);
+  return row?.[key] ?? fallback;
+}
+
+function blankTemplateForm(defaultMemberId = "") {
+  return {
+    name: "",
+    categoryId: "",
+    isVariable: false,
+    defaultAmount: "",
+    defaultSplitType: "equal",
+    personalUserId: defaultMemberId,
+    ratioMe: 50,
+    ratioOther: 50,
+    fixedMe: "",
+    fixedOther: "",
+  };
+}
+
 function Pill({ children, tone = "gray" }) {
   const tones = {
     gray: "bg-gray-50 text-gray-700 border-gray-200",
@@ -131,18 +163,9 @@ export default function Fixed() {
   const [filterStatus, setFilterStatus] = useState("all");
 
   const [templateOpen, setTemplateOpen] = useState(false);
-  const [templateForm, setTemplateForm] = useState({
-    name: "",
-    categoryId: "",
-    isVariable: false,
-    defaultAmount: "",
-    defaultSplitType: "equal",
-    personalUserId: "",
-    ratioMe: 50,
-    ratioOther: 50,
-    fixedMe: "",
-    fixedOther: "",
-  });
+  const [templateMode, setTemplateMode] = useState("create");
+  const [editingTemplateId, setEditingTemplateId] = useState(null);
+  const [templateForm, setTemplateForm] = useState(() => blankTemplateForm());
 
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentMode, setPaymentMode] = useState("template");
@@ -206,66 +229,124 @@ export default function Fixed() {
 
   function openTemplateModal() {
     setMsg("");
-    setTemplateForm((prev) => ({
-      ...prev,
-      personalUserId: prev.personalUserId || members?.[0]?.id || "",
-    }));
+    setTemplateMode("create");
+    setEditingTemplateId(null);
+    setTemplateForm(blankTemplateForm(members?.[0]?.id || ""));
+    setTemplateOpen(true);
+  }
+
+  function openEditTemplateModal(template) {
+    setMsg("");
+    setTemplateMode("edit");
+    setEditingTemplateId(template._id);
+
+    setTemplateForm({
+      name: template?.name || "",
+      categoryId: getId(template?.categoryId),
+      isVariable: !!template?.isVariable,
+      defaultAmount: template?.isVariable ? "" : String(template?.defaultAmount || ""),
+      defaultSplitType: template?.defaultSplitType || "equal",
+      personalUserId: getId(template?.personalUserId) || members?.[0]?.id || "",
+      ratioMe: findByUserId(template?.ratios || [], me?.id, "ratio", 50),
+      ratioOther: otherMember
+        ? findByUserId(template?.ratios || [], otherMember.id, "ratio", 50)
+        : 50,
+      fixedMe: findByUserId(template?.fixed || [], me?.id, "amount", ""),
+      fixedOther: otherMember
+        ? findByUserId(template?.fixed || [], otherMember.id, "amount", "")
+        : "",
+    });
+
     setTemplateOpen(true);
   }
 
   function closeTemplateModal() {
     setTemplateOpen(false);
+    setTemplateMode("create");
+    setEditingTemplateId(null);
   }
 
-  async function createTemplate() {
+  function buildTemplatePayload() {
+    if (!templateForm.name.trim()) {
+      setMsg("Name required");
+      return null;
+    }
+
+    if (!templateForm.categoryId) {
+      setMsg("Select category");
+      return null;
+    }
+
+    const amt = templateForm.defaultAmount === "" ? null : Number(templateForm.defaultAmount);
+
+    if (!templateForm.isVariable && (!amt || amt <= 0)) {
+      setMsg("Amount must be > 0 (or mark Variable)");
+      return null;
+    }
+
+    const payload = {
+      name: templateForm.name.trim(),
+      categoryId: templateForm.categoryId,
+      isVariable: !!templateForm.isVariable,
+      defaultAmount: templateForm.isVariable ? null : amt,
+      defaultSplitType: templateForm.defaultSplitType,
+      personalUserId: null,
+      ratios: [],
+      fixed: [],
+    };
+
+    if (templateForm.defaultSplitType === "personal") {
+      if (!templateForm.personalUserId) {
+        setMsg("Select personal member");
+        return null;
+      }
+      payload.personalUserId = templateForm.personalUserId;
+    }
+
+    if (templateForm.defaultSplitType === "ratio") {
+      if (!otherMember) {
+        setMsg("Need 2 members for ratio");
+        return null;
+      }
+
+      payload.ratios = [
+        { userId: me.id, ratio: Number(templateForm.ratioMe || 0) },
+        { userId: otherMember.id, ratio: Number(templateForm.ratioOther || 0) },
+      ];
+    }
+
+    if (templateForm.defaultSplitType === "fixed") {
+      if (!otherMember) {
+        setMsg("Need 2 members for fixed");
+        return null;
+      }
+
+      payload.fixed = [
+        { userId: me.id, amount: Number(templateForm.fixedMe || 0) },
+        { userId: otherMember.id, amount: Number(templateForm.fixedOther || 0) },
+      ];
+    }
+
+    return payload;
+  }
+
+  async function saveTemplate() {
     setMsg("");
 
     try {
-      if (!templateForm.name.trim()) return setMsg("Name required");
-      if (!templateForm.categoryId) return setMsg("Select category");
+      const payload = buildTemplatePayload();
+      if (!payload) return;
 
-      const amt =
-        templateForm.defaultAmount === "" ? null : Number(templateForm.defaultAmount);
-
-      if (!templateForm.isVariable && (!amt || amt <= 0)) {
-        return setMsg("Amount must be > 0 (or mark Variable)");
+      if (templateMode === "edit" && editingTemplateId) {
+        await api.put(`/api/fixed/templates/${editingTemplateId}`, payload);
+      } else {
+        await api.post("/api/fixed/templates", payload);
       }
 
-      const payload = {
-        name: templateForm.name,
-        categoryId: templateForm.categoryId,
-        isVariable: !!templateForm.isVariable,
-        defaultAmount: templateForm.isVariable ? null : amt,
-        defaultSplitType: templateForm.defaultSplitType,
-      };
-
-      if (templateForm.defaultSplitType === "personal") {
-        payload.personalUserId = templateForm.personalUserId;
-      }
-
-      if (templateForm.defaultSplitType === "ratio") {
-        if (!otherMember) return setMsg("Need 2 members for ratio");
-
-        payload.ratios = [
-          { userId: me.id, ratio: Number(templateForm.ratioMe) },
-          { userId: otherMember.id, ratio: Number(templateForm.ratioOther) },
-        ];
-      }
-
-      if (templateForm.defaultSplitType === "fixed") {
-        if (!otherMember) return setMsg("Need 2 members for fixed");
-
-        payload.fixed = [
-          { userId: me.id, amount: Number(templateForm.fixedMe || 0) },
-          { userId: otherMember.id, amount: Number(templateForm.fixedOther || 0) },
-        ];
-      }
-
-      await api.post("/api/fixed/templates", payload);
       closeTemplateModal();
       await loadTemplates();
     } catch (e) {
-      setMsg(e?.response?.data?.message || "Create template failed");
+      setMsg(e?.response?.data?.message || (templateMode === "edit" ? "Update template failed" : "Create template failed"));
     }
   }
 
@@ -306,8 +387,26 @@ export default function Fixed() {
     setPaymentOpen(true);
   }
 
+  function openEditPaymentModal(instance) {
+    setMsg("");
+    setPaymentMode("edit");
+    setSelectedTemplate(instance.templateId || null);
+    setSelectedInstance(instance);
+
+    setPaymentForm({
+      paidByUserId: getId(instance?.paidByUserId) || members?.[0]?.id || "",
+      fromAccountId: getId(instance?.fromAccountId) || accounts?.[0]?._id || "",
+      paymentDate: toDateInput(instance?.date),
+      amount: String(instance?.amount || instance?.templateId?.defaultAmount || ""),
+      note: instance?.note || "",
+    });
+
+    setPaymentOpen(true);
+  }
+
   function closePaymentModal() {
     setPaymentOpen(false);
+    setPaymentMode("template");
     setSelectedTemplate(null);
     setSelectedInstance(null);
   }
@@ -321,7 +420,8 @@ export default function Fixed() {
       if (!paymentForm.paymentDate) return setMsg("Select payment date");
 
       const isVariable = !!selectedTemplate?.isVariable;
-      if (isVariable) {
+      const amountCanBeEdited = isVariable || paymentMode === "edit";
+      if (amountCanBeEdited) {
         const amt = Number(paymentForm.amount);
         if (!amt || amt <= 0) return setMsg("Amount must be > 0");
       }
@@ -343,6 +443,17 @@ export default function Fixed() {
           fromAccountId: paymentForm.fromAccountId,
           paymentDate: paymentForm.paymentDate,
           amount: isVariable ? Number(paymentForm.amount) : undefined,
+          note: paymentForm.note,
+        });
+      }
+
+      if (paymentMode === "edit" && selectedInstance?._id) {
+        await api.put(`/api/fixed/instances/${selectedInstance._id}`, {
+          month,
+          paidByUserId: paymentForm.paidByUserId,
+          fromAccountId: paymentForm.fromAccountId,
+          paymentDate: paymentForm.paymentDate,
+          amount: Number(paymentForm.amount),
           note: paymentForm.note,
         });
       }
@@ -573,9 +684,13 @@ export default function Fixed() {
                       </div>
                     </div>
 
-                    <div className="mt-4 flex justify-end gap-2">
+                    <div className="mt-4 flex justify-end gap-2 flex-wrap">
                       <IconButton onClick={() => openPaymentModalForTemplate(t)}>
                         Add to this month
+                      </IconButton>
+
+                      <IconButton onClick={() => openEditTemplateModal(t)}>
+                        Edit
                       </IconButton>
 
                       <IconButton danger onClick={() => deleteTemplate(t._id)}>
@@ -620,13 +735,17 @@ export default function Fixed() {
                     </div>
 
                     <div className="flex items-center gap-2 justify-end">
-                      {i.status === "pending" && (
+                      {i.status === "pending" ? (
                         <button
                           className="bg-black text-white rounded-md px-3 py-2 text-sm"
                           onClick={() => openPaymentModalForInstance(i)}
                         >
                           Post Now
                         </button>
+                      ) : (
+                        <IconButton onClick={() => openEditPaymentModal(i)}>
+                          Edit
+                        </IconButton>
                       )}
 
                       <IconButton danger onClick={() => deleteInstance(i._id)}>
@@ -653,7 +772,7 @@ export default function Fixed() {
             <div className="app-modal-panel max-w-xl rounded-2xl p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h3 className="text-lg font-semibold">Add Template</h3>
+                  <h3 className="text-lg font-semibold">{templateMode === "edit" ? "Edit Template" : "Add Template"}</h3>
                   <p className="text-sm text-gray-500">
                     Template stores only recurring rule. Payment details will be selected later.
                   </p>
@@ -795,10 +914,10 @@ export default function Fixed() {
                   Cancel
                 </button>
                 <button
-                  onClick={createTemplate}
+                  onClick={saveTemplate}
                   className="bg-black text-white rounded-md px-4 py-2 text-sm"
                 >
-                  Save Template
+                  {templateMode === "edit" ? "Update Template" : "Save Template"}
                 </button>
               </div>
             </div>
@@ -811,7 +930,11 @@ export default function Fixed() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h3 className="text-lg font-semibold">
-                    {paymentMode === "template" ? "Add to This Month" : "Post Month Item"}
+                    {paymentMode === "template"
+                      ? "Add to This Month"
+                      : paymentMode === "edit"
+                        ? "Edit Month Item"
+                        : "Post Month Item"}
                   </h3>
                   <p className="text-sm text-gray-500">
                     {selectedTemplate?.name || "Fixed Expense"}
@@ -865,7 +988,7 @@ export default function Fixed() {
                   />
                 </Field>
 
-                {selectedTemplate?.isVariable && (
+                {(selectedTemplate?.isVariable || paymentMode === "edit") && (
                   <Field label="Amount">
                     <input
                       type="number"
@@ -878,7 +1001,7 @@ export default function Fixed() {
                   </Field>
                 )}
 
-                {!selectedTemplate?.isVariable && (
+                {!selectedTemplate?.isVariable && paymentMode !== "edit" && (
                   <div className="rounded-lg border bg-gray-50 px-3 py-2 text-sm">
                     Fixed Amount: <span className="font-semibold">{selectedTemplate?.defaultAmount || 0}</span>
                   </div>
@@ -907,7 +1030,7 @@ export default function Fixed() {
                   onClick={submitPaymentModal}
                   className="bg-black text-white rounded-md px-4 py-2 text-sm"
                 >
-                  Confirm
+                  {paymentMode === "edit" ? "Update" : "Confirm"}
                 </button>
               </div>
             </div>

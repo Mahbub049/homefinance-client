@@ -78,7 +78,7 @@ export default function Wallet() {
               Wallet Summary
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              Track income, expenses, and who owes who — month by month.
+              Track income, expenses, owner-aware transfers, and who owes who — month by month.
             </p>
           </div>
 
@@ -127,8 +127,13 @@ export default function Wallet() {
               const income = Number(u.income || 0);
               const paid = Number(u.paidExpense || 0);
               const share = Number(u.shareExpense || 0);
+              const transferIn = Number(u.transferIn || 0);
+              const transferOut = Number(u.transferOut || 0);
+              const transferNet = Number(u.transferNet || 0);
               const net = Number(u.net || 0);
-              const remaining = income - paid;
+              const remaining = Number(
+                u.remaining ?? income - share + transferNet
+              );
 
               const netPositive = net >= 0;
               const pct = Math.round((Math.abs(net) / maxAbsNet) * 100);
@@ -163,7 +168,7 @@ export default function Wallet() {
                   </div>
 
                   {/* Stats */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                     <div className="bg-gray-50 border rounded-xl p-3">
                       <p className="text-xs text-gray-500">Income</p>
                       <p className="text-sm sm:text-base font-semibold text-gray-900 break-words">
@@ -182,12 +187,30 @@ export default function Wallet() {
                         {formatMoney(share)}
                       </p>
                     </div>
+                    <div className="bg-sky-50 border border-sky-100 rounded-xl p-3">
+                      <p className="text-xs text-sky-700">Transfer In</p>
+                      <p className="text-sm sm:text-base font-semibold text-gray-900 break-words">
+                        {formatMoney(transferIn)}
+                      </p>
+                    </div>
+                    <div className="bg-rose-50 border border-rose-100 rounded-xl p-3">
+                      <p className="text-xs text-rose-700">Transfer Out</p>
+                      <p className="text-sm sm:text-base font-semibold text-gray-900 break-words">
+                        {formatMoney(transferOut)}
+                      </p>
+                    </div>
                     <div className="bg-gray-50 border rounded-xl p-3">
                       <p className="text-xs text-gray-500">Remaining</p>
                       <p className="text-sm sm:text-base font-semibold text-gray-900 break-words">
                         {formatMoney(remaining)}
                       </p>
                     </div>
+                  </div>
+
+                  <div className="mt-3 text-xs text-gray-500 leading-5">
+                    Transfer Net: <b>{formatMoney(transferNet)}</b>. Same-owner
+                    transfers are ignored; cross-owner transfers reduce one
+                    person and increase the other.
                   </div>
 
                   {/* Visual Net Bar */}
@@ -210,8 +233,8 @@ export default function Wallet() {
                   {/* Hint */}
                   <div className="mt-4 text-xs sm:text-sm text-gray-500">
                     {netPositive
-                      ? "They paid more than their share."
-                      : "They paid less than their share."}
+                      ? "They paid more than their expense share."
+                      : "They paid less than their expense share."}
                   </div>
                 </div>
               );

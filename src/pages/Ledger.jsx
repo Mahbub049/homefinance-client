@@ -192,6 +192,12 @@ export default function Ledger() {
     toAccountId: "",
     paidByUserId: "",
     receivedByUserId: "",
+    splitType: "personal",
+    personalUserId: "",
+    ratioMe: 50,
+    ratioOther: 50,
+    fixedMe: "",
+    fixedOther: "",
   });
 
   async function loadBasics() {
@@ -282,6 +288,11 @@ export default function Ledger() {
     return out;
   }, [members]);
 
+  const otherMember = useMemo(() => {
+    const myId = String(me?.id || "");
+    return (members || []).find((m) => String(getId(m)) !== myId) || null;
+  }, [members, me?.id]);
+
   const showCategory = form.txType !== "transfer";
   const showFrom = form.txType === "expense" || form.txType === "transfer";
   const showTo = form.txType === "income" || form.txType === "transfer";
@@ -303,6 +314,12 @@ export default function Ledger() {
       toAccountId: next.toAccountId || defaultAccount,
       paidByUserId: next.paidByUserId || defaultUser,
       receivedByUserId: next.receivedByUserId || defaultUser,
+      splitType: next.splitType || "personal",
+      personalUserId: next.personalUserId || next.paidByUserId || defaultUser,
+      ratioMe: next.ratioMe ?? 50,
+      ratioOther: next.ratioOther ?? 50,
+      fixedMe: next.fixedMe ?? "",
+      fixedOther: next.fixedOther ?? "",
     };
   }
 
@@ -312,6 +329,36 @@ export default function Ledger() {
     setEditId(null);
     setForm(getDefaultForm());
     setOpen(true);
+  }
+
+  function transactionSplitToForm(item) {
+    const split = item?.split || {};
+    const splitType = split?.type || "personal";
+
+    const out = {
+      splitType,
+      personalUserId: getId(split.personalUserId) || getId(item?.paidByUserId),
+      ratioMe: 50,
+      ratioOther: 50,
+      fixedMe: "",
+      fixedOther: "",
+    };
+
+    if (splitType === "ratio" && Array.isArray(split.ratios)) {
+      const myRatio = split.ratios.find((r) => String(getId(r.userId)) === String(me?.id));
+      const otherRatio = split.ratios.find((r) => String(getId(r.userId)) === String(getId(otherMember)));
+      out.ratioMe = myRatio?.ratio ?? 50;
+      out.ratioOther = otherRatio?.ratio ?? 50;
+    }
+
+    if (splitType === "fixed" && Array.isArray(split.fixed)) {
+      const myFixed = split.fixed.find((f) => String(getId(f.userId)) === String(me?.id));
+      const otherFixed = split.fixed.find((f) => String(getId(f.userId)) === String(getId(otherMember)));
+      out.fixedMe = myFixed?.amount ?? "";
+      out.fixedOther = otherFixed?.amount ?? "";
+    }
+
+    return out;
   }
 
   function openEditModal(item) {
@@ -329,6 +376,7 @@ export default function Ledger() {
         toAccountId: getId(item.toAccountId),
         paidByUserId: getId(item.paidByUserId),
         receivedByUserId: getId(item.receivedByUserId),
+        ...transactionSplitToForm(item),
       })
     );
     setOpen(true);
@@ -356,6 +404,43 @@ export default function Ledger() {
         return setMsg("From and To accounts must be different");
       }
 
+      let split = null;
+
+      if (form.txType === "expense") {
+        if (!form.paidByUserId) return setMsg("Select Paid By");
+
+        split = { type: form.splitType || "personal" };
+
+        if (form.splitType === "personal") {
+          if (!form.personalUserId) return setMsg("Select Personal For");
+          split.personalUserId = form.personalUserId;
+        }
+
+        if (form.splitType === "ratio") {
+          if (!otherMember) return setMsg("Need 2 members for Ratio split");
+          const r1 = Number(form.ratioMe || 0);
+          const r2 = Number(form.ratioOther || 0);
+          if (r1 + r2 !== 100) return setMsg("Ratio split must sum to 100");
+          split.ratios = [
+            { userId: getId(me), ratio: r1 },
+            { userId: getId(otherMember), ratio: r2 },
+          ];
+        }
+
+        if (form.splitType === "fixed") {
+          if (!otherMember) return setMsg("Need 2 members for Fixed split");
+          const f1 = Number(form.fixedMe || 0);
+          const f2 = Number(form.fixedOther || 0);
+          if (Math.round((f1 + f2) * 100) / 100 !== Math.round(amt * 100) / 100) {
+            return setMsg("Fixed split amounts must sum to total amount");
+          }
+          split.fixed = [
+            { userId: getId(me), amount: f1 },
+            { userId: getId(otherMember), amount: f2 },
+          ];
+        }
+      }
+
       const payload = {
         txType: form.txType,
         date: form.date,
@@ -367,6 +452,7 @@ export default function Ledger() {
         paidByUserId: form.txType === "expense" ? form.paidByUserId : null,
         receivedByUserId:
           form.txType === "income" ? form.receivedByUserId : null,
+        split,
       };
 
       if (isEditing && editId) {
@@ -510,8 +596,23 @@ export default function Ledger() {
     const membersArr = Object.values(by);
     const memberCount = Math.max(1, membersArr.length);
 
+    const participantsForOwner = (owner) => {
+      const normalizedOwner = owner || "Joint";
+      const ownerMemberId = ownerToMemberId[normalizedOwner] || "";
+
+      // Personal account: full transfer effect goes to that person.
+      if (normalizedOwner !== "Joint" && ownerMemberId && by[ownerMemberId]) {
+        return [{ id: ownerMemberId, ratio: 1 }];
+      }
+
+      // Joint or unknown owner: split equally among all visible family members.
+      const ratio = 1 / memberCount;
+      return membersArr.map((m) => ({ id: m.id, ratio }));
+    };
+
     for (const t of allItems || []) {
       if (t.txType !== "transfer") continue;
+
       const amt = Number(t.amount || 0);
       const fromAcc = accountsById.get(getId(t.fromAccountId));
       const toAcc = accountsById.get(getId(t.toAccountId));
@@ -519,30 +620,36 @@ export default function Ledger() {
       const fromOwner = fromAcc?.owner || "Joint";
       const toOwner = toAcc?.owner || "Joint";
 
-      const fromMemberId = ownerToMemberId[fromOwner] || "";
-      const toMemberId = ownerToMemberId[toOwner] || "";
+      // Same owner transfer, such as Mahbub Bank -> Mahbub DPS,
+      // is only movement between that person's own accounts.
+      // So it must not reduce or increase personal remaining.
+      if (fromOwner === toOwner) continue;
 
-      if (fromOwner === "Joint" || !fromMemberId) {
-        const share = amt / memberCount;
-        for (const m of membersArr) m.transferOut += share;
-      } else if (by[fromMemberId]) {
-        by[fromMemberId].transferOut += amt;
+      for (const part of participantsForOwner(fromOwner)) {
+        if (by[part.id]) by[part.id].transferOut += amt * part.ratio;
       }
 
-      if (toOwner === "Joint" || !toMemberId) {
-        const share = amt / memberCount;
-        for (const m of membersArr) m.transferIn += share;
-      } else if (by[toMemberId]) {
-        by[toMemberId].transferIn += amt;
+      for (const part of participantsForOwner(toOwner)) {
+        if (by[part.id]) by[part.id].transferIn += amt * part.ratio;
       }
     }
 
-    const list = Object.values(by).map((x) => ({
-      ...x,
-      transferIn: Number(x.transferIn || 0),
-      transferOut: Number(x.transferOut || 0),
-      remaining: Number(x.income || 0) - Number(x.expense || 0),
-    }));
+    const list = Object.values(by).map((x) => {
+      const transferIn = Number(x.transferIn || 0);
+      const transferOut = Number(x.transferOut || 0);
+      const transferNet = transferIn - transferOut;
+
+      return {
+        ...x,
+        transferIn,
+        transferOut,
+        transferNet,
+        remaining:
+          Number(x.income || 0) -
+          Number(x.expense || 0) +
+          transferNet,
+      };
+    });
 
     list.sort((a, b) => b.remaining - a.remaining);
     return list;
@@ -570,6 +677,15 @@ export default function Ledger() {
         : t === "transfer"
           ? "Transfer"
           : t;
+
+  const splitLabel = (split) => {
+    const t = split?.type;
+    if (t === "equal") return "Equal";
+    if (t === "personal") return "Personal";
+    if (t === "ratio") return "Ratio";
+    if (t === "fixed") return "Fixed Amount";
+    return "";
+  };
 
   async function exportTransactionsPdf() {
     try {
@@ -626,13 +742,14 @@ export default function Ledger() {
       autoTable(doc, {
         startY: doc.lastAutoTable.finalY + 6,
         theme: "grid",
-        head: [["Member", "Income", "Expense", "Transfer In", "Transfer Out", "Remaining"]],
+        head: [["Member", "Income", "Expense", "Transfer In", "Transfer Out", "Transfer Net", "Remaining"]],
         body: memberStats.map((m) => [
           m.name || "-",
           moneyPdf(m.income),
           moneyPdf(m.expense),
           moneyPdf(m.transferIn),
           moneyPdf(m.transferOut),
+          moneyPdf(m.transferNet),
           moneyPdf(m.remaining),
         ]),
         styles: {
@@ -835,8 +952,8 @@ export default function Ledger() {
                     Individual summary (split-aware)
                   </div>
                   <div className="text-xs text-gray-500 leading-5">
-                    Remaining = Income (splits) − Expense (splits). Transfers
-                    shown separately.
+                    Remaining = Income (splits) − Expense (splits) + Transfer Net.
+                    Same-owner transfers are ignored for personal remaining.
                   </div>
                   <div className="mt-2 text-xs text-gray-500 leading-5">
                     Ledger entries loaded: <b>{ledgerItems.length}</b> •
@@ -908,6 +1025,8 @@ export default function Ledger() {
                                   <br />
                                   Transfer In {money(m.transferIn)} • Transfer Out{" "}
                                   {money(m.transferOut)}
+                                  <br />
+                                  Transfer Net {money(m.transferNet)}
                                 </div>
                               </div>
 
@@ -934,7 +1053,7 @@ export default function Ledger() {
                             />
                           </div>
                           <div className="mt-2 text-xs text-gray-500">
-                            {isNeg ? "Over budget (negative remaining)" : "Remaining available"}
+                            {isNeg ? "Negative after expenses and transfers" : "Remaining after expenses and transfers"}
                           </div>
                         </div>
                       </div>
@@ -1039,6 +1158,10 @@ export default function Ledger() {
                 else if (it.txType === "income") details = `${catName || "-"} • To: ${toName || "-"}`;
                 else details = `${catName || "-"} • From: ${fromName || "-"}`;
 
+                if (it.txType === "expense" && splitLabel(it.split)) {
+                  details += ` • Split: ${splitLabel(it.split)}`;
+                }
+
                 if (it.note) details += ` • ${it.note}`;
 
                 const who =
@@ -1135,7 +1258,12 @@ export default function Ledger() {
                     className="w-full border rounded-md px-3 py-2"
                     value={form.txType}
                     onChange={(e) =>
-                      setForm({ ...form, txType: e.target.value, categoryId: "" })
+                      setForm({
+                        ...form,
+                        txType: e.target.value,
+                        categoryId: "",
+                        splitType: e.target.value === "expense" ? form.splitType : "personal",
+                      })
                     }
                   >
                     <option value="income">Income</option>
@@ -1223,6 +1351,105 @@ export default function Ledger() {
                         </option>
                       ))}
                     </select>
+                  </div>
+                )}
+
+                {form.txType === "expense" && (
+                  <div className="md:col-span-2 rounded-xl border bg-slate-50 p-3">
+                    <div className="text-sm font-semibold mb-2">Split</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="sm:col-span-2">
+                        <label className="text-sm font-medium">Split Type</label>
+                        <select
+                          className="w-full border rounded-md px-3 py-2 bg-white"
+                          value={form.splitType}
+                          onChange={(e) => setForm({ ...form, splitType: e.target.value })}
+                        >
+                          <option value="personal">Personal</option>
+                          <option value="equal">Equal</option>
+                          <option value="ratio">Ratio</option>
+                          <option value="fixed">Fixed Amount</option>
+                        </select>
+                      </div>
+
+                      {form.splitType === "personal" && (
+                        <div className="sm:col-span-2">
+                          <label className="text-sm font-medium">Personal For</label>
+                          <select
+                            className="w-full border rounded-md px-3 py-2 bg-white"
+                            value={form.personalUserId}
+                            onChange={(e) => setForm({ ...form, personalUserId: e.target.value })}
+                          >
+                            <option value="">Select member</option>
+                            {members.map((m) => (
+                              <option key={getId(m)} value={getId(m)}>
+                                {m.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {form.splitType === "ratio" && otherMember && (
+                        <>
+                          <div>
+                            <label className="text-sm font-medium">My %</label>
+                            <input
+                              type="number"
+                              className="w-full border rounded-md px-3 py-2 bg-white"
+                              value={form.ratioMe}
+                              onChange={(e) => setForm({ ...form, ratioMe: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium">{otherMember.name} %</label>
+                            <input
+                              type="number"
+                              className="w-full border rounded-md px-3 py-2 bg-white"
+                              value={form.ratioOther}
+                              onChange={(e) => setForm({ ...form, ratioOther: e.target.value })}
+                            />
+                          </div>
+                          <div className="sm:col-span-2 text-xs text-gray-500">
+                            Ratio total must be 100.
+                          </div>
+                        </>
+                      )}
+
+                      {form.splitType === "fixed" && otherMember && (
+                        <>
+                          <div>
+                            <label className="text-sm font-medium">My Amount</label>
+                            <input
+                              type="number"
+                              className="w-full border rounded-md px-3 py-2 bg-white"
+                              value={form.fixedMe}
+                              onChange={(e) => setForm({ ...form, fixedMe: e.target.value })}
+                              placeholder="e.g., 300"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium">{otherMember.name} Amount</label>
+                            <input
+                              type="number"
+                              className="w-full border rounded-md px-3 py-2 bg-white"
+                              value={form.fixedOther}
+                              onChange={(e) => setForm({ ...form, fixedOther: e.target.value })}
+                              placeholder="e.g., 200"
+                            />
+                          </div>
+                          <div className="sm:col-span-2 text-xs text-gray-500">
+                            Fixed amounts must be equal to the total expense amount.
+                          </div>
+                        </>
+                      )}
+
+                      {form.splitType === "equal" && (
+                        <div className="sm:col-span-2 text-xs text-gray-500 leading-5">
+                          The expense will be shared equally among all family members.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 

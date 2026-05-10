@@ -371,6 +371,15 @@ export default function EMI() {
       .sort((a, b) => b.amount - a.amount);
   }, [plans, members, month]);
 
+  const monthlyCombinedTotal = useMemo(() => {
+    const total = monthlyPersonTotals.reduce(
+      (sum, item) => sum + Number(item.amount || 0),
+      0
+    );
+
+    return Math.round(total * 100) / 100;
+  }, [monthlyPersonTotals]);
+
   async function generateMonth() {
     setMsg("");
     try {
@@ -586,23 +595,39 @@ export default function EMI() {
               No active EMI liability for this month.
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-              {monthlyPersonTotals.map((item) => (
-                <div
-                  key={item.userId}
-                  className="rounded-xl border bg-gray-50 p-4"
-                >
+            <div className="space-y-3">
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
                   <div className="text-xs uppercase tracking-wide text-gray-500">
-                    EMI To Pay
+                    Combined EMI To Pay
                   </div>
-                  <div className="mt-1 text-base font-semibold text-gray-900 break-words">
-                    {item.name}
-                  </div>
-                  <div className="mt-2 text-2xl font-bold text-black">
-                    ৳ {money(item.amount)}
+                  <div className="mt-1 text-sm text-gray-600">
+                    Total amount all persons need to pay in {month}.
                   </div>
                 </div>
-              ))}
+                <div className="text-2xl sm:text-3xl font-bold text-black">
+                  ৳ {money(monthlyCombinedTotal)}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {monthlyPersonTotals.map((item) => (
+                  <div
+                    key={item.userId}
+                    className="rounded-xl border bg-gray-50 p-4"
+                  >
+                    <div className="text-xs uppercase tracking-wide text-gray-500">
+                      EMI To Pay
+                    </div>
+                    <div className="mt-1 text-base font-semibold text-gray-900 break-words">
+                      {item.name}
+                    </div>
+                    <div className="mt-2 text-2xl font-bold text-black">
+                      ৳ {money(item.amount)}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

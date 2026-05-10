@@ -33,6 +33,26 @@ function toLocalYMD(dateLike) {
   return `${y}-${m}-${day}`;
 }
 
+function getId(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return String(value._id || value.id || "");
+}
+
+function blankTxnItem(next = {}) {
+  return {
+    name: next.name || "",
+    brand: next.brand || "",
+    unit: next.unit || "pcs",
+    qty: next.qty ?? 1,
+    unitPrice: next.unitPrice ?? 0,
+    itemDiscount: next.itemDiscount ?? 0,
+    productStartDate: next.productStartDate || "",
+    productEndDate: next.productEndDate || "",
+    note: next.note || "",
+  };
+}
+
 export default function Grocery() {
   const me = getUser();
   const [month, setMonth] = useState(monthNow());
@@ -49,6 +69,8 @@ export default function Grocery() {
   const [loading, setLoading] = useState(true);
 
   const [open, setOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editId, setEditId] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
@@ -75,26 +97,17 @@ export default function Grocery() {
     fixedOther: "",
   });
 
-  const [txnItems, setTxnItems] = useState([
-    {
-      name: "",
-      brand: "",
-      unit: "pcs",
-      qty: 1,
-      unitPrice: 0,
-      itemDiscount: 0,
-      productStartDate: "",
-      productEndDate: "",
-      note: "",
-    },
-  ]);
+  const [txnItems, setTxnItems] = useState([blankTxnItem()]);
 
   useEffect(() => {
     const m = day.slice(0, 7);
     if (m !== month) setMonth(m);
   }, [day]);
 
-  const otherMember = useMemo(() => members.find((m) => m.id !== me?.id) || null, [members, me]);
+  const otherMember = useMemo(
+    () => members.find((m) => String(getId(m)) !== String(me?.id)) || null,
+    [members, me]
+  );
 
   const itemsSubtotal = useMemo(() => {
     let sum = 0;
@@ -152,55 +165,96 @@ export default function Grocery() {
     loadMonth();
   }, [month]);
 
-  function openModal() {
-    setMsg("");
-
-    const defaultUser = members?.[0]?.id || "";
+  function getDefaultForm(next = {}) {
+    const defaultUser = getId(members?.[0]) || "";
     const defaultAccount = accounts?.[0]?._id || "";
 
-    setForm((f) => ({
-      ...f,
-      paidByUserId: f.paidByUserId || defaultUser,
-      personalUserId: f.personalUserId || defaultUser,
-      fromAccountId: f.fromAccountId || defaultAccount,
-    }));
+    return {
+      txnDate: next.txnDate || day || dayNow(),
+      shopName: next.shopName || "",
+      location: next.location || "",
+      paymentMethodId: next.paymentMethodId || "",
+      cardLabelId: next.cardLabelId || "",
+      categoryId: next.categoryId || "",
+      paidByUserId: next.paidByUserId || defaultUser,
+      fromAccountId: next.fromAccountId || defaultAccount,
+      discountTotal: next.discountTotal ?? 0,
+      deliveryFee: next.deliveryFee ?? 0,
+      vatAmount: next.vatAmount ?? 0,
+      vatIncluded: next.vatIncluded ?? true,
+      note: next.note || "",
 
-    setTxnItems([
-      {
-        name: "",
-        brand: "",
-        unit: "pcs",
-        qty: 1,
-        unitPrice: 0,
-        itemDiscount: 0,
-        productStartDate: "",
-        productEndDate: "",
-        note: "",
-      },
-    ]);
+      splitType: next.splitType || "equal",
+      personalUserId: next.personalUserId || next.paidByUserId || defaultUser,
+      ratioMe: next.ratioMe ?? 50,
+      ratioOther: next.ratioOther ?? 50,
+      fixedMe: next.fixedMe ?? "",
+      fixedOther: next.fixedOther ?? "",
+    };
+  }
+
+  function openModal() {
+    setMsg("");
+    setIsEditing(false);
+    setEditId(null);
+    setForm(getDefaultForm());
+    setTxnItems([blankTxnItem()]);
+    setOpen(true);
+  }
+
+  function openEditModal(txn) {
+    setMsg("");
+    setIsEditing(true);
+    setEditId(txn._id);
+
+    setForm(
+      getDefaultForm({
+        txnDate: toLocalYMD(txn.txnDate),
+        shopName: txn.shopName || "",
+        location: txn.location || "",
+        paymentMethodId: getId(txn.paymentMethodId),
+        cardLabelId: getId(txn.cardLabelId),
+        categoryId: getId(txn.categoryId),
+        paidByUserId: getId(txn.paidByUserId),
+        fromAccountId: getId(txn.fromAccountId),
+        discountTotal: txn.discountTotal ?? 0,
+        deliveryFee: txn.deliveryFee ?? 0,
+        vatAmount: txn.vatAmount ?? 0,
+        vatIncluded: txn.vatIncluded ?? true,
+        note: txn.note || "",
+      })
+    );
+
+    setTxnItems(
+      (txn.items || []).length
+        ? (txn.items || []).map((it) =>
+            blankTxnItem({
+              name: it.name || "",
+              brand: it.brand || "",
+              unit: it.unit || "pcs",
+              qty: it.qty ?? 1,
+              unitPrice: it.unitPrice ?? 0,
+              itemDiscount: it.itemDiscount ?? 0,
+              productStartDate: it.productStartDate ? toLocalYMD(it.productStartDate) : "",
+              productEndDate: it.productEndDate ? toLocalYMD(it.productEndDate) : "",
+              note: it.note || "",
+            })
+          )
+        : [blankTxnItem()]
+    );
 
     setOpen(true);
   }
 
   function closeModal() {
     setOpen(false);
+    setIsEditing(false);
+    setEditId(null);
+    setMsg("");
   }
 
   function addItemRow() {
-    setTxnItems([
-      ...txnItems,
-      {
-        name: "",
-        brand: "",
-        unit: "pcs",
-        qty: 1,
-        unitPrice: 0,
-        itemDiscount: 0,
-        productStartDate: "",
-        productEndDate: "",
-        note: "",
-      },
-    ]);
+    setTxnItems([...txnItems, blankTxnItem()]);
   }
 
   function removeItemRow(idx) {
@@ -269,11 +323,25 @@ export default function Grocery() {
         split,
       };
 
-      await api.post("/api/grocery", payload);
+      if (isEditing && editId) {
+        await api.put(`/api/grocery/${editId}`, payload);
+      } else {
+        await api.post("/api/grocery", payload);
+      }
+
+      const nextMonth = String(form.txnDate || "").slice(0, 7);
+      const nextDay = form.txnDate || day;
+
       closeModal();
-      await loadMonth();
+      setDay(nextDay);
+
+      if (nextMonth && nextMonth !== month) {
+        setMonth(nextMonth);
+      } else {
+        await loadMonth();
+      }
     } catch (e) {
-      setMsg(e?.response?.data?.message || "Save failed");
+      setMsg(e?.response?.data?.message || (isEditing ? "Update failed" : "Save failed"));
     }
   }
 
@@ -382,12 +450,20 @@ export default function Grocery() {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => deleteTxn(t._id)}
-                      className="border rounded-md px-3 py-2 text-sm hover:bg-gray-50 w-full sm:w-auto"
-                    >
-                      Delete
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                      <button
+                        onClick={() => openEditModal(t)}
+                        className="border rounded-md px-3 py-2 text-sm hover:bg-gray-50 w-full sm:w-auto"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => deleteTxn(t._id)}
+                        className="border rounded-md px-3 py-2 text-sm hover:bg-gray-50 w-full sm:w-auto"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
 
                   {/* Desktop table */}
@@ -473,9 +549,13 @@ export default function Grocery() {
         {open && (
           <div className="app-modal-overlay">
             <div className="app-modal-panel max-w-6xl rounded-2xl p-4 sm:p-5">
-              <h3 className="text-lg font-semibold mb-1">Add Grocery Transaction</h3>
+              <h3 className="text-lg font-semibold mb-1">
+                {isEditing ? "Edit Grocery Transaction" : "Add Grocery Transaction"}
+              </h3>
               <p className="text-sm text-gray-500 mb-4">
-                Add items like a receipt. Split on total payable.
+                {isEditing
+                  ? "Update this receipt. Ledger and split data will sync automatically."
+                  : "Add items like a receipt. Split on total payable."}
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
@@ -963,7 +1043,7 @@ export default function Grocery() {
                   onClick={saveTxn}
                   className="w-full sm:w-auto bg-black text-white rounded-md px-4 py-2 text-sm"
                 >
-                  Save Transaction
+                  {isEditing ? "Update Transaction" : "Save Transaction"}
                 </button>
               </div>
 
