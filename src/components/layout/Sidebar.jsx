@@ -1,23 +1,15 @@
 import { NavLink } from "react-router-dom";
 import { useMemo } from "react";
 
-/**
- * Usage examples:
- * 1) Normal desktop sidebar:
- *    <Sidebar />
- *
- * 2) With collapse toggle:
- *    const [collapsed, setCollapsed] = useState(false);
- *    <Sidebar collapsed={collapsed} onToggleCollapse={() => setCollapsed(v=>!v)} />
- *
- * 3) Mobile drawer:
- *    const [open, setOpen] = useState(false);
- *    <Sidebar drawerOpen={open} onCloseDrawer={() => setOpen(false)} />
- */
-
 function Icon({ name, className = "h-5 w-5" }) {
-  // Simple inline icons (no extra library)
-  const common = { className, fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" };
+  const common = {
+    className,
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+  };
 
   switch (name) {
     case "dashboard":
@@ -113,19 +105,18 @@ function Icon({ name, className = "h-5 w-5" }) {
           <path d="M9 18l6-6-6-6" />
         </svg>
       );
-    case "menu":
-      return (
-        <svg {...common} viewBox="0 0 24 24">
-          <path d="M4 6h16" />
-          <path d="M4 12h16" />
-          <path d="M4 18h16" />
-        </svg>
-      );
     case "close":
       return (
         <svg {...common} viewBox="0 0 24 24">
           <path d="M18 6L6 18" />
           <path d="M6 6l12 12" />
+        </svg>
+      );
+    case "spark":
+      return (
+        <svg {...common} viewBox="0 0 24 24">
+          <path d="M12 3l1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3z" />
+          <path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16z" />
         </svg>
       );
     default:
@@ -134,9 +125,10 @@ function Icon({ name, className = "h-5 w-5" }) {
 }
 
 function GroupTitle({ collapsed, children }) {
-  if (collapsed) return <div className="h-3" />;
+  if (collapsed) return <div className="h-4" />;
+
   return (
-    <div className="px-3 pt-4 pb-2 text-[11px] font-semibold tracking-wider text-gray-400 uppercase">
+    <div className="px-3 pb-2 pt-5 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
       {children}
     </div>
   );
@@ -145,26 +137,51 @@ function GroupTitle({ collapsed, children }) {
 function Item({ to, label, icon, collapsed }) {
   const className = ({ isActive }) =>
     [
-      "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition",
+      "group relative flex items-center gap-3 overflow-hidden rounded-2xl px-3 py-2.5 text-sm font-semibold transition-all duration-200",
       isActive
-        ? "bg-black text-white"
-        : "text-gray-700 hover:bg-gray-100 hover:text-gray-900",
+        ? "active bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white shadow-lg shadow-indigo-500/25"
+        : "text-slate-600 hover:-translate-y-0.5 hover:bg-white hover:text-slate-950 hover:shadow-sm dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white",
     ].join(" ");
 
   return (
     <NavLink to={to} className={className} title={collapsed ? label : undefined}>
-      {/* active indicator */}
-      <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r bg-transparent group-[.active]:bg-white/80" />
-      <span className="shrink-0">{icon}</span>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition group-hover:bg-slate-200 group-hover:text-slate-950 dark:bg-slate-800 dark:text-slate-300 dark:group-hover:bg-slate-700 dark:group-hover:text-white group-[.active]:bg-white/20 group-[.active]:text-white">
+        {icon}
+      </span>
       {!collapsed && <span className="truncate">{label}</span>}
     </NavLink>
+  );
+}
+
+function SidebarFooter({ collapsed }) {
+  return (
+    <div className="border-t border-slate-200/70 p-3 dark:border-slate-800">
+      <div
+        className={[
+          "rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-white shadow-lg shadow-indigo-500/20",
+          collapsed ? "p-2" : "p-4",
+        ].join(" ")}
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/20">
+            <Icon name="spark" className="h-5 w-5" />
+          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <div className="text-sm font-bold">Smart Budgeting</div>
+              <div className="mt-0.5 text-xs text-white/75">Track • Split • Plan</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
 export default function Sidebar({
   collapsed = false,
   onToggleCollapse,
-  drawerOpen = false, // for mobile overlay
+  drawerOpen = false,
   onCloseDrawer,
 }) {
   const nav = useMemo(
@@ -173,7 +190,6 @@ export default function Sidebar({
         title: "Main",
         items: [
           { to: "/dashboard", label: "Dashboard", icon: <Icon name="dashboard" /> },
-          //   { to: "/family", label: "Family", icon: <Icon name="family" /> },
           { to: "/settings", label: "Settings", icon: <Icon name="settings" /> },
         ],
       },
@@ -203,38 +219,49 @@ export default function Sidebar({
   const content = (
     <aside
       className={[
-        "h-screen sticky top-0 border-r bg-white",
+        "sticky top-0 flex h-screen flex-col border-r border-white/70 bg-white/85 shadow-xl shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 dark:border-slate-800/80 dark:bg-slate-950/90 dark:shadow-black/30",
         collapsed ? "w-20" : "w-72",
       ].join(" ")}
     >
-      {/* Header */}
-      <div className="border-b p-4">
+      <div className="border-b border-slate-200/70 p-4 dark:border-slate-800">
         <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-base font-bold leading-5 truncate">
-              {collapsed ? "HF" : "HomeFinance"}
-            </h1>
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-sm font-black text-white shadow-lg shadow-indigo-500/30">
+              {collapsed ? "HF" : <Icon name="spark" className="h-5 w-5" />}
+            </div>
+
             {!collapsed && (
-              <p className="text-xs text-gray-500 mt-1">Track • Split • Plan</p>
+              <div className="min-w-0">
+                <h1 className="truncate text-base font-black leading-5 text-slate-950 dark:text-white">
+                  HomeFinance
+                </h1>
+                <p className="mt-1 truncate text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Beautiful budgeting workspace
+                </p>
+              </div>
             )}
           </div>
 
-          {/* Collapse toggle (optional) */}
           {onToggleCollapse && (
             <button
               onClick={onToggleCollapse}
-              className="hidden md:inline-flex items-center justify-center rounded-md border px-2 py-2 hover:bg-gray-50"
+              className="hidden h-9 w-9 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:-translate-y-0.5 hover:bg-slate-50 hover:text-slate-950 hover:shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 md:inline-flex"
               title={collapsed ? "Expand" : "Collapse"}
             >
-              <Icon name="chev" className={["h-4 w-4 transition", collapsed ? "rotate-180" : ""].join(" ")} />
+              <Icon
+                name="chev"
+                className={[
+                  "h-4 w-4 transition-transform duration-200",
+                  collapsed ? "rotate-180" : "",
+                ].join(" ")}
+              />
             </button>
           )}
 
-          {/* Mobile close (only drawer) */}
           {onCloseDrawer && (
             <button
               onClick={onCloseDrawer}
-              className="md:hidden inline-flex items-center justify-center rounded-md border px-2 py-2 hover:bg-gray-50"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 md:hidden"
               title="Close"
             >
               <Icon name="close" className="h-4 w-4" />
@@ -243,12 +270,11 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Nav */}
-      <nav className="p-3 overflow-y-auto h-[calc(100vh-73px)]">
+      <nav className="flex-1 overflow-y-auto p-3">
         {nav.map((group) => (
           <div key={group.title}>
             <GroupTitle collapsed={collapsed}>{group.title}</GroupTitle>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {group.items.map((it) => (
                 <Item
                   key={it.to}
@@ -262,26 +288,25 @@ export default function Sidebar({
           </div>
         ))}
       </nav>
+
+      <SidebarFooter collapsed={collapsed} />
     </aside>
   );
 
-  // If used as a mobile drawer:
   if (typeof onCloseDrawer === "function") {
     return (
       <>
-        {/* overlay */}
         <div
           className={[
-            "fixed inset-0 bg-black/30 z-40 transition",
+            "fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm transition-opacity",
             drawerOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
           ].join(" ")}
           onClick={onCloseDrawer}
         />
 
-        {/* panel */}
         <div
           className={[
-            "fixed left-0 top-0 z-50 transition-transform",
+            "fixed left-0 top-0 z-50 transition-transform duration-300",
             drawerOpen ? "translate-x-0" : "-translate-x-full",
           ].join(" ")}
         >
@@ -293,11 +318,3 @@ export default function Sidebar({
 
   return content;
 }
-
-/**
- * Optional helper button for mobile (place in your top bar)
- *
- * <button onClick={()=>setOpen(true)} className="md:hidden border rounded-md p-2">
- *   <Icon name="menu" className="h-5 w-5" />
- * </button>
- */

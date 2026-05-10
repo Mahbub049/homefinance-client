@@ -30,9 +30,22 @@ function toLocalYMD(dateLike) {
   return `${y}-${m}-${day}`;
 }
 
+function formatPrettyDate(dateLike) {
+  if (!dateLike) return "No date";
+  const d = new Date(dateLike);
+  return d.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 function money(n) {
   const v = Number(n || 0);
-  return `৳ ${v.toLocaleString("en-BD")}`;
+  return `৳ ${v.toLocaleString("en-BD", {
+    minimumFractionDigits: Number.isInteger(v) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function moneyPdf(n) {
@@ -74,15 +87,167 @@ function getId(v) {
   return String(v._id || v.id || "");
 }
 
-function TabButton({ active, children, onClick }) {
+function typeLabel(t) {
+  if (t === "income") return "Income";
+  if (t === "expense") return "Expense";
+  if (t === "transfer") return "Transfer";
+  return t || "Transaction";
+}
+
+function splitLabel(split) {
+  const t = split?.type;
+  if (t === "equal") return "Equal";
+  if (t === "personal") return "Personal";
+  if (t === "ratio") return "Ratio";
+  if (t === "fixed") return "Fixed Amount";
+  return "";
+}
+
+function Icon({ name, className = "h-5 w-5" }) {
+  const common = {
+    className,
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+  };
+
+  if (name === "plus") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <path d="M12 5v14" />
+        <path d="M5 12h14" />
+      </svg>
+    );
+  }
+  if (name === "download") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <path d="M12 3v12" />
+        <path d="m7 10 5 5 5-5" />
+        <path d="M5 21h14" />
+      </svg>
+    );
+  }
+  if (name === "search") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-3.5-3.5" />
+      </svg>
+    );
+  }
+  if (name === "calendar") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <path d="M8 2v4" />
+        <path d="M16 2v4" />
+        <path d="M3 10h18" />
+        <path d="M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" />
+      </svg>
+    );
+  }
+  if (name === "sun") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2" />
+        <path d="M12 20v2" />
+        <path d="m4.93 4.93 1.41 1.41" />
+        <path d="m17.66 17.66 1.41 1.41" />
+        <path d="M2 12h2" />
+        <path d="M20 12h2" />
+        <path d="m6.34 17.66-1.41 1.41" />
+        <path d="m19.07 4.93-1.41 1.41" />
+      </svg>
+    );
+  }
+  if (name === "moon") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <path d="M21 14.2A8 8 0 0 1 9.8 3 7 7 0 1 0 21 14.2z" />
+      </svg>
+    );
+  }
+  if (name === "spark") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <path d="M13 2 3 14h8l-1 8 11-14h-8l0-6z" />
+      </svg>
+    );
+  }
+  if (name === "edit") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+      </svg>
+    );
+  }
+  if (name === "trash") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <path d="M3 6h18" />
+        <path d="M8 6V4h8v2" />
+        <path d="M19 6l-1 14H6L5 6" />
+        <path d="M10 11v5" />
+        <path d="M14 11v5" />
+      </svg>
+    );
+  }
+  if (name === "wallet") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <path d="M3 7h18v14H3z" />
+        <path d="M3 7l2-4h14l2 4" />
+        <path d="M17 14h4" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common} viewBox="0 0 24 24">
+      <path d="M4 19V5" />
+      <path d="M4 19h16" />
+      <path d="M8 15v-5" />
+      <path d="M12 15V7" />
+      <path d="M16 15v-3" />
+    </svg>
+  );
+}
+
+function TypeDot({ txType }) {
+  const map = {
+    income: "bg-emerald-500 shadow-emerald-500/40",
+    expense: "bg-rose-500 shadow-rose-500/40",
+    transfer: "bg-sky-500 shadow-sky-500/40",
+  };
+  return (
+    <span
+      className={cn(
+        "inline-block h-3 w-3 rounded-full shadow-lg ring-4 ring-white dark:ring-slate-950",
+        map[txType] || "bg-slate-400"
+      )}
+    />
+  );
+}
+
+function PillButton({ active, children, onClick, tone = "slate" }) {
+  const activeMap = {
+    slate: "bg-slate-950 text-white shadow-lg shadow-slate-900/20 dark:bg-white dark:text-slate-950",
+    income: "bg-emerald-600 text-white shadow-lg shadow-emerald-500/25",
+    expense: "bg-rose-600 text-white shadow-lg shadow-rose-500/25",
+    transfer: "bg-sky-600 text-white shadow-lg shadow-sky-500/25",
+  };
   return (
     <button
+      type="button"
       onClick={onClick}
       className={cn(
-        "px-3 py-2 rounded-lg text-sm border transition whitespace-nowrap",
+        "rounded-2xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 whitespace-nowrap",
         active
-          ? "bg-black text-white border-black"
-          : "bg-white hover:bg-gray-50 text-gray-700 border-gray-200"
+          ? activeMap[tone]
+          : "border border-slate-200 bg-white/80 text-slate-700 hover:-translate-y-0.5 hover:bg-white hover:shadow-md dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
       )}
     >
       {children}
@@ -90,45 +255,116 @@ function TabButton({ active, children, onClick }) {
   );
 }
 
-function MetricCard({ title, value, subtitle, tone = "neutral" }) {
-  const toneMap = {
-    neutral: "from-slate-50 to-white border-slate-200",
-    income: "from-emerald-50 to-white border-emerald-200",
-    expense: "from-rose-50 to-white border-rose-200",
-    transfer: "from-sky-50 to-white border-sky-200",
-    net: "from-violet-50 to-white border-violet-200",
+function ActionButton({ children, onClick, variant = "primary", type = "button", disabled = false }) {
+  const variants = {
+    primary:
+      "bg-slate-950 text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100",
+    warm:
+      "bg-gradient-to-r from-fuchsia-600 via-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25 hover:shadow-violet-500/35",
+    soft:
+      "border border-slate-200 bg-white/80 text-slate-700 hover:bg-white hover:shadow-md dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10",
+    danger:
+      "border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200",
   };
+
   return (
-    <div
+    <button
+      type={type}
+      disabled={disabled}
+      onClick={onClick}
       className={cn(
-        "rounded-2xl border bg-gradient-to-b p-4",
-        toneMap[tone] || toneMap.neutral
+        "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60",
+        variants[variant]
       )}
     >
-      <div className="text-xs text-gray-600">{title}</div>
-      <div className="mt-1 text-lg sm:text-2xl font-semibold tracking-tight break-words">
-        {value}
+      {children}
+    </button>
+  );
+}
+
+function MetricCard({ title, value, subtitle, tone = "neutral", icon = "chart" }) {
+  const toneMap = {
+    neutral: {
+      card: "from-slate-50 via-white to-slate-100 border-slate-200 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 dark:border-white/10",
+      badge: "bg-slate-900 text-white dark:bg-white dark:text-slate-950",
+      glow: "bg-slate-300/40",
+    },
+    income: {
+      card: "from-emerald-50 via-white to-teal-50 border-emerald-200 dark:from-emerald-950/40 dark:via-slate-900 dark:to-teal-950/30 dark:border-emerald-500/20",
+      badge: "bg-emerald-600 text-white",
+      glow: "bg-emerald-400/30",
+    },
+    expense: {
+      card: "from-rose-50 via-white to-orange-50 border-rose-200 dark:from-rose-950/40 dark:via-slate-900 dark:to-orange-950/25 dark:border-rose-500/20",
+      badge: "bg-rose-600 text-white",
+      glow: "bg-rose-400/30",
+    },
+    transfer: {
+      card: "from-sky-50 via-white to-cyan-50 border-sky-200 dark:from-sky-950/40 dark:via-slate-900 dark:to-cyan-950/25 dark:border-sky-500/20",
+      badge: "bg-sky-600 text-white",
+      glow: "bg-sky-400/30",
+    },
+    net: {
+      card: "from-violet-50 via-white to-fuchsia-50 border-violet-200 dark:from-violet-950/40 dark:via-slate-900 dark:to-fuchsia-950/25 dark:border-violet-500/20",
+      badge: "bg-violet-600 text-white",
+      glow: "bg-violet-400/30",
+    },
+  };
+
+  const s = toneMap[tone] || toneMap.neutral;
+
+  return (
+    <div className={cn("group relative overflow-hidden rounded-3xl border bg-gradient-to-br p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl", s.card)}>
+      <div className={cn("pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full blur-2xl transition group-hover:scale-125", s.glow)} />
+      <div className="relative flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+            {title}
+          </div>
+          <div className="mt-2 text-2xl font-black tracking-tight text-slate-950 dark:text-white break-words">
+            {value}
+          </div>
+          {subtitle ? (
+            <div className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+              {subtitle}
+            </div>
+          ) : null}
+        </div>
+        <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl", s.badge)}>
+          <Icon name={icon} className="h-5 w-5" />
+        </div>
       </div>
-      {subtitle ? (
-        <div className="mt-1 text-xs text-gray-500 leading-5">{subtitle}</div>
-      ) : null}
     </div>
   );
 }
 
-function IconDot({ txType }) {
-  const map = {
-    income: "bg-emerald-500",
-    expense: "bg-rose-500",
-    transfer: "bg-sky-500",
-  };
+function FieldLabel({ children }) {
+  return <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">{children}</label>;
+}
+
+function FieldInput({ className = "", ...props }) {
   return (
-    <span
+    <input
+      {...props}
       className={cn(
-        "inline-block h-2.5 w-2.5 rounded-full",
-        map[txType] || "bg-gray-400"
+        "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-500",
+        className
       )}
     />
+  );
+}
+
+function FieldSelect({ className = "", children, ...props }) {
+  return (
+    <select
+      {...props}
+      className={cn(
+        "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10 dark:border-white/10 dark:bg-slate-950/70 dark:text-white",
+        className
+      )}
+    >
+      {children}
+    </select>
   );
 }
 
@@ -138,6 +374,7 @@ export default function Ledger() {
   const [month, setMonth] = useState(monthNow());
   const [activeTab, setActiveTab] = useState("all");
   const [day, setDay] = useState(dayNow());
+  const [theme, setTheme] = useState(() => localStorage.getItem("homefinance-ledger-theme") || "light");
 
   const [members, setMembers] = useState([]);
   const [incomeCats, setIncomeCats] = useState([]);
@@ -157,21 +394,6 @@ export default function Ledger() {
     transfer: 0,
     netCashflow: 0,
   });
-
-  const fixedExpenseTotal = useMemo(() => {
-    return (allItems || [])
-      .filter(
-        (t) =>
-          t.txType === "expense" &&
-          (t.note?.toLowerCase().includes("fixed") ||
-            t.categoryId?.name?.toLowerCase().includes("housing"))
-      )
-      .reduce((s, t) => s + Number(t.amount || 0), 0);
-  }, [allItems]);
-
-  const remainingExpense = useMemo(() => {
-    return Number(totals.expense || 0) - Number(fixedExpenseTotal || 0);
-  }, [totals, fixedExpenseTotal]);
 
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
@@ -199,6 +421,25 @@ export default function Ledger() {
     fixedMe: "",
     fixedOther: "",
   });
+
+  useEffect(() => {
+    localStorage.setItem("homefinance-ledger-theme", theme);
+  }, [theme]);
+
+  const fixedExpenseTotal = useMemo(() => {
+    return (allItems || [])
+      .filter(
+        (t) =>
+          t.txType === "expense" &&
+          (t.note?.toLowerCase().includes("fixed") ||
+            t.categoryId?.name?.toLowerCase().includes("housing"))
+      )
+      .reduce((s, t) => s + Number(t.amount || 0), 0);
+  }, [allItems]);
+
+  const remainingExpense = useMemo(() => {
+    return Number(totals.expense || 0) - Number(fixedExpenseTotal || 0);
+  }, [totals, fixedExpenseTotal]);
 
   async function loadBasics() {
     const [mRes, inc, exp, acc] = await Promise.all([
@@ -255,7 +496,8 @@ export default function Ledger() {
   }
 
   useEffect(() => {
-    loadBasics();
+    loadBasics().catch((e) => setMsg(e?.response?.data?.message || "Failed to load basic data"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -305,10 +547,7 @@ export default function Ledger() {
       txType: next.txType || "expense",
       date: next.date || new Date().toISOString().slice(0, 10),
       categoryId: next.categoryId || "",
-      amount:
-        next.amount === 0 || next.amount
-          ? String(next.amount)
-          : "",
+      amount: next.amount === 0 || next.amount ? String(next.amount) : "",
       note: next.note || "",
       fromAccountId: next.fromAccountId || defaultAccount,
       toAccountId: next.toAccountId || defaultAccount,
@@ -397,10 +636,7 @@ export default function Ledger() {
       if (showCategory && !form.categoryId) return setMsg("Select a category");
       if (showFrom && !form.fromAccountId) return setMsg("Select From account");
       if (showTo && !form.toAccountId) return setMsg("Select To account");
-      if (
-        form.txType === "transfer" &&
-        form.fromAccountId === form.toAccountId
-      ) {
+      if (form.txType === "transfer" && form.fromAccountId === form.toAccountId) {
         return setMsg("From and To accounts must be different");
       }
 
@@ -450,8 +686,7 @@ export default function Ledger() {
         fromAccountId: showFrom ? form.fromAccountId : null,
         toAccountId: showTo ? form.toAccountId : null,
         paidByUserId: form.txType === "expense" ? form.paidByUserId : null,
-        receivedByUserId:
-          form.txType === "income" ? form.receivedByUserId : null,
+        receivedByUserId: form.txType === "income" ? form.receivedByUserId : null,
         split,
       };
 
@@ -464,10 +699,7 @@ export default function Ledger() {
       closeModal();
       await loadTransactions();
     } catch (e) {
-      setMsg(
-        e?.response?.data?.message ||
-          (isEditing ? "Update failed" : "Create failed")
-      );
+      setMsg(e?.response?.data?.message || (isEditing ? "Update failed" : "Create failed"));
     }
   }
 
@@ -503,10 +735,8 @@ export default function Ledger() {
     const filtered = (items || []).filter((it) => {
       if (memberFilter !== "all") {
         const filterId = String(memberFilter);
-        if (it.txType === "income" && getId(it.receivedByUserId) !== filterId)
-          return false;
-        if (it.txType === "expense" && getId(it.paidByUserId) !== filterId)
-          return false;
+        if (it.txType === "income" && getId(it.receivedByUserId) !== filterId) return false;
+        if (it.txType === "expense" && getId(it.paidByUserId) !== filterId) return false;
       }
 
       if (!needle) return true;
@@ -515,7 +745,8 @@ export default function Ledger() {
       const fromName = it.fromAccountId?.name || "";
       const toName = it.toAccountId?.name || "";
       const note = it.note || "";
-      const hay = `${catName} ${fromName} ${toName} ${note} ${it.txType}`.toLowerCase();
+      const splitName = splitLabel(it.split);
+      const hay = `${catName} ${fromName} ${toName} ${note} ${splitName} ${it.txType}`.toLowerCase();
       return hay.includes(needle);
     });
 
@@ -524,9 +755,7 @@ export default function Ledger() {
 
   const availableDates = useMemo(() => {
     const s = new Set();
-    for (const it of rows || []) {
-      s.add(toLocalYMD(it.date));
-    }
+    for (const it of rows || []) s.add(toLocalYMD(it.date));
     return Array.from(s).sort((a, b) => (a < b ? 1 : -1));
   }, [rows]);
 
@@ -539,15 +768,23 @@ export default function Ledger() {
       return;
     }
 
-    if (!availableDates.includes(day)) {
-      setDay(availableDates[0]);
-    }
+    if (!availableDates.includes(day)) setDay(availableDates[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableDates, month]);
 
   const dayRows = useMemo(() => {
     return (rows || []).filter((it) => toLocalYMD(it.date) === day);
   }, [rows, day]);
+
+  const dayTotals = useMemo(() => {
+    return dayRows.reduce(
+      (acc, it) => {
+        acc[it.txType] = Number(acc[it.txType] || 0) + Number(it.amount || 0);
+        return acc;
+      },
+      { income: 0, expense: 0, transfer: 0 }
+    );
+  }, [dayRows]);
 
   const memberStats = useMemo(() => {
     const by = {};
@@ -600,12 +837,10 @@ export default function Ledger() {
       const normalizedOwner = owner || "Joint";
       const ownerMemberId = ownerToMemberId[normalizedOwner] || "";
 
-      // Personal account: full transfer effect goes to that person.
       if (normalizedOwner !== "Joint" && ownerMemberId && by[ownerMemberId]) {
         return [{ id: ownerMemberId, ratio: 1 }];
       }
 
-      // Joint or unknown owner: split equally among all visible family members.
       const ratio = 1 / memberCount;
       return membersArr.map((m) => ({ id: m.id, ratio }));
     };
@@ -620,9 +855,6 @@ export default function Ledger() {
       const fromOwner = fromAcc?.owner || "Joint";
       const toOwner = toAcc?.owner || "Joint";
 
-      // Same owner transfer, such as Mahbub Bank -> Mahbub DPS,
-      // is only movement between that person's own accounts.
-      // So it must not reduce or increase personal remaining.
       if (fromOwner === toOwner) continue;
 
       for (const part of participantsForOwner(fromOwner)) {
@@ -644,10 +876,7 @@ export default function Ledger() {
         transferIn,
         transferOut,
         transferNet,
-        remaining:
-          Number(x.income || 0) -
-          Number(x.expense || 0) +
-          transferNet,
+        remaining: Number(x.income || 0) - Number(x.expense || 0) + transferNet,
       };
     });
 
@@ -669,39 +898,29 @@ export default function Ledger() {
     return best;
   }, [allItems]);
 
-  const typeLabel = (t) =>
-    t === "income"
-      ? "Income"
-      : t === "expense"
-        ? "Expense"
-        : t === "transfer"
-          ? "Transfer"
-          : t;
+  const biggestTransaction = useMemo(() => {
+    if (!allItems.length) return null;
+    return [...allItems].sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0))[0];
+  }, [allItems]);
 
-  const splitLabel = (split) => {
-    const t = split?.type;
-    if (t === "equal") return "Equal";
-    if (t === "personal") return "Personal";
-    if (t === "ratio") return "Ratio";
-    if (t === "fixed") return "Fixed Amount";
-    return "";
-  };
+  const memberRemainingTotal = useMemo(() => {
+    return memberStats.reduce((s, x) => s + Number(x.remaining || 0), 0);
+  }, [memberStats]);
 
   async function exportTransactionsPdf() {
     try {
       const doc = new jsPDF("p", "mm", "a4");
       const pageWidth = doc.internal.pageSize.getWidth();
 
-      const exportRows = [...rows].sort(
-        (a, b) => new Date(a.date) - new Date(b.date)
-      );
+      const exportRows = [...rows].sort((a, b) => new Date(a.date) - new Date(b.date));
 
       const title = "HomeFinance Transaction Statement";
       const subtitle = `Month: ${month}`;
-      const filterLine = `Type: ${activeTab === "all" ? "All" : typeLabel(activeTab)} | Member: ${memberFilter === "all"
-        ? "All members"
-        : members.find((m) => getId(m) === memberFilter)?.name || "All members"
-        }`;
+      const filterLine = `Type: ${activeTab === "all" ? "All" : typeLabel(activeTab)} | Member: ${
+        memberFilter === "all"
+          ? "All members"
+          : members.find((m) => getId(m) === memberFilter)?.name || "All members"
+      }`;
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
@@ -729,14 +948,8 @@ export default function Ledger() {
           ["Remaining Expense", moneyPdf(remainingExpense)],
           ["Transactions Count", String(exportRows.length)],
         ],
-        styles: {
-          fontSize: 9,
-          cellPadding: 2.5,
-        },
-        headStyles: {
-          fillColor: [240, 240, 240],
-          textColor: 20,
-        },
+        styles: { fontSize: 9, cellPadding: 2.5 },
+        headStyles: { fillColor: [240, 240, 240], textColor: 20 },
       });
 
       autoTable(doc, {
@@ -752,29 +965,14 @@ export default function Ledger() {
           moneyPdf(m.transferNet),
           moneyPdf(m.remaining),
         ]),
-        styles: {
-          fontSize: 8.5,
-          cellPadding: 2.2,
-        },
-        headStyles: {
-          fillColor: [240, 240, 240],
-          textColor: 20,
-        },
+        styles: { fontSize: 8.5, cellPadding: 2.2 },
+        headStyles: { fillColor: [240, 240, 240], textColor: 20 },
       });
 
       autoTable(doc, {
         startY: doc.lastAutoTable.finalY + 6,
         theme: "grid",
-        head: [[
-          "Date",
-          "Type",
-          "Member",
-          "Category / Details",
-          "From",
-          "To",
-          "Amount",
-          "Note",
-        ]],
+        head: [["Date", "Type", "Member", "Category / Details", "From", "To", "Amount", "Split", "Note"]],
         body: exportRows.map((it) => {
           const who =
             it.txType === "income"
@@ -791,29 +989,27 @@ export default function Ledger() {
             it.fromAccountId?.name || "-",
             it.toAccountId?.name || "-",
             `${it.txType === "expense" ? "-" : it.txType === "income" ? "+" : ""}${moneyPdf(it.amount)}`,
+            it.txType === "expense" ? splitLabel(it.split) || "-" : "-",
             it.note || "-",
           ];
         }),
         styles: {
-          fontSize: 7.8,
-          cellPadding: 1.8,
+          fontSize: 7.5,
+          cellPadding: 1.7,
           overflow: "linebreak",
           valign: "middle",
         },
-        headStyles: {
-          fillColor: [240, 240, 240],
-          textColor: 20,
-          fontSize: 8,
-        },
+        headStyles: { fillColor: [240, 240, 240], textColor: 20, fontSize: 7.5 },
         columnStyles: {
-          0: { cellWidth: 18 },
-          1: { cellWidth: 16 },
-          2: { cellWidth: 24 },
-          3: { cellWidth: 34 },
-          4: { cellWidth: 24 },
-          5: { cellWidth: 24 },
-          6: { cellWidth: 24 },
-          7: { cellWidth: 28 },
+          0: { cellWidth: 17 },
+          1: { cellWidth: 15 },
+          2: { cellWidth: 23 },
+          3: { cellWidth: 30 },
+          4: { cellWidth: 22 },
+          5: { cellWidth: 22 },
+          6: { cellWidth: 22 },
+          7: { cellWidth: 18 },
+          8: { cellWidth: 28 },
         },
         didDrawPage: () => {
           const pageCount = doc.getNumberOfPages();
@@ -837,401 +1033,442 @@ export default function Ledger() {
     }
   }
 
+  const tabCount = {
+    all: allItems.length,
+    income: allItems.filter((x) => x.txType === "income").length,
+    expense: allItems.filter((x) => x.txType === "expense").length,
+    transfer: allItems.filter((x) => x.txType === "transfer").length,
+  };
+
   return (
     <AppLayout>
-      <div className="w-full px-3 sm:px-4 lg:px-6">
-        <div className="mb-5 rounded-2xl border bg-gradient-to-br from-slate-50 to-white p-4 sm:p-5">
-          <div className="flex flex-col gap-4">
-            <div className="min-w-0">
-              <div className="text-xs text-gray-500">HomeFinance Ledger</div>
-              <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight">
-                Transactions
-              </h2>
-              <p className="text-sm text-gray-600 mt-1 leading-6">
-                Track <b>Income</b>, <b>Expense</b>, and <b>Transfer</b>.
-                Individual summary uses <b>ledger entries</b> (split-aware). If
-                ledger entries are missing, rebuild once.
-              </p>
+      <div className={cn(theme === "dark" && "dark")}> 
+        <div className="min-h-[calc(100vh-7rem)] rounded-[2rem] bg-slate-100/70 p-2 text-slate-900 transition-colors dark:bg-slate-950 dark:text-white sm:p-3">
+          <div className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/80 shadow-2xl shadow-slate-200/70 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/80 dark:shadow-black/20">
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+              <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-fuchsia-400/20 blur-3xl" />
+              <div className="absolute right-0 top-8 h-80 w-80 rounded-full bg-sky-400/20 blur-3xl" />
+              <div className="absolute bottom-0 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-emerald-400/10 blur-3xl" />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  value={month}
-                  onChange={(e) => setMonth(e.target.value)}
-                  type="month"
-                  className="border rounded-md px-3 py-2 text-sm bg-white w-full sm:w-auto"
-                />
-                <button
-                  onClick={openModal}
-                  className="bg-black text-white rounded-lg px-4 py-2 text-sm shadow-sm hover:opacity-95 active:opacity-90 w-full sm:w-auto"
-                >
-                  + Add
-                </button>
-                <button
-                  onClick={exportTransactionsPdf}
-                  className="border rounded-lg px-4 py-2 text-sm bg-white hover:bg-gray-50 shadow-sm w-full sm:w-auto"
-                >
-                  Export PDF
-                </button>
-              </div>
+            <div className="relative p-4 sm:p-6 lg:p-8">
+              <section className="overflow-hidden rounded-[1.75rem] border border-white/60 bg-gradient-to-br from-slate-950 via-indigo-950 to-fuchsia-900 p-5 text-white shadow-2xl shadow-violet-900/20 dark:border-white/10 sm:p-6">
+                <div className="relative z-10 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
+                  <div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-white/80 backdrop-blur">
+                      <Icon name="spark" className="h-4 w-4" />
+                      Split-aware family ledger
+                    </div>
+                    <h1 className="mt-4 max-w-3xl text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">
+                      Smart Transactions Dashboard
+                    </h1>
+                    <p className="mt-3 max-w-3xl text-sm leading-7 text-white/75 sm:text-base">
+                      Track income, expenses, transfers, split type, account movement, and individual remaining balance from one organized page.
+                    </p>
 
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  className="border rounded-lg px-3 py-2 text-sm bg-white w-full"
-                  placeholder="Search category, note, account…"
-                />
-                <select
-                  value={memberFilter}
-                  onChange={(e) => setMemberFilter(e.target.value)}
-                  className="border rounded-lg px-3 py-2 text-sm bg-white w-full sm:w-auto"
-                  title="Filter by member"
-                >
-                  <option value="all">All members</option>
-                  {members.map((m) => (
-                    <option key={getId(m)} value={getId(m)}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 text-sm text-gray-600 leading-6">
-            Biggest expense this month: <b>{topExpenseCategory.name}</b> (
-            {money(topExpenseCategory.amount)}).
-          </div>
-        </div>
-
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-          <TabButton active={activeTab === "all"} onClick={() => setActiveTab("all")}>
-            All
-          </TabButton>
-          <TabButton active={activeTab === "income"} onClick={() => setActiveTab("income")}>
-            Income
-          </TabButton>
-          <TabButton active={activeTab === "expense"} onClick={() => setActiveTab("expense")}>
-            Expense
-          </TabButton>
-          <TabButton active={activeTab === "transfer"} onClick={() => setActiveTab("transfer")}>
-            Transfer
-          </TabButton>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-          <div className="lg:col-span-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
-              <MetricCard title="Income" value={money(totals.income)} tone="income" />
-              <MetricCard title="Expense" value={money(totals.expense)} tone="expense" />
-              <MetricCard
-                title="Remaining Expense"
-                value={money(remainingExpense)}
-                subtitle={`Expense - Fixed (${money(fixedExpenseTotal)})`}
-                tone="neutral"
-              />
-              <MetricCard title="Transfer" value={money(totals.transfer)} tone="transfer" />
-              <MetricCard
-                title="Net Cashflow"
-                value={money(totals.netCashflow)}
-                subtitle={
-                  totals.netCashflow < 0
-                    ? "Overspending this month"
-                    : "Healthy month so far"
-                }
-                tone="net"
-              />
-            </div>
-
-            <div className="mt-4 rounded-2xl border bg-white">
-              <div className="p-4 border-b flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold">
-                    Individual summary (split-aware)
+                    <div className="mt-5 flex flex-wrap items-center gap-3">
+                      <ActionButton onClick={openModal} variant="warm">
+                        <Icon name="plus" className="h-4 w-4" /> Add Transaction
+                      </ActionButton>
+                      <ActionButton onClick={exportTransactionsPdf} variant="soft">
+                        <Icon name="download" className="h-4 w-4" /> Export PDF
+                      </ActionButton>
+                      <ActionButton onClick={() => setTheme(theme === "dark" ? "light" : "dark")} variant="soft">
+                        <Icon name={theme === "dark" ? "sun" : "moon"} className="h-4 w-4" />
+                        {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                      </ActionButton>
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500 leading-5">
-                    Remaining = Income (splits) − Expense (splits) + Transfer Net.
-                    Same-owner transfers are ignored for personal remaining.
-                  </div>
-                  <div className="mt-2 text-xs text-gray-500 leading-5">
-                    Ledger entries loaded: <b>{ledgerItems.length}</b> •
-                    Transactions loaded: <b>{allItems.length}</b>
+
+                  <div className="grid grid-cols-2 gap-3 rounded-[1.5rem] border border-white/10 bg-white/10 p-3 backdrop-blur-xl">
+                    <div className="rounded-2xl bg-white/10 p-4">
+                      <div className="text-xs text-white/60">Month</div>
+                      <div className="mt-1 text-xl font-black">{month}</div>
+                    </div>
+                    <div className="rounded-2xl bg-white/10 p-4">
+                      <div className="text-xs text-white/60">Transactions</div>
+                      <div className="mt-1 text-xl font-black">{allItems.length}</div>
+                    </div>
+                    <div className="col-span-2 rounded-2xl bg-white/10 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-xs text-white/60">Net Cashflow</div>
+                          <div className="mt-1 text-2xl font-black">{money(totals.netCashflow)}</div>
+                        </div>
+                        <div className="rounded-2xl bg-white px-3 py-2 text-xs font-bold text-slate-950">
+                          {totals.netCashflow < 0 ? "Needs control" : "Healthy"}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
+              </section>
 
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                  <div className="text-sm text-gray-600">
-                    Total Remaining:{" "}
-                    <b>
-                      {money(
-                        memberStats.reduce((s, x) => s + (x.remaining || 0), 0)
-                      )}
-                    </b>
+              <section className="mt-5 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <FieldLabel>Month</FieldLabel>
+                    <div className="relative">
+                      <Icon name="calendar" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <FieldInput value={month} onChange={(e) => setMonth(e.target.value)} type="month" className="pl-11" />
+                    </div>
+                  </div>
+                  <div className="sm:col-span-1 lg:col-span-2">
+                    <FieldLabel>Search</FieldLabel>
+                    <div className="relative">
+                      <Icon name="search" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <FieldInput
+                        value={q}
+                        onChange={(e) => setQ(e.target.value)}
+                        className="pl-11"
+                        placeholder="Search category, note, account, split type..."
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <FieldLabel>Member</FieldLabel>
+                    <FieldSelect value={memberFilter} onChange={(e) => setMemberFilter(e.target.value)} title="Filter by member">
+                      <option value="all">All members</option>
+                      {members.map((m) => (
+                        <option key={getId(m)} value={getId(m)}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </FieldSelect>
+                  </div>
+                </div>
+              </section>
+
+              {msg ? (
+                <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+                  {msg}
+                </div>
+              ) : null}
+
+              <section className="mt-5 flex gap-2 overflow-x-auto pb-1">
+                <PillButton active={activeTab === "all"} onClick={() => setActiveTab("all")}>
+                  All <span className="ml-1 opacity-70">{tabCount.all}</span>
+                </PillButton>
+                <PillButton active={activeTab === "income"} tone="income" onClick={() => setActiveTab("income")}>
+                  Income <span className="ml-1 opacity-70">{tabCount.income}</span>
+                </PillButton>
+                <PillButton active={activeTab === "expense"} tone="expense" onClick={() => setActiveTab("expense")}>
+                  Expense <span className="ml-1 opacity-70">{tabCount.expense}</span>
+                </PillButton>
+                <PillButton active={activeTab === "transfer"} tone="transfer" onClick={() => setActiveTab("transfer")}>
+                  Transfer <span className="ml-1 opacity-70">{tabCount.transfer}</span>
+                </PillButton>
+              </section>
+
+              <section className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <MetricCard title="Income" value={money(totals.income)} tone="income" icon="wallet" />
+                <MetricCard title="Expense" value={money(totals.expense)} tone="expense" icon="chart" />
+                <MetricCard title="Remaining Expense" value={money(remainingExpense)} subtitle={`Expense - Fixed (${money(fixedExpenseTotal)})`} tone="neutral" icon="spark" />
+                <MetricCard title="Transfer" value={money(totals.transfer)} tone="transfer" icon="download" />
+                <MetricCard
+                  title="Net Cashflow"
+                  value={money(totals.netCashflow)}
+                  subtitle={totals.netCashflow < 0 ? "Expense is higher than income" : "Income is covering expenses"}
+                  tone="net"
+                  icon="chart"
+                />
+              </section>
+
+              <section className="mt-5 grid gap-5 xl:grid-cols-[1.4fr_0.6fr]">
+                <div className="rounded-[1.75rem] border border-slate-200 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/50 sm:p-5">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <div className="text-lg font-black text-slate-950 dark:text-white">Individual Summary</div>
+                      <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+                        Remaining = Income split − Expense split + Transfer net. Same-owner transfers are ignored for personal remaining.
+                      </p>
+                      <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                        Ledger entries: <b>{ledgerItems.length}</b> • Transactions: <b>{allItems.length}</b>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                        Total Remaining: <b className="text-slate-950 dark:text-white">{money(memberRemainingTotal)}</b>
+                      </div>
+                      {ledgerItems.length === 0 && allItems.length > 0 ? (
+                        <ActionButton onClick={rebuildLedger} variant="soft">
+                          Rebuild Ledger
+                        </ActionButton>
+                      ) : null}
+                    </div>
                   </div>
 
-                  {ledgerItems.length === 0 && allItems.length > 0 ? (
-                    <button
-                      onClick={rebuildLedger}
-                      className="text-xs border rounded-lg px-3 py-2 hover:bg-gray-50 w-full sm:w-auto"
-                      title="Rebuild ledger entries from transactions"
-                    >
-                      Rebuild Ledger
-                    </button>
-                  ) : null}
-                </div>
-              </div>
+                  <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {memberStats.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-slate-300 p-5 text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
+                        No family members found.
+                      </div>
+                    ) : (
+                      memberStats.map((m, idx) => {
+                        const maxAbs = Math.max(
+                          1,
+                          ...memberStats.map((x) =>
+                            Math.max(
+                              Math.abs(x.income),
+                              Math.abs(x.expense),
+                              Math.abs(x.remaining),
+                              Math.abs(x.transferIn),
+                              Math.abs(x.transferOut)
+                            )
+                          )
+                        );
 
-              <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                {memberStats.length === 0 ? (
-                  <div className="text-sm text-gray-600">No family members found.</div>
-                ) : (
-                  memberStats.map((m) => {
-                    const maxAbs = Math.max(
-                      1,
-                      ...memberStats.map((x) =>
-                        Math.max(
-                          Math.abs(x.income),
-                          Math.abs(x.expense),
-                          Math.abs(x.remaining),
-                          Math.abs(x.transferIn),
-                          Math.abs(x.transferOut)
-                        )
-                      )
-                    );
+                        const remP = pct(Math.abs(m.remaining), maxAbs);
+                        const isNeg = m.remaining < 0;
 
-                    const remP = pct(Math.abs(m.remaining), maxAbs);
-                    const isNeg = m.remaining < 0;
-
-                    return (
-                      <div
-                        key={m.id}
-                        className="rounded-2xl border border-gray-200 p-4"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="h-10 w-10 shrink-0 rounded-xl bg-slate-100 flex items-center justify-center font-semibold text-gray-700">
-                            {initials(m.name)}
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                              <div className="min-w-0">
-                                <div className="text-sm font-semibold break-words">
-                                  {m.name}
+                        return (
+                          <div key={m.id} className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm dark:border-white/10 dark:from-white/10 dark:to-white/5">
+                            <div className={cn("absolute -right-10 -top-10 h-24 w-24 rounded-full blur-2xl", idx % 2 === 0 ? "bg-violet-400/20" : "bg-emerald-400/20")} />
+                            <div className="relative flex items-start gap-3">
+                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-sm font-black text-white shadow-lg shadow-slate-900/20 dark:bg-white dark:text-slate-950">
+                                {initials(m.name)}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-slate-950 dark:text-white">{m.name}</div>
+                                    <div className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                                      Income {money(m.income)} • Expense {money(m.expense)}
+                                      <br />
+                                      In {money(m.transferIn)} • Out {money(m.transferOut)} • Net {money(m.transferNet)}
+                                    </div>
+                                  </div>
+                                  <div className={cn("shrink-0 rounded-2xl px-3 py-1 text-sm font-black", isNeg ? "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200" : "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200")}>
+                                    {money(m.remaining)}
+                                  </div>
                                 </div>
-                                <div className="text-xs text-gray-500 leading-5 mt-1">
-                                  Income {money(m.income)} • Expense {money(m.expense)}
-                                  <br />
-                                  Transfer In {money(m.transferIn)} • Transfer Out{" "}
-                                  {money(m.transferOut)}
-                                  <br />
-                                  Transfer Net {money(m.transferNet)}
+
+                                <div className="mt-4">
+                                  <div className="h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                                    <div className={cn("h-3 rounded-full", isNeg ? "bg-gradient-to-r from-rose-500 to-orange-400" : "bg-gradient-to-r from-emerald-500 to-teal-400")} style={{ width: `${remP}%` }} />
+                                  </div>
+                                  <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                    {isNeg ? "Negative after expenses and transfers" : "Remaining after expenses and transfers"}
+                                  </div>
                                 </div>
                               </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
 
+                <div className="space-y-5">
+                  <div className="rounded-[1.75rem] border border-slate-200 bg-white/85 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/50">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-lg font-black text-slate-950 dark:text-white">Quick Insights</div>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Readable overview for this month.</p>
+                      </div>
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-600 text-white">
+                        <Icon name="spark" className="h-5 w-5" />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                      <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm dark:bg-white/5">
+                        <span className="text-slate-500 dark:text-slate-400">Shown transactions</span>
+                        <b>{rows.length}</b>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm dark:bg-white/5">
+                        <span className="text-slate-500 dark:text-slate-400">Selected day items</span>
+                        <b>{dayRows.length}</b>
+                      </div>
+                      <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm dark:bg-white/5">
+                        <div className="text-slate-500 dark:text-slate-400">Top expense category</div>
+                        <div className="mt-1 flex items-center justify-between gap-3">
+                          <b className="truncate" title={topExpenseCategory.name}>{topExpenseCategory.name}</b>
+                          <b className="text-rose-600 dark:text-rose-300">{money(topExpenseCategory.amount)}</b>
+                        </div>
+                      </div>
+                      <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm dark:bg-white/5">
+                        <div className="text-slate-500 dark:text-slate-400">Biggest transaction</div>
+                        <div className="mt-1 flex items-center justify-between gap-3">
+                          <b>{biggestTransaction ? typeLabel(biggestTransaction.txType) : "—"}</b>
+                          <b>{biggestTransaction ? money(biggestTransaction.amount) : money(0)}</b>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 p-4 text-xs leading-5 text-violet-800 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-200">
+                      Transfers use account ownership: Mahbub, Mirza, or Joint. Same-owner transfers are not counted as personal spending.
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.75rem] border border-slate-200 bg-white/85 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/50">
+                    <div className="text-lg font-black text-slate-950 dark:text-white">Selected Day</div>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Income, expense and transfer for {formatPrettyDate(day)}.</p>
+                    <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
+                        <div>Income</div>
+                        <b>{money(dayTotals.income)}</b>
+                      </div>
+                      <div className="rounded-2xl bg-rose-50 p-3 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200">
+                        <div>Expense</div>
+                        <b>{money(dayTotals.expense)}</b>
+                      </div>
+                      <div className="rounded-2xl bg-sky-50 p-3 text-sky-700 dark:bg-sky-500/10 dark:text-sky-200">
+                        <div>Transfer</div>
+                        <b>{money(dayTotals.transfer)}</b>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="mt-5 overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white/85 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/50">
+                <div className="border-b border-slate-200 p-4 dark:border-white/10 sm:p-5">
+                  <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                    <div>
+                      <div className="text-lg font-black text-slate-950 dark:text-white">Transaction Timeline</div>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        {month} — {dayRows.length} item(s) showing for {formatPrettyDate(day)}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                      <div className="min-w-[190px]">
+                        <FieldInput type="date" value={day} onChange={(e) => setDay(e.target.value)} />
+                      </div>
+                      <ActionButton onClick={() => setDay(dayNow())} variant="soft">
+                        Today
+                      </ActionButton>
+                      <div className="rounded-2xl bg-slate-50 px-4 py-2 text-xs text-slate-500 dark:bg-white/5 dark:text-slate-400">
+                        Logged in as <b className="text-slate-900 dark:text-white">{me?.name || "User"}</b>
+                      </div>
+                    </div>
+                  </div>
+
+                  {availableDates.length > 0 ? (
+                    <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+                      {availableDates.slice(0, 12).map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setDay(d)}
+                          className={cn(
+                            "rounded-2xl px-3 py-2 text-xs font-bold transition whitespace-nowrap",
+                            day === d
+                              ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
+                              : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+                          )}
+                        >
+                          {formatPrettyDate(d)}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+
+                {loading ? (
+                  <Loader text="Loading ledger" subtext="Collecting transactions and balances" />
+                ) : rows.length === 0 ? (
+                  <div className="p-8 text-center text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    No transactions match your filters. Click <b>+ Add Transaction</b> to create one.
+                  </div>
+                ) : dayRows.length === 0 ? (
+                  <div className="p-8 text-center text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    No transactions found for <b>{day}</b>. Try another date.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 dark:divide-white/10">
+                    {dayRows.map((it) => {
+                      const catName = it.categoryId?.name;
+                      const fromName = it.fromAccountId?.name;
+                      const toName = it.toAccountId?.name;
+
+                      let details = "";
+                      if (it.txType === "transfer") details = `${fromName || "-"} → ${toName || "-"}`;
+                      else if (it.txType === "income") details = `${catName || "-"} • To: ${toName || "-"}`;
+                      else details = `${catName || "-"} • From: ${fromName || "-"}`;
+
+                      const splitText = it.txType === "expense" ? splitLabel(it.split) : "";
+
+                      const who =
+                        it.txType === "income"
+                          ? memberById.get(getId(it.receivedByUserId))?.name
+                          : it.txType === "expense"
+                            ? memberById.get(getId(it.paidByUserId))?.name
+                            : null;
+
+                      return (
+                        <div key={it._id} className="group px-4 py-4 transition hover:bg-slate-50/70 dark:hover:bg-white/[0.03] sm:px-5">
+                          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="flex min-w-0 flex-1 items-start gap-4">
+                              <div className="pt-1">
+                                <TypeDot txType={it.txType} />
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <div className="font-black text-slate-950 dark:text-white">{typeLabel(it.txType)}</div>
+                                  {who ? (
+                                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                                      {who}
+                                    </span>
+                                  ) : null}
+                                  {splitText ? (
+                                    <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-500/10 dark:text-violet-200">
+                                      Split: {splitText}
+                                    </span>
+                                  ) : null}
+                                </div>
+
+                                <div className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                                  {details}
+                                </div>
+                                {it.note ? (
+                                  <div className="mt-2 rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:bg-white/5 dark:text-slate-400">
+                                    {it.note}
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-3 lg:block lg:text-right">
                               <div
                                 className={cn(
-                                  "text-sm font-semibold shrink-0",
-                                  isNeg ? "text-rose-600" : "text-emerald-700"
+                                  "whitespace-nowrap text-lg font-black",
+                                  it.txType === "income"
+                                    ? "text-emerald-600 dark:text-emerald-300"
+                                    : it.txType === "expense"
+                                      ? "text-rose-600 dark:text-rose-300"
+                                      : "text-sky-600 dark:text-sky-300"
                                 )}
                               >
-                                {money(m.remaining)}
+                                {it.txType === "expense" ? "-" : it.txType === "income" ? "+" : ""}
+                                {money(it.amount)}
+                              </div>
+                              <div className="flex items-center justify-end gap-2 lg:mt-3">
+                                <button
+                                  onClick={() => openEditModal(it)}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+                                >
+                                  <Icon name="edit" className="h-3.5 w-3.5" /> Edit
+                                </button>
+                                <button
+                                  onClick={() => deleteTx(it._id)}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
+                                >
+                                  <Icon name="trash" className="h-3.5 w-3.5" /> Delete
+                                </button>
                               </div>
                             </div>
                           </div>
                         </div>
-
-                        <div className="mt-3">
-                          <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
-                            <div
-                              className={cn(
-                                "h-2",
-                                isNeg ? "bg-rose-500" : "bg-emerald-500"
-                              )}
-                              style={{ width: `${remP}%` }}
-                            />
-                          </div>
-                          <div className="mt-2 text-xs text-gray-500">
-                            {isNeg ? "Negative after expenses and transfers" : "Remaining after expenses and transfers"}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="rounded-2xl border bg-white p-4">
-              <div className="text-sm font-semibold">Quick insights</div>
-              <div className="mt-3 space-y-2 text-sm text-gray-700">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-gray-600">Transactions (month)</span>
-                  <b>{allItems.length}</b>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-gray-600">Shown now (day)</span>
-                  <b>{dayRows.length}</b>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-gray-600">Top expense</span>
-                  <b className="truncate max-w-[160px]" title={topExpenseCategory.name}>
-                    {topExpenseCategory.name}
-                  </b>
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-gray-600 leading-5">
-                Tip: Transfers are attributed using <b>account ownership</b>{" "}
-                (Mahbub/Mirza/Joint). If an account owner is wrong, transfer
-                per-person may show 0 or split equally.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border bg-white overflow-hidden">
-          <div className="p-4 border-b flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="text-sm font-semibold leading-6">
-              {month} — {dayRows.length} item(s)
-              {availableDates.length ? (
-                <span className="text-xs font-normal text-gray-500">
-                  {" "}
-                  • (Showing {day})
-                </span>
-              ) : null}
-            </div>
-
-            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <span className="text-sm text-gray-600">Date</span>
-                <input
-                  type="date"
-                  value={day}
-                  onChange={(e) => setDay(e.target.value)}
-                  className="border rounded-md px-3 py-2 text-sm bg-white w-full sm:w-auto"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setDay(dayNow())}
-                className="border rounded-md px-3 py-2 text-sm hover:bg-gray-50 w-full sm:w-auto"
-              >
-                Today
-              </button>
-
-              <div className="text-xs text-gray-500">
-                Logged in as <b>{me?.name || "User"}</b>
-              </div>
-            </div>
-          </div>
-
-          {msg && (
-            <div className="px-4 py-3 text-sm text-rose-600 border-b bg-rose-50 break-words">
-              {msg}
-            </div>
-          )}
-
-          {loading ? (
-            <Loader text="Loading ledger" subtext="Collecting transactions and balances" />
-          ) : rows.length === 0 ? (
-            <div className="p-6 text-gray-600 text-sm leading-6">
-              No transactions match your filters. Click <b>+ Add</b> to create one.
-            </div>
-          ) : dayRows.length === 0 ? (
-            <div className="p-6 text-gray-600 text-sm leading-6">
-              No transactions found for <b>{day}</b>. Try another date.
-            </div>
-          ) : (
-            <div className="divide-y">
-              {dayRows.map((it) => {
-                const catName = it.categoryId?.name;
-                const fromName = it.fromAccountId?.name;
-                const toName = it.toAccountId?.name;
-
-                let details = "";
-                if (it.txType === "transfer") details = `${fromName || "-"} → ${toName || "-"}`;
-                else if (it.txType === "income") details = `${catName || "-"} • To: ${toName || "-"}`;
-                else details = `${catName || "-"} • From: ${fromName || "-"}`;
-
-                if (it.txType === "expense" && splitLabel(it.split)) {
-                  details += ` • Split: ${splitLabel(it.split)}`;
-                }
-
-                if (it.note) details += ` • ${it.note}`;
-
-                const who =
-                  it.txType === "income"
-                    ? memberById.get(getId(it.receivedByUserId))?.name
-                    : it.txType === "expense"
-                      ? memberById.get(getId(it.paidByUserId))?.name
-                      : null;
-
-                return (
-                  <div
-                    key={it._id}
-                    className="px-4 py-3 flex flex-col sm:flex-row sm:items-start gap-3"
-                  >
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <div className="pt-1 shrink-0">
-                        <IconDot txType={it.txType} />
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="text-sm font-semibold text-gray-900">
-                            {typeLabel(it.txType)}
-                          </div>
-                          {who ? (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                              {who}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="text-sm text-gray-700 mt-1 break-words leading-6">
-                          {details}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="sm:text-right flex sm:block items-center justify-between gap-3">
-                      <div
-                        className={cn(
-                          "text-sm font-semibold whitespace-nowrap",
-                          it.txType === "income"
-                            ? "text-emerald-700"
-                            : it.txType === "expense"
-                              ? "text-rose-700"
-                              : "text-sky-700"
-                        )}
-                      >
-                        {it.txType === "expense" ? "-" : it.txType === "income" ? "+" : ""}
-                        {money(it.amount)}
-                      </div>
-                      <div className="sm:mt-2 flex items-center gap-2 justify-end">
-                        <button
-                          onClick={() => openEditModal(it)}
-                          className="text-xs border rounded-lg px-3 py-1 hover:bg-gray-50 whitespace-nowrap"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => deleteTx(it._id)}
-                          className="text-xs border rounded-lg px-3 py-1 hover:bg-gray-50 whitespace-nowrap"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                )}
+              </section>
             </div>
-          )}
+          </div>
         </div>
 
         <ConfirmModal
@@ -1244,18 +1481,27 @@ export default function Ledger() {
 
         {open && (
           <div className="app-modal-overlay">
-            <div className="app-modal-panel max-w-lg rounded-2xl p-4 sm:p-5">
-              <h3 className="text-lg font-semibold mb-1">{isEditing ? "Edit Transaction" : "Add Transaction"}</h3>
-              <p className="text-sm text-gray-500 mb-4 leading-6">
-                Use <b>Transfer</b> for moving money between accounts
-                (e.g., Bank → DPS).
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="app-modal-panel max-w-3xl rounded-[1.75rem] border-slate-200 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-slate-900 sm:p-5">
+              <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 dark:border-white/10 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <label className="text-sm font-medium">Type</label>
-                  <select
-                    className="w-full border rounded-md px-3 py-2"
+                  <h3 className="text-2xl font-black text-slate-950 dark:text-white">{isEditing ? "Edit Transaction" : "Add Transaction"}</h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    Use <b>Transfer</b> for moving money between accounts. Expense entries support Personal, Equal, Ratio and Fixed split.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <FieldLabel>Type</FieldLabel>
+                  <FieldSelect
                     value={form.txType}
                     onChange={(e) =>
                       setForm({
@@ -1269,183 +1515,134 @@ export default function Ledger() {
                     <option value="income">Income</option>
                     <option value="expense">Expense</option>
                     <option value="transfer">Transfer</option>
-                  </select>
+                  </FieldSelect>
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium">Date</label>
-                  <input
-                    type="date"
-                    className="w-full border rounded-md px-3 py-2"
-                    value={form.date}
-                    onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  />
+                  <FieldLabel>Date</FieldLabel>
+                  <FieldInput type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
                 </div>
 
                 {showCategory && (
                   <div className="md:col-span-2">
-                    <label className="text-sm font-medium">Category</label>
-                    <select
-                      className="w-full border rounded-md px-3 py-2"
-                      value={form.categoryId}
-                      onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-                    >
-                      <option value="">Select</option>
+                    <FieldLabel>Category</FieldLabel>
+                    <FieldSelect value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>
+                      <option value="">Select category</option>
                       {(form.txType === "income" ? incomeCats : expenseCats).map((c) => (
                         <option key={c._id} value={c._id}>
                           {c.name}
                         </option>
                       ))}
-                    </select>
+                    </FieldSelect>
                   </div>
                 )}
 
                 {showFrom && (
                   <div className="md:col-span-2">
-                    <label className="text-sm font-medium">From Account</label>
-                    <select
-                      className="w-full border rounded-md px-3 py-2"
-                      value={form.fromAccountId}
-                      onChange={(e) => setForm({ ...form, fromAccountId: e.target.value })}
-                    >
-                      <option value="">Select</option>
+                    <FieldLabel>From Account</FieldLabel>
+                    <FieldSelect value={form.fromAccountId} onChange={(e) => setForm({ ...form, fromAccountId: e.target.value })}>
+                      <option value="">Select account</option>
                       {accounts.map((a) => (
                         <option key={a._id} value={a._id}>
-                          {a.name}
+                          {a.name} {a.owner ? `(${a.owner})` : ""}
                         </option>
                       ))}
-                    </select>
+                    </FieldSelect>
                   </div>
                 )}
 
                 {showTo && (
                   <div className="md:col-span-2">
-                    <label className="text-sm font-medium">To Account</label>
-                    <select
-                      className="w-full border rounded-md px-3 py-2"
-                      value={form.toAccountId}
-                      onChange={(e) => setForm({ ...form, toAccountId: e.target.value })}
-                    >
-                      <option value="">Select</option>
+                    <FieldLabel>To Account</FieldLabel>
+                    <FieldSelect value={form.toAccountId} onChange={(e) => setForm({ ...form, toAccountId: e.target.value })}>
+                      <option value="">Select account</option>
                       {accounts.map((a) => (
                         <option key={a._id} value={a._id}>
-                          {a.name}
+                          {a.name} {a.owner ? `(${a.owner})` : ""}
                         </option>
                       ))}
-                    </select>
+                    </FieldSelect>
                   </div>
                 )}
 
                 {form.txType === "expense" && (
                   <div className="md:col-span-2">
-                    <label className="text-sm font-medium">Paid By</label>
-                    <select
-                      className="w-full border rounded-md px-3 py-2"
-                      value={form.paidByUserId}
-                      onChange={(e) => setForm({ ...form, paidByUserId: e.target.value })}
-                    >
-                      <option value="">Select</option>
+                    <FieldLabel>Paid By</FieldLabel>
+                    <FieldSelect value={form.paidByUserId} onChange={(e) => setForm({ ...form, paidByUserId: e.target.value })}>
+                      <option value="">Select member</option>
                       {members.map((m) => (
                         <option key={getId(m)} value={getId(m)}>
                           {m.name}
                         </option>
                       ))}
-                    </select>
+                    </FieldSelect>
                   </div>
                 )}
 
                 {form.txType === "expense" && (
-                  <div className="md:col-span-2 rounded-xl border bg-slate-50 p-3">
-                    <div className="text-sm font-semibold mb-2">Split</div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="md:col-span-2 rounded-[1.5rem] border border-violet-100 bg-violet-50/70 p-4 dark:border-violet-500/20 dark:bg-violet-500/10">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-black text-slate-950 dark:text-white">Split Details</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">Select how this expense should affect personal remaining.</div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div className="sm:col-span-2">
-                        <label className="text-sm font-medium">Split Type</label>
-                        <select
-                          className="w-full border rounded-md px-3 py-2 bg-white"
-                          value={form.splitType}
-                          onChange={(e) => setForm({ ...form, splitType: e.target.value })}
-                        >
+                        <FieldLabel>Split Type</FieldLabel>
+                        <FieldSelect value={form.splitType} onChange={(e) => setForm({ ...form, splitType: e.target.value })}>
                           <option value="personal">Personal</option>
                           <option value="equal">Equal</option>
                           <option value="ratio">Ratio</option>
                           <option value="fixed">Fixed Amount</option>
-                        </select>
+                        </FieldSelect>
                       </div>
 
                       {form.splitType === "personal" && (
                         <div className="sm:col-span-2">
-                          <label className="text-sm font-medium">Personal For</label>
-                          <select
-                            className="w-full border rounded-md px-3 py-2 bg-white"
-                            value={form.personalUserId}
-                            onChange={(e) => setForm({ ...form, personalUserId: e.target.value })}
-                          >
+                          <FieldLabel>Personal For</FieldLabel>
+                          <FieldSelect value={form.personalUserId} onChange={(e) => setForm({ ...form, personalUserId: e.target.value })}>
                             <option value="">Select member</option>
                             {members.map((m) => (
                               <option key={getId(m)} value={getId(m)}>
                                 {m.name}
                               </option>
                             ))}
-                          </select>
+                          </FieldSelect>
                         </div>
                       )}
 
                       {form.splitType === "ratio" && otherMember && (
                         <>
                           <div>
-                            <label className="text-sm font-medium">My %</label>
-                            <input
-                              type="number"
-                              className="w-full border rounded-md px-3 py-2 bg-white"
-                              value={form.ratioMe}
-                              onChange={(e) => setForm({ ...form, ratioMe: e.target.value })}
-                            />
+                            <FieldLabel>My %</FieldLabel>
+                            <FieldInput type="number" value={form.ratioMe} onChange={(e) => setForm({ ...form, ratioMe: e.target.value })} />
                           </div>
                           <div>
-                            <label className="text-sm font-medium">{otherMember.name} %</label>
-                            <input
-                              type="number"
-                              className="w-full border rounded-md px-3 py-2 bg-white"
-                              value={form.ratioOther}
-                              onChange={(e) => setForm({ ...form, ratioOther: e.target.value })}
-                            />
+                            <FieldLabel>{otherMember.name} %</FieldLabel>
+                            <FieldInput type="number" value={form.ratioOther} onChange={(e) => setForm({ ...form, ratioOther: e.target.value })} />
                           </div>
-                          <div className="sm:col-span-2 text-xs text-gray-500">
-                            Ratio total must be 100.
-                          </div>
+                          <div className="sm:col-span-2 text-xs text-slate-500 dark:text-slate-400">Ratio total must be exactly 100.</div>
                         </>
                       )}
 
                       {form.splitType === "fixed" && otherMember && (
                         <>
                           <div>
-                            <label className="text-sm font-medium">My Amount</label>
-                            <input
-                              type="number"
-                              className="w-full border rounded-md px-3 py-2 bg-white"
-                              value={form.fixedMe}
-                              onChange={(e) => setForm({ ...form, fixedMe: e.target.value })}
-                              placeholder="e.g., 300"
-                            />
+                            <FieldLabel>My Amount</FieldLabel>
+                            <FieldInput type="number" value={form.fixedMe} onChange={(e) => setForm({ ...form, fixedMe: e.target.value })} placeholder="e.g., 300" />
                           </div>
                           <div>
-                            <label className="text-sm font-medium">{otherMember.name} Amount</label>
-                            <input
-                              type="number"
-                              className="w-full border rounded-md px-3 py-2 bg-white"
-                              value={form.fixedOther}
-                              onChange={(e) => setForm({ ...form, fixedOther: e.target.value })}
-                              placeholder="e.g., 200"
-                            />
+                            <FieldLabel>{otherMember.name} Amount</FieldLabel>
+                            <FieldInput type="number" value={form.fixedOther} onChange={(e) => setForm({ ...form, fixedOther: e.target.value })} placeholder="e.g., 200" />
                           </div>
-                          <div className="sm:col-span-2 text-xs text-gray-500">
-                            Fixed amounts must be equal to the total expense amount.
-                          </div>
+                          <div className="sm:col-span-2 text-xs text-slate-500 dark:text-slate-400">Fixed amounts must be equal to the total expense amount.</div>
                         </>
                       )}
 
                       {form.splitType === "equal" && (
-                        <div className="sm:col-span-2 text-xs text-gray-500 leading-5">
+                        <div className="sm:col-span-2 rounded-2xl bg-white/80 p-3 text-xs leading-5 text-slate-500 dark:bg-white/5 dark:text-slate-400">
                           The expense will be shared equally among all family members.
                         </div>
                       )}
@@ -1455,66 +1652,43 @@ export default function Ledger() {
 
                 {form.txType === "income" && (
                   <div className="md:col-span-2">
-                    <label className="text-sm font-medium">Received By</label>
-                    <select
-                      className="w-full border rounded-md px-3 py-2"
-                      value={form.receivedByUserId}
-                      onChange={(e) =>
-                        setForm({ ...form, receivedByUserId: e.target.value })
-                      }
-                    >
-                      <option value="">Select</option>
+                    <FieldLabel>Received By</FieldLabel>
+                    <FieldSelect value={form.receivedByUserId} onChange={(e) => setForm({ ...form, receivedByUserId: e.target.value })}>
+                      <option value="">Select member</option>
                       {members.map((m) => (
                         <option key={getId(m)} value={getId(m)}>
                           {m.name}
                         </option>
                       ))}
-                    </select>
+                    </FieldSelect>
                   </div>
                 )}
 
                 <div className="md:col-span-2">
-                  <label className="text-sm font-medium">Amount</label>
-                  <input
-                    type="number"
-                    className="w-full border rounded-md px-3 py-2"
-                    value={form.amount}
-                    onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                    placeholder="e.g., 5000"
-                  />
+                  <FieldLabel>Amount</FieldLabel>
+                  <FieldInput type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="e.g., 5000" />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="text-sm font-medium">Note (optional)</label>
-                  <input
-                    className="w-full border rounded-md px-3 py-2"
+                  <FieldLabel>Note</FieldLabel>
+                  <FieldInput
                     value={form.note}
                     onChange={(e) => setForm({ ...form, note: e.target.value })}
-                    placeholder={
-                      form.txType === "transfer"
-                        ? "e.g., DPS deposit"
-                        : "e.g., Electricity bill"
-                    }
+                    placeholder={form.txType === "transfer" ? "e.g., DPS deposit" : "e.g., Electricity bill"}
                   />
                 </div>
               </div>
 
-              <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end mt-4">
-                <button
-                  onClick={closeModal}
-                  className="border rounded-lg px-4 py-2 text-sm hover:bg-gray-50 w-full sm:w-auto"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={saveTx}
-                  className="bg-black text-white rounded-lg px-4 py-2 text-sm w-full sm:w-auto"
-                >
-                  {isEditing ? "Update" : "Save"}
-                </button>
-              </div>
+              {msg ? <div className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 dark:bg-rose-500/10 dark:text-rose-200">{msg}</div> : null}
 
-              {msg && <div className="mt-3 text-sm text-red-600 break-words">{msg}</div>}
+              <div className="mt-5 flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 dark:border-white/10 sm:flex-row sm:justify-end">
+                <ActionButton onClick={closeModal} variant="soft">
+                  Cancel
+                </ActionButton>
+                <ActionButton onClick={saveTx} variant="warm">
+                  {isEditing ? "Update Transaction" : "Save Transaction"}
+                </ActionButton>
+              </div>
             </div>
           </div>
         )}

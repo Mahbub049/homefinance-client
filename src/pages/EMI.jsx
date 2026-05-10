@@ -36,6 +36,50 @@ function normalizeId(v) {
   return String(v);
 }
 
+function safeDate(dateLike) {
+  if (!dateLike) return "-";
+  const d = new Date(dateLike);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString();
+}
+
+function percentage(value, total) {
+  const v = Number(value || 0);
+  const t = Number(total || 0);
+  if (!t) return 0;
+  return Math.min(100, Math.max(0, Math.round((v / t) * 100)));
+}
+
+function statusClass(status) {
+  const s = String(status || "").toLowerCase();
+
+  if (s === "paid") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+
+  if (s === "pending") {
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }
+
+  if (s === "active") {
+    return "border-sky-200 bg-sky-50 text-sky-700";
+  }
+
+  if (s === "closed") {
+    return "border-slate-200 bg-slate-100 text-slate-600";
+  }
+
+  return "border-slate-200 bg-slate-50 text-slate-600";
+}
+
+function splitLabel(value) {
+  const v = String(value || "equal").toLowerCase();
+  if (v === "personal") return "Personal";
+  if (v === "ratio") return "Ratio";
+  if (v === "fixed") return "Fixed";
+  return "Equal";
+}
+
 function splitMonthlyAmount(plan, members) {
   const total = Number(plan?.monthlyAmount || 0);
   const splitType = String(plan?.splitType || "equal").toLowerCase();
@@ -111,9 +155,7 @@ function splitMonthlyAmount(plan, members) {
   return activeMembers.map((m, index) => {
     const userId = normalizeId(m.id || m._id);
     const isLast = index === activeMembers.length - 1;
-    const amount = isLast
-      ? Math.round((total - used) * 100) / 100
-      : base;
+    const amount = isLast ? Math.round((total - used) * 100) / 100 : base;
 
     used += base;
 
@@ -126,8 +168,39 @@ function splitMonthlyAmount(plan, members) {
   });
 }
 
+function StatCard({ label, value, helper, accent = "from-sky-500 to-indigo-600" }) {
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-white/70 bg-white/90 p-4 shadow-sm ring-1 ring-slate-100 backdrop-blur transition hover:-translate-y-0.5 hover:shadow-md">
+      <div className={`absolute -right-6 -top-6 h-20 w-20 rounded-full bg-gradient-to-br ${accent} opacity-15`} />
+      <div className="relative">
+        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          {label}
+        </div>
+        <div className="mt-2 text-2xl font-black text-slate-950 break-words">{value}</div>
+        {helper && <div className="mt-1 text-xs text-slate-500 break-words">{helper}</div>}
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, children, className = "" }) {
+  return (
+    <div className={className}>
+      <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function inputClass(extra = "") {
+  return `w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 ${extra}`;
+}
+
 export default function EMI() {
   const me = getUser();
+  const myId = normalizeId(me?.id);
   const [month, setMonth] = useState(monthNow());
   const [open, setOpen] = useState(false);
   const [msg, setMsg] = useState("");
@@ -163,14 +236,14 @@ export default function EMI() {
   const [payModalOpen, setPayModalOpen] = useState(false);
   const [selectedInstallment, setSelectedInstallment] = useState(null);
   const [payForm, setPayForm] = useState({
-    paidByUserId: me?.id || "",
+    paidByUserId: myId || "",
     fromAccountId: "",
     paidDate: new Date().toISOString().slice(0, 10),
   });
 
   const otherMember = useMemo(
-    () => members.find((m) => m.id !== me?.id) || null,
-    [members, me]
+    () => members.find((m) => normalizeId(m.id || m._id) !== myId) || null,
+    [members, myId]
   );
 
   const payableAccounts = useMemo(
@@ -192,13 +265,11 @@ export default function EMI() {
       api.get("/api/categories", { params: { kind: "expense" } }),
     ]);
 
-    setMembers(mRes.data.members || []);
-
     const memberItems = mRes.data.members || [];
     setMembers(memberItems);
 
     if (memberItems.length > 0) {
-      const defaultPersonalId = me?.id || memberItems[0]?.id || "";
+      const defaultPersonalId = myId || memberItems[0]?.id || "";
       setForm((prev) => ({
         ...prev,
         personalUserId: prev.personalUserId || defaultPersonalId,
@@ -260,7 +331,7 @@ export default function EMI() {
       months: 6,
       startMonth: month,
       splitType: "equal",
-      personalUserId: me?.id || members[0]?.id || "",
+      personalUserId: myId || members[0]?.id || "",
       ratioMe: 50,
       ratioOther: 50,
       fixedMe: "",
@@ -307,14 +378,14 @@ export default function EMI() {
 
       if (form.splitType === "ratio" && otherMember) {
         payload.ratios = [
-          { userId: me.id, ratio: Number(form.ratioMe) },
+          { userId: myId, ratio: Number(form.ratioMe) },
           { userId: otherMember.id, ratio: Number(form.ratioOther) },
         ];
       }
 
       if (form.splitType === "fixed" && otherMember) {
         payload.fixed = [
-          { userId: me.id, amount: Number(form.fixedMe || 0) },
+          { userId: myId, amount: Number(form.fixedMe || 0) },
           { userId: otherMember.id, amount: Number(form.fixedOther || 0) },
         ];
       }
@@ -380,6 +451,45 @@ export default function EMI() {
     return Math.round(total * 100) / 100;
   }, [monthlyPersonTotals]);
 
+  const activePlansThisMonth = useMemo(
+    () =>
+      plans.filter(
+        (p) => String(p?.status || "") === "active" && monthInRange(month, p?.startMonth, p?.endMonth)
+      ),
+    [plans, month]
+  );
+
+  const installmentStats = useMemo(() => {
+    const total = installments.reduce((sum, i) => sum + Number(i.amount || 0), 0);
+    const paid = installments
+      .filter((i) => String(i.status || "").toLowerCase() === "paid")
+      .reduce((sum, i) => sum + Number(i.amount || 0), 0);
+    const pending = Math.max(0, total - paid);
+    const pendingCount = installments.filter(
+      (i) => String(i.status || "").toLowerCase() !== "paid"
+    ).length;
+    const paidCount = installments.filter(
+      (i) => String(i.status || "").toLowerCase() === "paid"
+    ).length;
+
+    return {
+      total: Math.round(total * 100) / 100,
+      paid: Math.round(paid * 100) / 100,
+      pending: Math.round(pending * 100) / 100,
+      pendingCount,
+      paidCount,
+      progress: total ? Math.round((paid / total) * 100) : 0,
+    };
+  }, [installments]);
+
+  const nextDueInstallment = useMemo(() => {
+    const pending = installments
+      .filter((i) => String(i.status || "").toLowerCase() !== "paid")
+      .sort((a, b) => new Date(a?.dueDate || 0) - new Date(b?.dueDate || 0));
+
+    return pending[0] || null;
+  }, [installments]);
+
   async function generateMonth() {
     setMsg("");
     try {
@@ -440,7 +550,7 @@ export default function EMI() {
     const defaultAccount = payableAccounts[0]?._id || "";
     setSelectedInstallment(item);
     setPayForm({
-      paidByUserId: me?.id || members[0]?.id || "",
+      paidByUserId: myId || members[0]?.id || "",
       fromAccountId: defaultAccount,
       paidDate: item?.dueDate
         ? new Date(item.dueDate).toISOString().slice(0, 10)
@@ -503,843 +613,792 @@ export default function EMI() {
     const items = splitMonthlyAmount(plan, members);
 
     if (!items.length) {
-      return <div className="text-xs text-gray-500">Split info missing</div>;
+      return <div className="text-xs text-slate-500">Split info missing</div>;
     }
 
     return (
-      <div className="space-y-1">
-        {items.map((item) => (
-          <div
-            key={item.key}
-            className="flex items-center justify-between gap-3 text-xs"
-          >
-            <span className="text-gray-600 truncate">{item.name}</span>
-            <span className="font-medium text-gray-900">৳ {money(item.amount)}</span>
-          </div>
-        ))}
+      <div className="space-y-2">
+        {items.map((item) => {
+          const bar = percentage(item.amount, Number(plan?.monthlyAmount || 0));
+
+          return (
+            <div key={item.key} className="rounded-xl bg-slate-50 p-2.5 ring-1 ring-slate-100">
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <span className="font-semibold text-slate-700 truncate">{item.name}</span>
+                <span className="font-black text-slate-950">৳ {money(item.amount)}</span>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-sky-500 to-indigo-600"
+                  style={{ width: `${bar}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   }
 
   return (
     <AppLayout>
-      <div className="w-full max-w-full overflow-x-hidden">
-        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <h2 className="text-xl sm:text-2xl font-bold">EMI</h2>
-            <p className="text-sm text-gray-600">
-              Create EMI plan → generate monthly payables into ledger.
-            </p>
-          </div>
+      <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-gradient-to-br from-slate-50 via-sky-50/60 to-indigo-50/70 px-3 py-4 sm:px-5 lg:px-6">
+        <div className="mx-auto max-w-[1500px] space-y-5">
+          <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-indigo-950 to-sky-800 p-5 text-white shadow-xl sm:p-6 lg:p-7">
+            <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-cyan-400/20 blur-2xl" />
+            <div className="absolute bottom-0 left-1/2 h-28 w-72 -translate-x-1/2 rounded-full bg-fuchsia-400/10 blur-3xl" />
 
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-center w-full lg:w-auto">
-            <input
-              type="month"
-              className="w-full sm:w-auto border rounded-md px-3 py-2 text-sm bg-white"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
+            <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+              <div className="max-w-3xl">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-100 backdrop-blur">
+                  EMI Planner
+                </div>
+                <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">
+                  Manage monthly installments clearly
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-200 sm:text-base">
+                  Create EMI plans, generate monthly bills, track who needs to pay, and mark payments from the selected account.
+                </p>
+              </div>
+
+              <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-auto">
+                <div className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur">
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-300">
+                    Selected Month
+                  </label>
+                  <input
+                    type="month"
+                    className="w-full rounded-xl border border-white/20 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:ring-4 focus:ring-white/20 xl:w-48"
+                    value={month}
+                    onChange={(e) => setMonth(e.target.value)}
+                  />
+                </div>
+
+                <button
+                  onClick={openModal}
+                  className="rounded-2xl bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-lg transition hover:-translate-y-0.5 hover:bg-sky-50"
+                >
+                  + Add EMI Plan
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              label="Combined EMI To Pay"
+              value={`৳ ${money(monthlyCombinedTotal)}`}
+              helper={`Total active EMI liability in ${month}`}
+              accent="from-emerald-400 to-teal-600"
             />
-            <button
-              onClick={openModal}
-              className="w-full sm:w-auto bg-black text-white rounded-md px-4 py-2 text-sm"
-            >
-              + Add EMI Plan
-            </button>
-          </div>
-        </div>
+            <StatCard
+              label="Active Plans"
+              value={activePlansThisMonth.length}
+              helper="Plans active in selected month"
+              accent="from-sky-400 to-blue-600"
+            />
+            <StatCard
+              label="Pending Bills"
+              value={`৳ ${money(installmentStats.pending)}`}
+              helper={`${installmentStats.pendingCount} pending installment(s)`}
+              accent="from-amber-400 to-orange-600"
+            />
+            <StatCard
+              label="Paid This Month"
+              value={`৳ ${money(installmentStats.paid)}`}
+              helper={`${installmentStats.paidCount} paid installment(s)`}
+              accent="from-violet-400 to-fuchsia-600"
+            />
+          </section>
 
-        {msg && <div className="mb-3 text-sm text-blue-700 break-words">{msg}</div>}
-
-        <div className="bg-white border rounded-lg p-4 mb-4">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-            <div className="min-w-0">
-              <div className="font-medium">Monthly EMI Bills — {month}</div>
-              <div className="text-sm text-gray-600">
-                This creates the <b>pending</b> EMI installment rows for all{" "}
-                <b>active</b> plans in this month.
-              </div>
-              <div className="text-xs text-gray-500 mt-1">
-                Uses Expense category <b>EMI</b> automatically. If you don’t
-                have it, go to Settings → Categories and create one.
-              </div>
-            </div>
-
-            <button
-              onClick={generateMonth}
-              className="w-full lg:w-auto bg-black text-white rounded-md px-4 py-2 text-sm whitespace-nowrap"
-            >
-              Create EMI Bills
-            </button>
-          </div>
-
-          <div className="mt-3">
-            <div className="inline-flex flex-wrap items-center gap-2 px-3 py-2 rounded-md bg-gray-50 border text-sm">
-              <span className="text-gray-600">
-                Bills already created for {month}:
-              </span>
-              <b>{installments.length}</b>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white border rounded-lg p-4 mb-4">
-          <div className="mb-3">
-            <div className="font-medium">EMI Liability by Person — {month}</div>
-            <div className="text-sm text-gray-600">
-              Total EMI amount each person has to pay in this selected month.
-            </div>
-          </div>
-
-          {monthlyPersonTotals.length === 0 ? (
-            <div className="text-sm text-gray-600">
-              No active EMI liability for this month.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div>
-                  <div className="text-xs uppercase tracking-wide text-gray-500">
-                    Combined EMI To Pay
-                  </div>
-                  <div className="mt-1 text-sm text-gray-600">
-                    Total amount all persons need to pay in {month}.
-                  </div>
-                </div>
-                <div className="text-2xl sm:text-3xl font-bold text-black">
-                  ৳ {money(monthlyCombinedTotal)}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                {monthlyPersonTotals.map((item) => (
-                  <div
-                    key={item.userId}
-                    className="rounded-xl border bg-gray-50 p-4"
-                  >
-                    <div className="text-xs uppercase tracking-wide text-gray-500">
-                      EMI To Pay
-                    </div>
-                    <div className="mt-1 text-base font-semibold text-gray-900 break-words">
-                      {item.name}
-                    </div>
-                    <div className="mt-2 text-2xl font-bold text-black">
-                      ৳ {money(item.amount)}
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {msg && (
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-800 shadow-sm break-words">
+              {msg}
             </div>
           )}
-        </div>
 
-        <div className="bg-white border rounded-lg overflow-hidden mb-4">
-          <div className="p-3 border-b font-medium text-sm">EMI Plans</div>
+          <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex flex-col gap-4 border-b border-slate-100 bg-gradient-to-r from-white to-sky-50 p-5 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <div className="text-lg font-black text-slate-950">Monthly EMI Bills</div>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Generate pending installment rows for all active plans in {month}.
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Expense category used: <b>{emiExpenseCategoryId ? "EMI" : "Not selected"}</b>
+                  </p>
+                </div>
 
-          {plans.length === 0 ? (
-            <div className="p-4 text-sm text-gray-600">No EMI plans yet.</div>
-          ) : (
-            <>
-              {/* Desktop table */}
-              <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full text-sm min-w-[980px]">
-                  <thead className="bg-gray-50">
-                    <tr className="text-left">
-                      <th className="p-3">Product</th>
-                      <th className="p-3">Total</th>
-                      <th className="p-3">Months</th>
-                      <th className="p-3">Monthly</th>
-                      <th className="p-3">Who Pays</th>
-                      <th className="p-3">Remaining</th>
-                      <th className="p-3">Progress</th>
-                      <th className="p-3">Start-End</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3 text-right">Action</th>
-                    </tr>
-                  </thead>
+                <button
+                  onClick={generateMonth}
+                  className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-indigo-700"
+                >
+                  Create EMI Bills
+                </button>
+              </div>
 
-                  <tbody>
-                    {plans.map((p) => (
-                      <tr key={p._id} className="border-t">
-                        <td className="p-3">
-                          <div className="font-medium">{p.productName}</div>
-                          <div className="text-xs text-gray-500">
-                            {p.brand || "-"} {p.category ? `• ${p.category}` : ""}
-                          </div>
-                        </td>
+              <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-3">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Created Bills
+                  </div>
+                  <div className="mt-2 text-3xl font-black text-slate-950">{installments.length}</div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Collection Progress
+                  </div>
+                  <div className="mt-2 text-3xl font-black text-slate-950">{installmentStats.progress}%</div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-sky-500"
+                      style={{ width: `${installmentStats.progress}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Next Due
+                  </div>
+                  <div className="mt-2 text-base font-black text-slate-950 break-words">
+                    {nextDueInstallment?.planId?.productName || "No pending due"}
+                  </div>
+                  <div className="mt-1 text-sm text-slate-500">
+                    {nextDueInstallment ? safeDate(nextDueInstallment.dueDate) : "All clear"}
+                  </div>
+                </div>
+              </div>
+            </div>
 
-                        <td className="p-3">{p.totalPayable}</td>
-                        <td className="p-3">{p.months}</td>
-                        <td className="p-3">৳ {money(p.monthlyAmount)}</td>
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-100 bg-gradient-to-r from-white to-emerald-50 p-5">
+                <div className="text-lg font-black text-slate-950">EMI Liability by Person</div>
+                <p className="mt-1 text-sm text-slate-600">
+                  Split-aware monthly payable amount for {month}.
+                </p>
+              </div>
 
-                        <td className="p-3 min-w-[220px]">
-                          <div className="rounded-lg border border-gray-200 bg-gray-50 p-2">
-                            <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-gray-500">
-                              {String(p?.splitType || "equal")}
+              <div className="p-5">
+                {monthlyPersonTotals.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                    No active EMI liability for this month.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {monthlyPersonTotals.map((item) => {
+                      const share = percentage(item.amount, monthlyCombinedTotal);
+
+                      return (
+                        <div key={item.userId} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="font-black text-slate-950 break-words">{item.name}</div>
+                              <div className="text-xs text-slate-500">{share}% of this month</div>
                             </div>
-                            {renderMonthlySplit(p)}
+                            <div className="text-xl font-black text-emerald-700">৳ {money(item.amount)}</div>
                           </div>
-                        </td>
+                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white ring-1 ring-slate-100">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500"
+                              style={{ width: `${share}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
 
-                        <td className="p-3">
-                          <div className="font-medium">
-                            ৳ {money(p?.stats?.remaining ?? 0)}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {p?.stats?.remainingMonths ?? "-"} mo left
-                          </div>
-                        </td>
+          <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-2 border-b border-slate-100 bg-gradient-to-r from-white via-indigo-50 to-sky-50 p-5 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="text-lg font-black text-slate-950">EMI Plans</div>
+                <p className="mt-1 text-sm text-slate-600">
+                  Product-wise installment plans, progress, split details, and monthly bill creation.
+                </p>
+              </div>
+              <div className="rounded-full border border-indigo-100 bg-white px-3 py-1 text-xs font-bold text-indigo-700">
+                {plans.length} plan(s)
+              </div>
+            </div>
 
-                        <td className="p-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-28 bg-gray-200 rounded-full h-2 overflow-hidden">
-                              <div
-                                className="bg-black h-2"
-                                style={{
-                                  width: `${Math.min(
-                                    100,
-                                    Math.max(0, Number(p?.stats?.progress || 0))
-                                  )}%`,
-                                }}
-                              />
+            {plans.length === 0 ? (
+              <div className="p-6">
+                <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+                  <div className="text-3xl">🧾</div>
+                  <div className="mt-2 text-base font-black text-slate-900">No EMI plans yet</div>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Add your first EMI plan to calculate monthly payables automatically.
+                  </p>
+                  <button
+                    onClick={openModal}
+                    className="mt-4 rounded-xl bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
+                  >
+                    + Add EMI Plan
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-2 2xl:grid-cols-3">
+                {plans.map((p) => {
+                  const progress = Math.min(100, Math.max(0, Number(p?.stats?.progress || 0)));
+                  const canCreateBill =
+                    p.status === "active" && month >= p.startMonth && month <= p.endMonth;
+
+                  return (
+                    <div key={p._id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                      <div className="bg-gradient-to-br from-slate-950 via-indigo-900 to-sky-800 p-4 text-white">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-lg font-black break-words">{p.productName}</div>
+                            <div className="mt-1 text-xs text-slate-200 break-words">
+                              {p.brand || "No brand"} {p.category ? `• ${p.category}` : ""}
                             </div>
-                            <div className="text-xs text-gray-600">
-                              {p?.stats?.progress ?? 0}%
+                          </div>
+                          <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold ${statusClass(p.status)}`}>
+                            {p.status || "-"}
+                          </span>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-3">
+                          <div className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur">
+                            <div className="text-xs text-slate-300">Monthly</div>
+                            <div className="mt-1 text-xl font-black">৳ {money(p.monthlyAmount)}</div>
+                          </div>
+                          <div className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur">
+                            <div className="text-xs text-slate-300">Total</div>
+                            <div className="mt-1 text-xl font-black">৳ {money(p.totalPayable)}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 p-4">
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
+                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Term</div>
+                            <div className="mt-1 font-black text-slate-950">{p.months} months</div>
+                          </div>
+                          <div className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
+                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Remaining</div>
+                            <div className="mt-1 font-black text-slate-950">৳ {money(p?.stats?.remaining ?? 0)}</div>
+                            <div className="text-[11px] text-slate-500">{p?.stats?.remainingMonths ?? "-"} mo left</div>
+                          </div>
+                          <div className="col-span-2 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Duration</div>
+                                <div className="mt-1 font-black text-slate-950">{p.startMonth} → {p.endMonth}</div>
+                              </div>
+                              <div className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200">
+                                {splitLabel(p?.splitType)} split
+                              </div>
                             </div>
                           </div>
+                        </div>
 
+                        <div>
+                          <div className="mb-2 flex items-center justify-between text-xs">
+                            <span className="font-bold uppercase tracking-wide text-slate-500">Payment Progress</span>
+                            <span className="font-black text-slate-800">{progress}%</span>
+                          </div>
+                          <div className="h-2.5 overflow-hidden rounded-full bg-slate-200">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-sky-500 via-indigo-500 to-violet-600"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
                           {Number(p?.stats?.behindBy || 0) > 0 && (
-                            <div className="text-xs text-amber-700 mt-1">
+                            <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
                               Behind: ৳ {money(p.stats.behindBy)}
                             </div>
                           )}
-                        </td>
+                        </div>
 
-                        <td className="p-3">
-                          {p.startMonth} → {p.endMonth}
-                        </td>
-
-                        <td className="p-3">{p.status}</td>
-
-                        <td className="p-3 text-right">
-                          <div className="flex items-center justify-end gap-2 flex-wrap">
-                            {p.status === "active" &&
-                              month >= p.startMonth &&
-                              month <= p.endMonth && (
-                                <button
-                                  onClick={() =>
-                                    generateSinglePlan(p._id, p.productName)
-                                  }
-                                  className="bg-black text-white rounded-md px-3 py-1 hover:opacity-90"
-                                >
-                                  Create Bill
-                                </button>
-                              )}
-
-                            {p.status === "active" ? (
-                              <button
-                                onClick={() => setStatus(p._id, "closed")}
-                                className="border rounded-md px-3 py-1 hover:bg-gray-50"
-                              >
-                                Close
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => setStatus(p._id, "active")}
-                                className="border rounded-md px-3 py-1 hover:bg-gray-50"
-                              >
-                                Reopen
-                              </button>
-                            )}
+                        <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                          <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                            Who Pays Monthly
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                          {renderMonthlySplit(p)}
+                        </div>
 
-              {/* Mobile cards */}
-              <div className="lg:hidden divide-y">
-                {plans.map((p) => (
-                  <div key={p._id} className="p-4">
-                    <div className="flex flex-col gap-3">
-                      <div>
-                        <div className="font-semibold text-sm break-words">
-                          {p.productName}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1 break-words">
-                          {p.brand || "-"} {p.category ? `• ${p.category}` : ""}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div className="border rounded-lg p-2">
-                          <div className="text-xs text-gray-500">Total</div>
-                          <div className="font-medium">{p.totalPayable}</div>
-                        </div>
-                        <div className="border rounded-lg p-2">
-                          <div className="text-xs text-gray-500">Months</div>
-                          <div className="font-medium">{p.months}</div>
-                        </div>
-                        <div className="border rounded-lg p-2">
-                          <div className="text-xs text-gray-500">Monthly</div>
-                          <div className="font-medium">৳ {money(p.monthlyAmount)}</div>
-                        </div>
-                        <div className="border rounded-lg p-2">
-                          <div className="text-xs text-gray-500">Remaining</div>
-                          <div className="font-medium">
-                            ৳ {money(p?.stats?.remaining ?? 0)}
-                          </div>
-                          <div className="text-[11px] text-gray-500">
-                            {p?.stats?.remainingMonths ?? "-"} mo left
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
-                            <div
-                              className="bg-black h-2"
-                              style={{
-                                width: `${Math.min(
-                                  100,
-                                  Math.max(0, Number(p?.stats?.progress || 0))
-                                )}%`,
-                              }}
-                            />
-                          </div>
-                          <div className="text-xs text-gray-600 whitespace-nowrap">
-                            {p?.stats?.progress ?? 0}%
-                          </div>
-                        </div>
-                        {Number(p?.stats?.behindBy || 0) > 0 && (
-                          <div className="text-xs text-amber-700 mt-1">
-                            Behind: ৳ {money(p.stats.behindBy)}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <div className="text-xs text-gray-500">Start-End</div>
-                          <div className="font-medium break-words">
-                            {p.startMonth} → {p.endMonth}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-gray-500">Status</div>
-                          <div className="font-medium">{p.status}</div>
-                        </div>
-                      </div>
-
-                      <div className="border rounded-xl bg-gray-50 p-3">
-                        <div className="text-xs font-medium uppercase tracking-wide text-gray-500 mb-2">
-                          Who Pays • {String(p?.splitType || "equal")}
-                        </div>
-                        {renderMonthlySplit(p)}
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        {p.status === "active" &&
-                          month >= p.startMonth &&
-                          month <= p.endMonth && (
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          {canCreateBill && (
                             <button
-                              onClick={() =>
-                                generateSinglePlan(p._id, p.productName)
-                              }
-                              className="w-full sm:w-auto bg-black text-white rounded-md px-3 py-2 text-sm"
+                              onClick={() => generateSinglePlan(p._id, p.productName)}
+                              className="flex-1 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-700"
                             >
                               Create Bill
                             </button>
                           )}
 
-                        {p.status === "active" ? (
-                          <button
-                            onClick={() => setStatus(p._id, "closed")}
-                            className="w-full sm:w-auto border rounded-md px-3 py-2 text-sm hover:bg-gray-50"
-                          >
-                            Close
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => setStatus(p._id, "active")}
-                            className="w-full sm:w-auto border rounded-md px-3 py-2 text-sm hover:bg-gray-50"
-                          >
-                            Reopen
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="bg-white border rounded-lg overflow-hidden">
-          <div className="p-3 border-b font-medium text-sm">
-            Installments ({month})
-          </div>
-
-          {installments.length === 0 ? (
-            <div className="p-4 text-sm text-gray-600">
-              No installments generated for this month.
-            </div>
-          ) : (
-            <>
-              {/* Desktop table */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-sm min-w-[720px]">
-                  <thead className="bg-gray-50">
-                    <tr className="text-left">
-                      <th className="p-3">Product</th>
-                      <th className="p-3">Amount</th>
-                      <th className="p-3">Due Date</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {installments.map((i) => (
-                      <tr key={i._id} className="border-t">
-                        <td className="p-3">{i?.planId?.productName || "-"}</td>
-                        <td className="p-3">{i.amount}</td>
-                        <td className="p-3">
-                          {i.dueDate
-                            ? new Date(i.dueDate).toLocaleDateString()
-                            : "-"}
-                        </td>
-                        <td className="p-3">{i.status}</td>
-                        <td className="p-3 text-right">
-                          {i.status === "paid" ? (
+                          {p.status === "active" ? (
                             <button
-                              onClick={() => setInstallmentStatus(i._id, "pending")}
-                              className="border rounded-md px-3 py-1 hover:bg-gray-50 mr-2"
+                              onClick={() => setStatus(p._id, "closed")}
+                              className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
                             >
-                              Mark Pending
+                              Close Plan
                             </button>
                           ) : (
                             <button
-                              onClick={() => openPayModalForInstallment(i)}
-                              className="bg-black text-white rounded-md px-3 py-1 mr-2"
+                              onClick={() => setStatus(p._id, "active")}
+                              className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
                             >
-                              Mark Paid
+                              Reopen Plan
                             </button>
                           )}
-
-                          <button
-                            onClick={() => deleteInstallment(i._id)}
-                            className="border rounded-md px-3 py-1 hover:bg-gray-50"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile cards */}
-              <div className="md:hidden divide-y">
-                {installments.map((i) => (
-                  <div key={i._id} className="p-4">
-                    <div className="font-semibold text-sm break-words">
-                      {i?.planId?.productName || "-"}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 mt-3 text-sm">
-                      <div className="border rounded-lg p-2">
-                        <div className="text-xs text-gray-500">Amount</div>
-                        <div className="font-medium">{i.amount}</div>
-                      </div>
-                      <div className="border rounded-lg p-2">
-                        <div className="text-xs text-gray-500">Status</div>
-                        <div className="font-medium">{i.status}</div>
-                      </div>
-                      <div className="border rounded-lg p-2 col-span-2">
-                        <div className="text-xs text-gray-500">Due Date</div>
-                        <div className="font-medium">
-                          {i.dueDate
-                            ? new Date(i.dueDate).toLocaleDateString()
-                            : "-"}
                         </div>
                       </div>
                     </div>
-
-                    <div className="flex flex-col gap-2 mt-3">
-                      {i.status === "paid" ? (
-                        <button
-                          onClick={() => setInstallmentStatus(i._id, "pending")}
-                          className="w-full border rounded-md px-3 py-2 text-sm hover:bg-gray-50"
-                        >
-                          Mark Pending
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => openPayModalForInstallment(i)}
-                          className="w-full bg-black text-white rounded-md px-3 py-2 text-sm"
-                        >
-                          Mark Paid
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => deleteInstallment(i._id)}
-                        className="w-full border rounded-md px-3 py-2 text-sm hover:bg-gray-50"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-            </>
-          )}
+            )}
+          </section>
+
+          <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-2 border-b border-slate-100 bg-gradient-to-r from-white to-amber-50 p-5 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="text-lg font-black text-slate-950">Installments ({month})</div>
+                <p className="mt-1 text-sm text-slate-600">
+                  Mark monthly installments paid or pending. Paid installments deduct from selected account.
+                </p>
+              </div>
+              <div className="rounded-full border border-amber-100 bg-white px-3 py-1 text-xs font-bold text-amber-700">
+                Total generated: {installments.length}
+              </div>
+            </div>
+
+            {installments.length === 0 ? (
+              <div className="p-6">
+                <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                  No installments generated for this month. Use <b>Create EMI Bills</b> first.
+                </div>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {installments.map((i) => {
+                  const paid = String(i.status || "").toLowerCase() === "paid";
+
+                  return (
+                    <div key={i._id} className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-[1.2fr_0.7fr_0.7fr_0.7fr_auto] lg:items-center">
+                      <div className="min-w-0">
+                        <div className="font-black text-slate-950 break-words">
+                          {i?.planId?.productName || "-"}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          Generated EMI installment for {month}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100 lg:bg-transparent lg:p-0 lg:ring-0">
+                        <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Amount</div>
+                        <div className="mt-1 text-lg font-black text-slate-950">৳ {money(i.amount)}</div>
+                      </div>
+
+                      <div className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100 lg:bg-transparent lg:p-0 lg:ring-0">
+                        <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Due Date</div>
+                        <div className="mt-1 font-bold text-slate-700">{safeDate(i.dueDate)}</div>
+                      </div>
+
+                      <div>
+                        <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-black ${statusClass(i.status)}`}>
+                          {i.status || "-"}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col gap-2 sm:flex-row lg:justify-end">
+                        {paid ? (
+                          <button
+                            onClick={() => setInstallmentStatus(i._id, "pending")}
+                            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                          >
+                            Mark Pending
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => openPayModalForInstallment(i)}
+                            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-700"
+                          >
+                            Mark Paid
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => deleteInstallment(i._id)}
+                          className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-bold text-rose-700 transition hover:bg-rose-100"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         </div>
 
         {payModalOpen && (
-          <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="w-full sm:max-w-lg bg-white border rounded-t-2xl sm:rounded-lg p-4 sm:p-5">
-              <h3 className="text-lg font-semibold">Mark EMI as Paid</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                {selectedInstallment?.planId?.productName || "This installment"} will
-                create an expense transaction and deduct the amount from the selected
-                account.
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-                <div className="sm:col-span-2">
-                  <label className="text-sm font-medium">Who is paying</label>
-                  <select
-                    className="w-full border rounded-md px-3 py-2"
-                    value={payForm.paidByUserId}
-                    onChange={(e) =>
-                      setPayForm((p) => ({ ...p, paidByUserId: e.target.value }))
-                    }
-                  >
-                    <option value="">Select member</option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="text-sm font-medium">From which account</label>
-                  <select
-                    className="w-full border rounded-md px-3 py-2"
-                    value={payForm.fromAccountId}
-                    onChange={(e) =>
-                      setPayForm((p) => ({ ...p, fromAccountId: e.target.value }))
-                    }
-                  >
-                    <option value="">Select account</option>
-                    {payableAccounts.map((a) => (
-                      <option key={a._id} value={a._id}>
-                        {a.name} ({a.type})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="text-sm font-medium">Payment Date</label>
-                  <input
-                    type="date"
-                    className="w-full border rounded-md px-3 py-2"
-                    value={payForm.paidDate}
-                    onChange={(e) =>
-                      setPayForm((p) => ({ ...p, paidDate: e.target.value }))
-                    }
-                  />
-                </div>
-
-                <div className="sm:col-span-2 rounded-lg border bg-gray-50 p-3 text-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-gray-600">Amount</span>
-                    <span className="font-semibold">
-                      {selectedInstallment?.amount || 0}
-                    </span>
-                  </div>
-                </div>
+          <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+            <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl border border-white/70 bg-white shadow-2xl sm:max-w-xl sm:rounded-3xl">
+              <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-5 text-white">
+                <div className="text-xl font-black">Mark EMI as Paid</div>
+                <p className="mt-1 text-sm text-emerald-50">
+                  {selectedInstallment?.planId?.productName || "This installment"} will create an expense transaction and deduct the selected account.
+                </p>
               </div>
 
-              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-5">
-                <button
-                  onClick={closePayModal}
-                  className="w-full sm:w-auto border rounded-md px-4 py-2 text-sm hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmMarkPaid}
-                  className="w-full sm:w-auto bg-black text-white rounded-md px-4 py-2 text-sm"
-                >
-                  Confirm Payment
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {open && (
-          <div className="app-modal-overlay">
-            <div className="app-modal-panel max-w-3xl rounded-2xl p-4 sm:p-5">
-              <h3 className="text-lg font-semibold mb-1">Add EMI Plan</h3>
-              <p className="text-sm text-gray-500 mb-4">
-                Monthly amount will be auto calculated.
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="text-sm font-medium">Product Name</label>
-                  <input
-                    className="w-full border rounded-md px-3 py-2"
-                    value={form.productName}
-                    onChange={(e) =>
-                      setForm({ ...form, productName: e.target.value })
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium">Brand</label>
-                  <input
-                    className="w-full border rounded-md px-3 py-2"
-                    value={form.brand}
-                    onChange={(e) => setForm({ ...form, brand: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium">Category (text)</label>
-                  <input
-                    className="w-full border rounded-md px-3 py-2"
-                    value={form.category}
-                    onChange={(e) =>
-                      setForm({ ...form, category: e.target.value })
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium">Purchase Date</label>
-                  <input
-                    type="date"
-                    className="w-full border rounded-md px-3 py-2"
-                    value={form.purchaseDate}
-                    onChange={(e) =>
-                      setForm({ ...form, purchaseDate: e.target.value })
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium">Start Month</label>
-                  <input
-                    type="month"
-                    className="w-full border rounded-md px-3 py-2"
-                    value={form.startMonth}
-                    onChange={(e) =>
-                      setForm({ ...form, startMonth: e.target.value })
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium">Original Price</label>
-                  <input
-                    className="w-full border rounded-md px-3 py-2"
-                    value={form.originalPrice}
-                    onChange={(e) =>
-                      setForm({ ...form, originalPrice: e.target.value })
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium">EMI Charge (%)</label>
-                  <input
-                    className="w-full border rounded-md px-3 py-2"
-                    value={form.emiCharge}
-                    onChange={(e) =>
-                      setForm({ ...form, emiCharge: e.target.value })
-                    }
-                    placeholder="e.g., 0.9"
-                  />
-                  <div className="text-xs text-gray-500 mt-1">
-                    Percentage. Example: <b>0.9</b> means <b>0.9%</b>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium">Total Payable</label>
-                  <input
-                    className="w-full border rounded-md px-3 py-2"
-                    value={form.totalPayable}
-                    readOnly
-                    title="Auto calculated = Original Price + (Original Price × EMI Charge%)"
-                    style={{ background: "#f9fafb" }}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium">Months</label>
-                  <select
-                    className="w-full border rounded-md px-3 py-2"
-                    value={form.months}
-                    onChange={(e) => setForm({ ...form, months: e.target.value })}
-                  >
-                    {monthOptions.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="text-xs text-gray-500 mt-1">
-                    Common EMI terms: 1, 3, 6, 9, 12, 18, 24, 36
-                  </div>
-                </div>
-
-                <div className="sm:col-span-2 md:col-span-2">
-                  <label className="text-sm font-medium">Split Type</label>
-                  <select
-                    className="w-full border rounded-md px-3 py-2"
-                    value={form.splitType}
-                    onChange={(e) => {
-                      const nextType = e.target.value;
-                      setForm((prev) => ({
-                        ...prev,
-                        splitType: nextType,
-                        personalUserId:
-                          nextType === "personal"
-                            ? (prev.personalUserId || me?.id || members[0]?.id || "")
-                            : prev.personalUserId,
-                      }));
-                    }}
-                  >
-                    <option value="equal">Equal</option>
-                    <option value="personal">Personal</option>
-                    <option value="ratio">Ratio</option>
-                    <option value="fixed">Fixed</option>
-                  </select>
-                </div>
-
-                {form.splitType === "personal" && (
-                  <div className="sm:col-span-2 md:col-span-3">
-                    <label className="text-sm font-medium">Personal For</label>
+              <div className="space-y-4 p-5">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label="Who is paying" className="sm:col-span-2">
                     <select
-                      className="w-full border rounded-md px-3 py-2"
-                      value={form.personalUserId}
+                      className={inputClass()}
+                      value={payForm.paidByUserId}
                       onChange={(e) =>
-                        setForm({ ...form, personalUserId: e.target.value })
+                        setPayForm((p) => ({ ...p, paidByUserId: e.target.value }))
                       }
                     >
+                      <option value="">Select member</option>
                       {members.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.name}
                         </option>
                       ))}
                     </select>
+                  </Field>
+
+                  <Field label="From which account" className="sm:col-span-2">
+                    <select
+                      className={inputClass()}
+                      value={payForm.fromAccountId}
+                      onChange={(e) =>
+                        setPayForm((p) => ({ ...p, fromAccountId: e.target.value }))
+                      }
+                    >
+                      <option value="">Select account</option>
+                      {payableAccounts.map((a) => (
+                        <option key={a._id} value={a._id}>
+                          {a.name} ({a.type})
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Payment Date" className="sm:col-span-2">
+                    <input
+                      type="date"
+                      className={inputClass()}
+                      value={payForm.paidDate}
+                      onChange={(e) =>
+                        setPayForm((p) => ({ ...p, paidDate: e.target.value }))
+                      }
+                    />
+                  </Field>
+                </div>
+
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-bold text-emerald-700">Payment Amount</span>
+                    <span className="text-2xl font-black text-emerald-800">
+                      ৳ {money(selectedInstallment?.amount || 0)}
+                    </span>
                   </div>
-                )}
+                </div>
 
-                {form.splitType === "ratio" && otherMember && (
-                  <>
-                    <div>
-                      <label className="text-sm font-medium">My %</label>
-                      <input
-                        className="w-full border rounded-md px-3 py-2"
-                        value={form.ratioMe}
-                        onChange={(e) =>
-                          setForm({ ...form, ratioMe: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium">
-                        {otherMember.name} %
-                      </label>
-                      <input
-                        className="w-full border rounded-md px-3 py-2"
-                        value={form.ratioOther}
-                        onChange={(e) =>
-                          setForm({ ...form, ratioOther: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div className="sm:col-span-2 md:col-span-3 text-xs text-gray-500">
-                      Must sum to 100.
-                    </div>
-                  </>
-                )}
-
-                {form.splitType === "fixed" && otherMember && (
-                  <>
-                    <div>
-                      <label className="text-sm font-medium">My Amount</label>
-                      <input
-                        className="w-full border rounded-md px-3 py-2"
-                        value={form.fixedMe}
-                        onChange={(e) =>
-                          setForm({ ...form, fixedMe: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium">
-                        {otherMember.name} Amount
-                      </label>
-                      <input
-                        className="w-full border rounded-md px-3 py-2"
-                        value={form.fixedOther}
-                        onChange={(e) =>
-                          setForm({ ...form, fixedOther: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div className="sm:col-span-2 md:col-span-3 text-xs text-gray-500">
-                      Must sum to monthly amount.
-                    </div>
-                  </>
-                )}
-
-                <div className="sm:col-span-2 md:col-span-3">
-                  <label className="text-sm font-medium">Note</label>
-                  <input
-                    className="w-full border rounded-md px-3 py-2"
-                    value={form.note}
-                    onChange={(e) => setForm({ ...form, note: e.target.value })}
-                  />
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    onClick={closePayModal}
+                    className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmMarkPaid}
+                    className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700"
+                  >
+                    Confirm Payment
+                  </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
 
-              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 mt-5">
-                <button
-                  onClick={closeModal}
-                  className="w-full sm:w-auto border rounded-md px-4 py-2 text-sm hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={createPlan}
-                  className="w-full sm:w-auto bg-black text-white rounded-md px-4 py-2 text-sm"
-                >
-                  Save Plan
-                </button>
+        {open && (
+          <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+            <div className="max-h-[94vh] w-full overflow-y-auto rounded-t-3xl border border-white/70 bg-white shadow-2xl sm:max-w-5xl sm:rounded-3xl">
+              <div className="bg-gradient-to-br from-slate-950 via-indigo-950 to-sky-800 p-5 text-white sm:p-6">
+                <div className="text-2xl font-black">Add EMI Plan</div>
+                <p className="mt-1 max-w-2xl text-sm text-slate-200">
+                  Enter product, pricing, schedule, and split details. Monthly amount will be calculated automatically.
+                </p>
               </div>
 
-              {msg && <div className="mt-3 text-sm text-red-600 break-words">{msg}</div>}
+              <div className="space-y-5 p-4 sm:p-6">
+                <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-base font-black text-slate-950">Product Details</div>
+                      <div className="text-xs text-slate-500">Basic purchase information</div>
+                    </div>
+                    <div className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200">
+                      Step 1
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <Field label="Product Name" className="sm:col-span-2">
+                      <input
+                        className={inputClass()}
+                        value={form.productName}
+                        onChange={(e) => setForm({ ...form, productName: e.target.value })}
+                        placeholder="Example: Mobile phone"
+                      />
+                    </Field>
+
+                    <Field label="Brand">
+                      <input
+                        className={inputClass()}
+                        value={form.brand}
+                        onChange={(e) => setForm({ ...form, brand: e.target.value })}
+                        placeholder="Example: Samsung"
+                      />
+                    </Field>
+
+                    <Field label="Category">
+                      <input
+                        className={inputClass()}
+                        value={form.category}
+                        onChange={(e) => setForm({ ...form, category: e.target.value })}
+                        placeholder="Example: Electronics"
+                      />
+                    </Field>
+
+                    <Field label="Purchase Date">
+                      <input
+                        type="date"
+                        className={inputClass()}
+                        value={form.purchaseDate}
+                        onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })}
+                      />
+                    </Field>
+
+                    <Field label="Start Month">
+                      <input
+                        type="month"
+                        className={inputClass()}
+                        value={form.startMonth}
+                        onChange={(e) => setForm({ ...form, startMonth: e.target.value })}
+                      />
+                    </Field>
+
+                    <Field label="Months">
+                      <select
+                        className={inputClass()}
+                        value={form.months}
+                        onChange={(e) => setForm({ ...form, months: e.target.value })}
+                      >
+                        {monthOptions.map((m) => (
+                          <option key={m} value={m}>
+                            {m} month{m > 1 ? "s" : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-base font-black text-slate-950">EMI Calculation</div>
+                      <div className="text-xs text-slate-500">Total payable is auto calculated</div>
+                    </div>
+                    <div className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 ring-1 ring-indigo-100">
+                      Step 2
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <Field label="Original Price">
+                      <input
+                        className={inputClass()}
+                        value={form.originalPrice}
+                        onChange={(e) => setForm({ ...form, originalPrice: e.target.value })}
+                        placeholder="Example: 60000"
+                      />
+                    </Field>
+
+                    <Field label="EMI Charge (%)">
+                      <input
+                        className={inputClass()}
+                        value={form.emiCharge}
+                        onChange={(e) => setForm({ ...form, emiCharge: e.target.value })}
+                        placeholder="Example: 0.9"
+                      />
+                      <div className="mt-1 text-xs text-slate-500">
+                        Example: <b>0.9</b> means <b>0.9%</b> charge.
+                      </div>
+                    </Field>
+
+                    <Field label="Total Payable">
+                      <input
+                        className={inputClass("bg-slate-50 font-black text-slate-950")}
+                        value={form.totalPayable}
+                        readOnly
+                        title="Auto calculated = Original Price + (Original Price × EMI Charge%)"
+                      />
+                    </Field>
+
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 md:col-span-3">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <div className="text-xs font-bold uppercase tracking-wide text-emerald-700">
+                            Estimated Monthly EMI
+                          </div>
+                          <div className="mt-1 text-sm text-emerald-700">
+                            Based on total payable and selected months.
+                          </div>
+                        </div>
+                        <div className="text-3xl font-black text-emerald-800">
+                          ৳ {money(Number(form.totalPayable || 0) / Number(form.months || 1))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-base font-black text-slate-950">Split Settings</div>
+                      <div className="text-xs text-slate-500">Decide who will carry this EMI liability</div>
+                    </div>
+                    <div className="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700 ring-1 ring-violet-100">
+                      Step 3
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <Field label="Split Type" className="sm:col-span-2">
+                      <select
+                        className={inputClass()}
+                        value={form.splitType}
+                        onChange={(e) => {
+                          const nextType = e.target.value;
+                          setForm((prev) => ({
+                            ...prev,
+                            splitType: nextType,
+                            personalUserId:
+                              nextType === "personal"
+                                ? (prev.personalUserId || myId || members[0]?.id || "")
+                                : prev.personalUserId,
+                          }));
+                        }}
+                      >
+                        <option value="equal">Equal</option>
+                        <option value="personal">Personal</option>
+                        <option value="ratio">Ratio</option>
+                        <option value="fixed">Fixed</option>
+                      </select>
+                    </Field>
+
+                    {form.splitType === "personal" && (
+                      <Field label="Personal For" className="sm:col-span-2">
+                        <select
+                          className={inputClass()}
+                          value={form.personalUserId}
+                          onChange={(e) => setForm({ ...form, personalUserId: e.target.value })}
+                        >
+                          {members.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.name}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    )}
+
+                    {form.splitType === "ratio" && otherMember && (
+                      <>
+                        <Field label="My %">
+                          <input
+                            className={inputClass()}
+                            value={form.ratioMe}
+                            onChange={(e) => setForm({ ...form, ratioMe: e.target.value })}
+                          />
+                        </Field>
+
+                        <Field label={`${otherMember.name} %`}>
+                          <input
+                            className={inputClass()}
+                            value={form.ratioOther}
+                            onChange={(e) => setForm({ ...form, ratioOther: e.target.value })}
+                          />
+                        </Field>
+
+                        <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-medium text-amber-800 sm:col-span-2 lg:col-span-4">
+                          Ratio split should normally sum to 100.
+                        </div>
+                      </>
+                    )}
+
+                    {form.splitType === "fixed" && otherMember && (
+                      <>
+                        <Field label="My Amount">
+                          <input
+                            className={inputClass()}
+                            value={form.fixedMe}
+                            onChange={(e) => setForm({ ...form, fixedMe: e.target.value })}
+                          />
+                        </Field>
+
+                        <Field label={`${otherMember.name} Amount`}>
+                          <input
+                            className={inputClass()}
+                            value={form.fixedOther}
+                            onChange={(e) => setForm({ ...form, fixedOther: e.target.value })}
+                          />
+                        </Field>
+
+                        <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-medium text-amber-800 sm:col-span-2 lg:col-span-4">
+                          Fixed amounts should match the monthly amount.
+                        </div>
+                      </>
+                    )}
+
+                    <Field label="Note" className="sm:col-span-2 lg:col-span-4">
+                      <input
+                        className={inputClass()}
+                        value={form.note}
+                        onChange={(e) => setForm({ ...form, note: e.target.value })}
+                        placeholder="Optional note"
+                      />
+                    </Field>
+                  </div>
+                </div>
+
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    onClick={closeModal}
+                    className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={createPlan}
+                    className="rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-indigo-700"
+                  >
+                    Save Plan
+                  </button>
+                </div>
+
+                {msg && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 break-words">{msg}</div>}
+              </div>
             </div>
           </div>
         )}

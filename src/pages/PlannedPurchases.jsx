@@ -22,25 +22,79 @@ import { CSS } from "@dnd-kit/utilities";
 
 function formatMoney(v) {
   const n = Number(v || 0);
-  return `৳ ${n.toLocaleString()}`;
+  return `৳ ${n.toLocaleString("en-BD", { maximumFractionDigits: 0 })}`;
+}
+
+function safeNumber(v) {
+  const n = Number(v || 0);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function percent(part, total) {
+  const p = Number(part || 0);
+  const t = Number(total || 0);
+  if (!t) return 0;
+  return Math.min(100, Math.max(0, Math.round((p / t) * 100)));
+}
+
+function safeDate(dateLike) {
+  if (!dateLike) return "—";
+  const d = new Date(dateLike);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString();
+}
+
+function priorityRank(value) {
+  if (value === "high") return 1;
+  if (value === "medium") return 2;
+  return 3;
 }
 
 function SkeletonCard() {
   return (
-    <div className="bg-white border rounded-2xl p-5 animate-pulse">
-      <div className="h-3 w-24 bg-gray-200 rounded mb-3" />
-      <div className="h-8 w-24 bg-gray-200 rounded mb-4" />
-      <div className="h-2 w-full bg-gray-200 rounded" />
+    <div className="relative overflow-hidden rounded-3xl border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/70">
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-400" />
+      <div className="animate-pulse">
+        <div className="mb-4 h-3 w-24 rounded bg-slate-200 dark:bg-slate-700" />
+        <div className="mb-4 h-8 w-28 rounded bg-slate-200 dark:bg-slate-700" />
+        <div className="h-2 w-full rounded bg-slate-200 dark:bg-slate-700" />
+      </div>
     </div>
   );
 }
 
-function StatCard({ title, value, hint }) {
+function StatCard({ title, value, hint, tone = "blue", icon }) {
+  const toneMap = {
+    blue: "from-sky-500/15 via-blue-500/10 to-indigo-500/15 text-blue-700 dark:text-blue-200",
+    green:
+      "from-emerald-500/15 via-green-500/10 to-teal-500/15 text-emerald-700 dark:text-emerald-200",
+    amber:
+      "from-amber-500/20 via-orange-500/10 to-yellow-500/15 text-amber-700 dark:text-amber-200",
+    purple:
+      "from-purple-500/15 via-fuchsia-500/10 to-pink-500/15 text-purple-700 dark:text-purple-200",
+  };
+
   return (
-    <div className="bg-white border rounded-2xl p-5 shadow-sm">
-      <div className="text-sm text-gray-500 mb-2">{title}</div>
-      <div className="text-2xl font-bold text-gray-900 mb-2">{value}</div>
-      <div className="text-xs text-gray-500">{hint}</div>
+    <div className="group relative overflow-hidden rounded-3xl border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:shadow-xl dark:border-white/10 dark:bg-slate-900/75">
+      <div className={`absolute inset-0 bg-gradient-to-br ${toneMap[tone] || toneMap.blue}`} />
+      <div className="relative">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              {title}
+            </div>
+            <div className="mt-2 text-2xl font-black text-slate-950 dark:text-white">
+              {value}
+            </div>
+          </div>
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/80 text-xl shadow-sm dark:bg-slate-950/60">
+            {icon}
+          </div>
+        </div>
+        <div className="text-xs leading-5 text-slate-600 dark:text-slate-300">
+          {hint}
+        </div>
+      </div>
     </div>
   );
 }
@@ -68,43 +122,72 @@ const initialFilters = {
 
 function badgeClass(type, value) {
   if (type === "priority") {
-    if (value === "high") return "bg-red-50 text-red-700 border-red-200";
-    if (value === "medium") return "bg-yellow-50 text-yellow-700 border-yellow-200";
-    return "bg-green-50 text-green-700 border-green-200";
+    if (value === "high") {
+      return "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200";
+    }
+    if (value === "medium") {
+      return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200";
+    }
+    return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200";
   }
 
   if (type === "ownership") {
-    if (value === "personal") return "bg-purple-50 text-purple-700 border-purple-200";
-    return "bg-blue-50 text-blue-700 border-blue-200";
+    if (value === "personal") {
+      return "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-200";
+    }
+    return "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200";
   }
 
   if (type === "payment") {
-    if (value === "emi") return "bg-orange-50 text-orange-700 border-orange-200";
-    if (value === "cash") return "bg-emerald-50 text-emerald-700 border-emerald-200";
-    if (value === "either") return "bg-sky-50 text-sky-700 border-sky-200";
-    return "bg-gray-50 text-gray-700 border-gray-200";
+    if (value === "emi") {
+      return "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-200";
+    }
+    if (value === "cash") {
+      return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200";
+    }
+    if (value === "either") {
+      return "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200";
+    }
+    return "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200";
   }
 
-  return "bg-gray-50 text-gray-700 border-gray-200";
+  return "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200";
 }
 
 function statusPillClass(kind) {
-  if (kind === "success") return "bg-emerald-50 text-emerald-700 border-emerald-200";
-  if (kind === "error") return "bg-red-50 text-red-700 border-red-200";
-  return "bg-blue-50 text-blue-700 border-blue-200";
+  if (kind === "success") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200";
+  }
+  if (kind === "error") {
+    return "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200";
+  }
+  return "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200";
+}
+
+function priorityDotClass(value) {
+  if (value === "high") return "bg-rose-500";
+  if (value === "medium") return "bg-amber-500";
+  return "bg-emerald-500";
+}
+
+function paymentAccentClass(value) {
+  if (value === "emi") return "from-orange-500 to-amber-400";
+  if (value === "cash") return "from-emerald-500 to-teal-400";
+  if (value === "either") return "from-sky-500 to-blue-400";
+  return "from-slate-500 to-slate-400";
 }
 
 function DragHandle(props) {
   return (
     <button
       type="button"
-      className="p-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 cursor-grab active:cursor-grabbing shadow-sm"
+      className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 active:cursor-grabbing dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-indigo-500/50 dark:hover:bg-indigo-500/10"
       title="Drag to reorder"
       {...props}
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
-        className="w-4 h-4 text-gray-500"
+        className="h-4 w-4"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -123,11 +206,11 @@ function DragHandle(props) {
 function ActionButton({ children, variant = "neutral", onClick, disabled = false }) {
   const styles = {
     neutral:
-      "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300",
+      "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-500/50 dark:hover:bg-indigo-500/10",
     success:
-      "border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+      "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/20",
     danger:
-      "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
+      "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20",
   };
 
   return (
@@ -135,11 +218,23 @@ function ActionButton({ children, variant = "neutral", onClick, disabled = false
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`px-3.5 py-2 rounded-xl text-sm font-medium shadow-sm transition ${styles[variant]} disabled:opacity-60`}
+      className={`rounded-2xl border px-3.5 py-2 text-sm font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${styles[variant]}`}
     >
       {children}
     </button>
   );
+}
+
+function FieldLabel({ children, required = false }) {
+  return (
+    <label className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-200">
+      {children} {required && <span className="text-rose-500">*</span>}
+    </label>
+  );
+}
+
+function inputClass() {
+  return "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-indigo-500";
 }
 
 function PurchaseModal({
@@ -165,233 +260,306 @@ function PurchaseModal({
 
   if (!open) return null;
 
+  const previewPrice = safeNumber(form.expectedPrice);
+
   return (
     <div className="fixed inset-0 z-50">
       <button
         type="button"
-        className="absolute inset-0 bg-black/40"
+        className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
         onClick={onClose}
         aria-label="Close modal"
       />
-      <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border max-h-[90vh] flex flex-col">
-          <div className="px-5 py-4 border-b flex items-start justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">
-                {editingId ? "Edit Planned Purchase" : "Add Planned Purchase"}
-              </h3>
-              <p className="text-sm text-gray-500 mt-1">
-                {editingId
-                  ? "Update this item and save the changes."
-                  : "Add a future item you want to buy later."}
-              </p>
-            </div>
+      <div className="absolute inset-0 flex items-end justify-center p-0 sm:items-center sm:p-4">
+        <div className="relative flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-[2rem] border border-white/60 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-950 sm:rounded-[2rem]">
+          <div className="relative overflow-hidden border-b border-white/40 bg-gradient-to-r from-indigo-600 via-purple-600 to-fuchsia-600 px-5 py-5 text-white sm:px-6">
+            <div className="absolute right-[-70px] top-[-80px] h-44 w-44 rounded-full bg-white/20 blur-2xl" />
+            <div className="absolute bottom-[-90px] left-[30%] h-44 w-44 rounded-full bg-amber-300/20 blur-2xl" />
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border px-3 py-2 text-sm hover:bg-gray-50"
-            >
-              Close
-            </button>
+            <div className="relative flex items-start justify-between gap-4">
+              <div>
+                <div className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur">
+                  {editingId ? "Update wishlist item" : "Create new purchase plan"}
+                </div>
+                <h3 className="mt-3 text-2xl font-black">
+                  {editingId ? "Edit Planned Purchase" : "Add Planned Purchase"}
+                </h3>
+                <p className="mt-1 max-w-2xl text-sm text-white/80">
+                  Add the product, priority, payment style, and ownership so the buying plan stays clear.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+              >
+                Close
+              </button>
+            </div>
           </div>
 
-          <form onSubmit={onSubmit} className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+          <form onSubmit={onSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6">
             {formErr && (
-              <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">
+              <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
                 {formErr}
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Product Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="productName"
-                value={form.productName}
-                onChange={onChange}
-                placeholder="e.g. Blender, Headphone, Rice Cooker"
-                className="w-full rounded-xl border px-3 py-2.5 outline-none focus:ring-2 focus:ring-gray-900"
-              />
-            </div>
+            <div className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr]">
+              <div className="space-y-5">
+                <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-200">
+                      🛍️
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-950 dark:text-white">Product Details</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Basic information about the item</div>
+                    </div>
+                  </div>
 
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category
-                </label>
-                <input
-                  type="text"
-                  name="category"
-                  value={form.category}
-                  onChange={onChange}
-                  placeholder="e.g. Appliance"
-                  className="w-full rounded-xl border px-3 py-2.5 outline-none focus:ring-2 focus:ring-gray-900"
-                />
+                  <div className="space-y-4">
+                    <div>
+                      <FieldLabel required>Product Name</FieldLabel>
+                      <input
+                        type="text"
+                        name="productName"
+                        value={form.productName}
+                        onChange={onChange}
+                        placeholder="e.g. Blender, Headphone, Rice Cooker"
+                        className={inputClass()}
+                      />
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <FieldLabel>Category</FieldLabel>
+                        <input
+                          type="text"
+                          name="category"
+                          value={form.category}
+                          onChange={onChange}
+                          placeholder="e.g. Appliance"
+                          className={inputClass()}
+                        />
+                      </div>
+
+                      <div>
+                        <FieldLabel>Brand</FieldLabel>
+                        <input
+                          type="text"
+                          name="brand"
+                          value={form.brand}
+                          onChange={onChange}
+                          placeholder="e.g. Philips"
+                          className={inputClass()}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <FieldLabel>Expected Price</FieldLabel>
+                        <input
+                          type="number"
+                          min="0"
+                          name="expectedPrice"
+                          value={form.expectedPrice}
+                          onChange={onChange}
+                          placeholder="e.g. 7000"
+                          className={inputClass()}
+                        />
+                      </div>
+
+                      <div>
+                        <FieldLabel>Product Link</FieldLabel>
+                        <input
+                          type="text"
+                          name="productLink"
+                          value={form.productLink}
+                          onChange={onChange}
+                          placeholder="Optional URL"
+                          className={inputClass()}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/10 dark:text-fuchsia-200">
+                      ⚙️
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-950 dark:text-white">Planning Rules</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Priority, ownership and payment preference</div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div>
+                      <FieldLabel>Priority</FieldLabel>
+                      <select
+                        name="priority"
+                        value={form.priority}
+                        onChange={onChange}
+                        className={inputClass()}
+                      >
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <FieldLabel>Ownership</FieldLabel>
+                      <select
+                        name="ownershipType"
+                        value={form.ownershipType}
+                        onChange={onChange}
+                        className={inputClass()}
+                      >
+                        <option value="shared">Shared</option>
+                        <option value="personal">Personal</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <FieldLabel>Payment</FieldLabel>
+                      <select
+                        name="paymentMode"
+                        value={form.paymentMode}
+                        onChange={onChange}
+                        className={inputClass()}
+                      >
+                        <option value="undecided">Undecided</option>
+                        <option value="cash">Cash</option>
+                        <option value="emi">EMI</option>
+                        <option value="either">Either</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {form.ownershipType === "personal" && (
+                    <div className="mt-4">
+                      <FieldLabel required>Personal For</FieldLabel>
+                      <select
+                        name="personalForUserId"
+                        value={form.personalForUserId}
+                        onChange={onChange}
+                        className={inputClass()}
+                      >
+                        <option value="">Select family member</option>
+                        {members.map((member) => (
+                          <option key={member.id} value={member.id}>
+                            {member.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="mt-4">
+                    <FieldLabel>Notes</FieldLabel>
+                    <textarea
+                      rows="5"
+                      name="notes"
+                      value={form.notes}
+                      onChange={onChange}
+                      placeholder="Optional details, color, model preference, timing, etc."
+                      className={`${inputClass()} resize-none`}
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Brand
-                </label>
-                <input
-                  type="text"
-                  name="brand"
-                  value={form.brand}
-                  onChange={onChange}
-                  placeholder="e.g. Philips"
-                  className="w-full rounded-xl border px-3 py-2.5 outline-none focus:ring-2 focus:ring-gray-900"
-                />
-              </div>
-            </div>
+              <div className="space-y-4">
+                <div className="rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-fuchsia-50 p-5 shadow-sm dark:border-indigo-500/20 dark:from-indigo-500/10 dark:via-slate-900 dark:to-fuchsia-500/10">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    Preview
+                  </div>
+                  <div className="mt-3 text-xl font-black text-slate-950 dark:text-white">
+                    {form.productName || "Product name"}
+                  </div>
+                  <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    {[form.brand, form.category].filter(Boolean).join(" • ") || "Brand and category will show here"}
+                  </div>
 
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Expected Price
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  name="expectedPrice"
-                  value={form.expectedPrice}
-                  onChange={onChange}
-                  placeholder="e.g. 7000"
-                  className="w-full rounded-xl border px-3 py-2.5 outline-none focus:ring-2 focus:ring-gray-900"
-                />
-              </div>
+                  <div className="mt-5 rounded-3xl bg-white/80 p-4 dark:bg-slate-950/60">
+                    <div className="text-xs text-slate-500 dark:text-slate-400">Estimated Budget</div>
+                    <div className="mt-1 text-3xl font-black text-slate-950 dark:text-white">
+                      {formatMoney(previewPrice)}
+                    </div>
+                  </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Product Link
-                </label>
-                <input
-                  type="text"
-                  name="productLink"
-                  value={form.productLink}
-                  onChange={onChange}
-                  placeholder="Optional URL"
-                  className="w-full rounded-xl border px-3 py-2.5 outline-none focus:ring-2 focus:ring-gray-900"
-                />
-              </div>
-            </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <span className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize ${badgeClass("priority", form.priority)}`}>
+                      {form.priority}
+                    </span>
+                    <span className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize ${badgeClass("ownership", form.ownershipType)}`}>
+                      {form.ownershipType}
+                    </span>
+                    <span className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize ${badgeClass("payment", form.paymentMode)}`}>
+                      {form.paymentMode}
+                    </span>
+                  </div>
+                </div>
 
-            <div className="grid sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Priority
-                </label>
-                <select
-                  name="priority"
-                  value={form.priority}
-                  onChange={onChange}
-                  className="w-full rounded-xl border px-3 py-2.5 outline-none focus:ring-2 focus:ring-gray-900"
-                >
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
+                <div className="rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
+                  <div className="font-bold text-slate-950 dark:text-white">Planning Tip</div>
+                  <p className="mt-2 leading-6">
+                    Keep high-priority items at the top. Use EMI only for large purchases that will not disturb monthly essentials.
+                  </p>
+                </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Ownership
-                </label>
-                <select
-                  name="ownershipType"
-                  value={form.ownershipType}
-                  onChange={onChange}
-                  className="w-full rounded-xl border px-3 py-2.5 outline-none focus:ring-2 focus:ring-gray-900"
-                >
-                  <option value="shared">Shared</option>
-                  <option value="personal">Personal</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Payment
-                </label>
-                <select
-                  name="paymentMode"
-                  value={form.paymentMode}
-                  onChange={onChange}
-                  className="w-full rounded-xl border px-3 py-2.5 outline-none focus:ring-2 focus:ring-gray-900"
-                >
-                  <option value="undecided">Undecided</option>
-                  <option value="cash">Cash</option>
-                  <option value="emi">EMI</option>
-                  <option value="either">Either</option>
-                </select>
-              </div>
-            </div>
-
-            {form.ownershipType === "personal" && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Personal For <span className="text-red-500">*</span>
-                </label>
-                <select
-                  name="personalForUserId"
-                  value={form.personalForUserId}
-                  onChange={onChange}
-                  className="w-full rounded-xl border px-3 py-2.5 outline-none focus:ring-2 focus:ring-gray-900"
-                >
-                  <option value="">Select family member</option>
-                  {members.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Notes
-              </label>
-              <textarea
-                rows="5"
-                name="notes"
-                value={form.notes}
-                onChange={onChange}
-                placeholder="Optional details, color, model preference, timing, etc."
-                className="w-full rounded-xl border px-3 py-2.5 outline-none focus:ring-2 focus:ring-gray-900 resize-none"
-              />
             </div>
           </form>
 
-          <div className="border-t px-5 py-4 bg-white flex gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                onReset();
-                onClose();
-              }}
-              className="flex-1 rounded-xl border py-3 font-medium hover:bg-gray-50"
-            >
-              Cancel
-            </button>
+          <div className="border-t border-slate-200 bg-white/90 px-5 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 sm:px-6">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  onReset();
+                  onClose();
+                }}
+                className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
 
-            <button
-              type="button"
-              onClick={onSubmit}
-              disabled={saving}
-              className="flex-1 rounded-xl bg-gray-900 text-white py-3 font-medium hover:bg-gray-800 disabled:opacity-60"
-            >
-              {saving
-                ? editingId
-                  ? "Updating..."
-                  : "Saving..."
-                : editingId
-                ? "Update Purchase"
-                : "Save Purchase"}
-            </button>
+              <button
+                type="button"
+                onClick={onSubmit}
+                disabled={saving}
+                className="rounded-2xl bg-gradient-to-r from-indigo-600 to-fuchsia-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving
+                  ? editingId
+                    ? "Updating..."
+                    : "Saving..."
+                  : editingId
+                  ? "Update Purchase"
+                  : "Save Purchase"}
+              </button>
+            </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function InfoChip({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/50">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+        {label}
+      </div>
+      <div className="mt-1 break-words text-sm font-bold text-slate-800 dark:text-slate-100">
+        {value || "—"}
       </div>
     </div>
   );
@@ -422,80 +590,49 @@ function SortablePlannedItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={`rounded-3xl border border-gray-200 bg-gradient-to-br from-white to-gray-50/80 p-4 md:p-5 transition ${
-        isDragging ? "shadow-xl opacity-80" : "shadow-sm hover:shadow-md"
+      className={`group relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/85 p-4 shadow-sm backdrop-blur transition duration-300 dark:border-white/10 dark:bg-slate-900/75 md:p-5 ${
+        isDragging ? "scale-[0.99] shadow-2xl opacity-90" : "hover:-translate-y-0.5 hover:shadow-xl"
       }`}
     >
-      <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
-        <div className="flex gap-3 min-w-0 flex-1">
+      <div className={`absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b ${paymentAccentClass(item.paymentMode)}`} />
+      <div className="absolute right-[-80px] top-[-80px] h-44 w-44 rounded-full bg-indigo-500/10 blur-3xl transition group-hover:bg-fuchsia-500/10" />
+
+      <div className="relative flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <div className="flex min-w-0 flex-1 gap-3">
           <div className="pt-1">
             <DragHandle {...attributes} {...listeners} />
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <div className="text-lg font-semibold text-gray-900">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <div className={`h-2.5 w-2.5 rounded-full ${priorityDotClass(item.priority)}`} />
+              <h4 className="break-words text-lg font-black text-slate-950 dark:text-white">
                 {item.productName}
-              </div>
+              </h4>
 
-              <span
-                className={`text-xs border px-2.5 py-1 rounded-full capitalize ${badgeClass(
-                  "priority",
-                  item.priority
-                )}`}
-              >
+              <span className={`rounded-full border px-2.5 py-1 text-xs font-bold capitalize ${badgeClass("priority", item.priority)}`}>
                 {item.priority}
               </span>
-
-              <span
-                className={`text-xs border px-2.5 py-1 rounded-full capitalize ${badgeClass(
-                  "ownership",
-                  item.ownershipType
-                )}`}
-              >
+              <span className={`rounded-full border px-2.5 py-1 text-xs font-bold capitalize ${badgeClass("ownership", item.ownershipType)}`}>
                 {item.ownershipType}
               </span>
-
-              <span
-                className={`text-xs border px-2.5 py-1 rounded-full capitalize ${badgeClass(
-                  "payment",
-                  item.paymentMode
-                )}`}
-              >
+              <span className={`rounded-full border px-2.5 py-1 text-xs font-bold capitalize ${badgeClass("payment", item.paymentMode)}`}>
                 {item.paymentMode}
               </span>
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm text-gray-600">
-              <div>
-                <span className="text-gray-400">Brand:</span>{" "}
-                <span className="font-medium text-gray-800">{item.brand || "—"}</span>
-              </div>
-              <div>
-                <span className="text-gray-400">Category:</span>{" "}
-                <span className="font-medium text-gray-800">{item.category || "—"}</span>
-              </div>
-
+            <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+              <InfoChip label="Brand" value={item.brand || "—"} />
+              <InfoChip label="Category" value={item.category || "—"} />
               {item.ownershipType === "personal" && (
-                <div>
-                  <span className="text-gray-400">Personal For:</span>{" "}
-                  <span className="font-medium text-gray-800">
-                    {personalName || "Unknown"}
-                  </span>
-                </div>
+                <InfoChip label="Personal For" value={personalName || "Unknown"} />
               )}
-
-              <div>
-                <span className="text-gray-400">Estimated Cost:</span>{" "}
-                <span className="font-semibold text-gray-900">
-                  {formatMoney(item.expectedPrice || 0)}
-                </span>
-              </div>
+              <InfoChip label="Estimated Cost" value={formatMoney(item.expectedPrice || 0)} />
             </div>
 
             {item.notes ? (
-              <div className="mt-3 rounded-2xl border border-gray-200 bg-white/80 px-3 py-2 text-sm text-gray-600">
-                <span className="text-gray-400">Note:</span> {item.notes}
+              <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-6 text-slate-600 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-300">
+                <span className="font-semibold text-slate-500 dark:text-slate-400">Note:</span> {item.notes}
               </div>
             ) : null}
 
@@ -505,29 +642,27 @@ function SortablePlannedItem({
                   href={item.productLink}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline break-all"
+                  className="inline-flex items-center gap-2 break-all text-sm font-bold text-indigo-600 hover:text-indigo-700 hover:underline dark:text-indigo-300 dark:hover:text-indigo-200"
                 >
-                  View Product Link
+                  View Product Link →
                 </a>
               </div>
             ) : null}
           </div>
         </div>
 
-        <div className="xl:min-w-[220px]">
-          <div className="text-xs text-gray-400 whitespace-nowrap mb-3 xl:text-right">
-            Added {new Date(item.createdAt).toLocaleDateString()}
+        <div className="xl:min-w-[230px]">
+          <div className="mb-3 rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-950/60 dark:text-slate-400 xl:text-right">
+            Added {safeDate(item.createdAt)}
           </div>
 
           <div className="flex flex-wrap gap-2 xl:justify-end">
             <ActionButton variant="neutral" onClick={() => onEdit(item)}>
               Edit
             </ActionButton>
-
             <ActionButton variant="success" onClick={() => onMarkBought(item._id)}>
               Mark Bought
             </ActionButton>
-
             <ActionButton variant="danger" onClick={() => onDelete(item._id)}>
               Delete
             </ActionButton>
@@ -540,83 +675,85 @@ function SortablePlannedItem({
 
 function BoughtHistoryItem({ item, personalName, onMoveBack, onDelete }) {
   return (
-    <div className="rounded-3xl border border-gray-200 bg-gradient-to-br from-white to-emerald-50/30 p-4 md:p-5 shadow-sm hover:shadow-md transition">
-      <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+    <div className="group relative overflow-hidden rounded-[2rem] border border-emerald-100 bg-gradient-to-br from-white via-white to-emerald-50/70 p-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-xl dark:border-emerald-500/20 dark:from-slate-900 dark:via-slate-900 dark:to-emerald-500/10 md:p-5">
+      <div className="absolute right-[-90px] top-[-90px] h-48 w-48 rounded-full bg-emerald-400/20 blur-3xl" />
+      <div className="relative flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <div className="text-lg font-semibold text-gray-900">{item.productName}</div>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <h4 className="break-words text-lg font-black text-slate-950 dark:text-white">
+              {item.productName}
+            </h4>
 
-            <span className="text-xs border px-2.5 py-1 rounded-full bg-green-50 text-green-700 border-green-200">
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
               bought
             </span>
-
-            <span
-              className={`text-xs border px-2.5 py-1 rounded-full capitalize ${badgeClass(
-                "ownership",
-                item.ownershipType
-              )}`}
-            >
+            <span className={`rounded-full border px-2.5 py-1 text-xs font-bold capitalize ${badgeClass("ownership", item.ownershipType)}`}>
               {item.ownershipType}
             </span>
-
-            <span
-              className={`text-xs border px-2.5 py-1 rounded-full capitalize ${badgeClass(
-                "payment",
-                item.paymentMode
-              )}`}
-            >
+            <span className={`rounded-full border px-2.5 py-1 text-xs font-bold capitalize ${badgeClass("payment", item.paymentMode)}`}>
               {item.paymentMode}
             </span>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm text-gray-600">
-            <div>
-              <span className="text-gray-400">Brand:</span>{" "}
-              <span className="font-medium text-gray-800">{item.brand || "—"}</span>
-            </div>
-            <div>
-              <span className="text-gray-400">Category:</span>{" "}
-              <span className="font-medium text-gray-800">{item.category || "—"}</span>
-            </div>
-
+          <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+            <InfoChip label="Brand" value={item.brand || "—"} />
+            <InfoChip label="Category" value={item.category || "—"} />
             {item.ownershipType === "personal" && (
-              <div>
-                <span className="text-gray-400">Personal For:</span>{" "}
-                <span className="font-medium text-gray-800">{personalName || "Unknown"}</span>
-              </div>
+              <InfoChip label="Personal For" value={personalName || "Unknown"} />
             )}
-
-            <div>
-              <span className="text-gray-400">Planned Cost:</span>{" "}
-              <span className="font-semibold text-gray-900">
-                {formatMoney(item.expectedPrice || 0)}
-              </span>
-            </div>
+            <InfoChip label="Planned Cost" value={formatMoney(item.expectedPrice || 0)} />
           </div>
 
           {item.notes ? (
-            <div className="mt-3 rounded-2xl border border-gray-200 bg-white/80 px-3 py-2 text-sm text-gray-600">
-              <span className="text-gray-400">Note:</span> {item.notes}
+            <div className="mt-3 rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm leading-6 text-slate-600 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-300">
+              <span className="font-semibold text-slate-500 dark:text-slate-400">Note:</span> {item.notes}
             </div>
           ) : null}
         </div>
 
-        <div className="xl:min-w-[220px]">
-          <div className="text-xs text-gray-400 whitespace-nowrap mb-3 xl:text-right">
-            Updated {new Date(item.updatedAt).toLocaleDateString()}
+        <div className="xl:min-w-[230px]">
+          <div className="mb-3 rounded-2xl bg-white/70 px-3 py-2 text-xs text-slate-500 dark:bg-slate-950/60 dark:text-slate-400 xl:text-right">
+            Updated {safeDate(item.updatedAt)}
           </div>
 
           <div className="flex flex-wrap gap-2 xl:justify-end">
             <ActionButton variant="neutral" onClick={() => onMoveBack(item._id)}>
               Move Back
             </ActionButton>
-
             <ActionButton variant="danger" onClick={() => onDelete(item._id)}>
               Delete
             </ActionButton>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ProgressRow({ label, value, total, barClass, right }) {
+  const width = percent(value, total);
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
+        <span className="font-semibold text-slate-600 dark:text-slate-300">{label}</span>
+        <span className="text-slate-500 dark:text-slate-400">{right || formatMoney(value)}</span>
+      </div>
+      <div className="h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+        <div className={`h-full rounded-full ${barClass}`} style={{ width: `${width}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ title, text, action }) {
+  return (
+    <div className="rounded-[2rem] border border-dashed border-slate-300 bg-white/60 p-10 text-center dark:border-slate-700 dark:bg-slate-900/40">
+      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-100 to-fuchsia-100 text-3xl dark:from-indigo-500/10 dark:to-fuchsia-500/10">
+        🧺
+      </div>
+      <div className="mb-2 text-lg font-black text-slate-950 dark:text-white">{title}</div>
+      <div className="mx-auto max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">{text}</div>
+      {action ? <div className="mt-5">{action}</div> : null}
     </div>
   );
 }
@@ -982,8 +1119,7 @@ export default function PlannedPurchases() {
         (a, b) => Number(a.expectedPrice || 0) - Number(b.expectedPrice || 0)
       );
     } else if (filters.sortBy === "priority") {
-      const rank = { high: 1, medium: 2, low: 3 };
-      list.sort((a, b) => rank[a.priority] - rank[b.priority]);
+      list.sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority));
     } else {
       list.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
     }
@@ -997,12 +1133,64 @@ export default function PlannedPurchases() {
       0
     );
 
+    const boughtTotal = boughtItems.reduce(
+      (sum, item) => sum + Number(item.expectedPrice || 0),
+      0
+    );
+
+    const highPriorityCount = activeItems.filter((item) => item.priority === "high").length;
+    const sharedCount = activeItems.filter((item) => item.ownershipType === "shared").length;
+    const personalCount = activeItems.filter((item) => item.ownershipType === "personal").length;
+
+    const priorityBudget = {
+      high: activeItems
+        .filter((item) => item.priority === "high")
+        .reduce((sum, item) => sum + Number(item.expectedPrice || 0), 0),
+      medium: activeItems
+        .filter((item) => item.priority === "medium")
+        .reduce((sum, item) => sum + Number(item.expectedPrice || 0), 0),
+      low: activeItems
+        .filter((item) => item.priority === "low")
+        .reduce((sum, item) => sum + Number(item.expectedPrice || 0), 0),
+    };
+
+    const paymentBudget = {
+      cash: activeItems
+        .filter((item) => item.paymentMode === "cash")
+        .reduce((sum, item) => sum + Number(item.expectedPrice || 0), 0),
+      emi: activeItems
+        .filter((item) => item.paymentMode === "emi")
+        .reduce((sum, item) => sum + Number(item.expectedPrice || 0), 0),
+      either: activeItems
+        .filter((item) => item.paymentMode === "either")
+        .reduce((sum, item) => sum + Number(item.expectedPrice || 0), 0),
+      undecided: activeItems
+        .filter((item) => item.paymentMode === "undecided")
+        .reduce((sum, item) => sum + Number(item.expectedPrice || 0), 0),
+    };
+
     return {
       activeCount: activeItems.length,
       boughtCount: boughtItems.length,
       estimatedTotal,
+      boughtTotal,
+      highPriorityCount,
+      sharedCount,
+      personalCount,
+      priorityBudget,
+      paymentBudget,
     };
   }, [activeItems, boughtItems]);
+
+  const filterCount = useMemo(() => {
+    let count = 0;
+    if (filters.search.trim()) count += 1;
+    if (filters.priority !== "all") count += 1;
+    if (filters.ownershipType !== "all") count += 1;
+    if (filters.paymentMode !== "all") count += 1;
+    if (filters.sortBy !== "manual") count += 1;
+    return count;
+  }, [filters]);
 
   async function handleDragEnd(event) {
     const { active, over } = event;
@@ -1060,86 +1248,156 @@ export default function PlannedPurchases() {
 
   return (
     <AppLayout>
-      <div className="mx-auto px-2 sm:px-4 pb-10">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              Planned Purchases
-            </h2>
-            <p className="text-sm text-gray-600">
-              Plan future products and organize what to buy next.
-            </p>
-          </div>
+      <div className="mx-auto w-full max-w-7xl px-2 pb-10 sm:px-4">
+        <section className="relative mb-6 overflow-hidden rounded-[2rem] border border-white/70 bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-5 text-white shadow-xl shadow-indigo-500/20 dark:border-white/10 sm:p-6 lg:p-7">
+          <div className="absolute right-[-80px] top-[-100px] h-72 w-72 rounded-full bg-white/20 blur-3xl" />
+          <div className="absolute bottom-[-120px] left-[20%] h-72 w-72 rounded-full bg-amber-300/20 blur-3xl" />
+          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl">
+              <div className="mb-3 inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] backdrop-blur">
+                Purchase Planner
+              </div>
+              <h2 className="text-3xl font-black tracking-tight sm:text-4xl">
+                Planned Purchases
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-white/80">
+                Organize future products, compare priorities, estimate required budget, and keep bought items in a clean history.
+              </p>
+            </div>
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={loadInitialData}
-              disabled={loading}
-              className="px-4 py-2 rounded-xl border border-gray-200 bg-white text-sm font-medium shadow-sm hover:bg-gray-50 disabled:opacity-60"
-            >
-              {loading ? "Refreshing..." : "Refresh"}
-            </button>
-
-            <button
-              onClick={openAddModal}
-              className="px-4 py-2 rounded-xl bg-gray-900 text-white text-sm font-medium shadow-sm hover:bg-gray-800"
-            >
-              Add Purchase
-            </button>
+            <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[380px]">
+              <button
+                onClick={loadInitialData}
+                disabled={loading}
+                className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading ? "Refreshing..." : "Refresh"}
+              </button>
+              <button
+                onClick={openAddModal}
+                className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-indigo-700 shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl"
+              >
+                + Add Purchase
+              </button>
+            </div>
           </div>
-        </div>
+        </section>
 
         {notice.text ? (
-          <div
-            className={`mb-6 rounded-2xl border px-4 py-3 text-sm font-medium ${statusPillClass(
-              notice.type
-            )}`}
-          >
+          <div className={`mb-6 rounded-2xl border px-4 py-3 text-sm font-bold ${statusPillClass(notice.type)}`}>
             {notice.text}
           </div>
         ) : null}
 
         {err && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 rounded-2xl p-4">
-            <div className="font-semibold mb-1">Couldn’t load planned items</div>
-            <div className="text-sm">{err}</div>
+          <div className="mb-6 rounded-3xl border border-rose-200 bg-rose-50 p-4 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
+            <div className="mb-1 font-black">Couldn’t load planned items</div>
+            <div className="text-sm break-words">{err}</div>
           </div>
         )}
 
         {loading ? (
-          <div className="grid md:grid-cols-3 gap-4 mb-6">
+          <div className="mb-6 grid gap-4 md:grid-cols-3">
             <SkeletonCard />
             <SkeletonCard />
             <SkeletonCard />
           </div>
         ) : (
-          <div className="grid md:grid-cols-3 gap-4 mb-6">
+          <div className="mb-6 grid gap-4 md:grid-cols-3">
             <StatCard
-              title="Active Planned Items"
+              title="Active Plans"
               value={summary.activeCount}
               hint="Items waiting to be bought"
+              tone="blue"
+              icon="🧾"
             />
             <StatCard
               title="Bought Items"
               value={summary.boughtCount}
-              hint="Items already completed"
+              hint={`Completed plan value: ${formatMoney(summary.boughtTotal)}`}
+              tone="green"
+              icon="✅"
             />
             <StatCard
-              title="Estimated Total"
+              title="Estimated Budget"
               value={formatMoney(summary.estimatedTotal)}
-              hint="Based on all active planned items"
+              hint={`${summary.highPriorityCount} high-priority item(s) in active list`}
+              tone="purple"
+              icon="🎯"
             />
           </div>
         )}
 
-        <div className="bg-white border rounded-2xl p-3 mb-6 flex gap-2 w-fit shadow-sm">
+        {!loading && (
+          <div className="mb-6 grid gap-4 lg:grid-cols-3">
+            <div className="rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/75 lg:col-span-2">
+              <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-black text-slate-950 dark:text-white">Priority & Payment Graph</h3>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Budget distribution from active planned items.</p>
+                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  Active only
+                </span>
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-4">
+                  <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Priority Budget</div>
+                  <ProgressRow label="High" value={summary.priorityBudget.high} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-rose-500 to-pink-400" />
+                  <ProgressRow label="Medium" value={summary.priorityBudget.medium} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-amber-500 to-yellow-400" />
+                  <ProgressRow label="Low" value={summary.priorityBudget.low} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-emerald-500 to-teal-400" />
+                </div>
+
+                <div className="space-y-4">
+                  <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Payment Budget</div>
+                  <ProgressRow label="Cash" value={summary.paymentBudget.cash} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-emerald-500 to-teal-400" />
+                  <ProgressRow label="EMI" value={summary.paymentBudget.emi} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-orange-500 to-amber-400" />
+                  <ProgressRow label="Either" value={summary.paymentBudget.either} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-sky-500 to-blue-400" />
+                  <ProgressRow label="Undecided" value={summary.paymentBudget.undecided} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-slate-500 to-slate-400" />
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/75">
+              <h3 className="text-lg font-black text-slate-950 dark:text-white">Plan Snapshot</h3>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Ownership and readiness indicators.</p>
+
+              <div className="mt-5 space-y-4">
+                <ProgressRow
+                  label="Shared Items"
+                  value={summary.sharedCount}
+                  total={Math.max(summary.activeCount, 1)}
+                  right={`${summary.sharedCount} item(s)`}
+                  barClass="bg-gradient-to-r from-blue-500 to-indigo-400"
+                />
+                <ProgressRow
+                  label="Personal Items"
+                  value={summary.personalCount}
+                  total={Math.max(summary.activeCount, 1)}
+                  right={`${summary.personalCount} item(s)`}
+                  barClass="bg-gradient-to-r from-purple-500 to-fuchsia-400"
+                />
+                <ProgressRow
+                  label="High Priority"
+                  value={summary.highPriorityCount}
+                  total={Math.max(summary.activeCount, 1)}
+                  right={`${summary.highPriorityCount} item(s)`}
+                  barClass="bg-gradient-to-r from-rose-500 to-pink-400"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="mb-6 flex w-full rounded-3xl border border-white/70 bg-white/80 p-2 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/70 sm:w-fit">
           <button
             type="button"
             onClick={() => setActiveTab("active")}
-            className={`px-4 py-2 rounded-xl text-sm font-medium ${
+            className={`flex-1 rounded-2xl px-4 py-2.5 text-sm font-black transition sm:flex-none ${
               activeTab === "active"
-                ? "bg-gray-900 text-white shadow-sm"
-                : "text-gray-700 hover:bg-gray-100"
+                ? "bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white shadow-lg shadow-indigo-500/20"
+                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
             }`}
           >
             Active Plans
@@ -1148,10 +1406,10 @@ export default function PlannedPurchases() {
           <button
             type="button"
             onClick={() => setActiveTab("history")}
-            className={`px-4 py-2 rounded-xl text-sm font-medium ${
+            className={`flex-1 rounded-2xl px-4 py-2.5 text-sm font-black transition sm:flex-none ${
               activeTab === "history"
-                ? "bg-gray-900 text-white shadow-sm"
-                : "text-gray-700 hover:bg-gray-100"
+                ? "bg-gradient-to-r from-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-500/20"
+                : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
             }`}
           >
             Bought History
@@ -1160,51 +1418,40 @@ export default function PlannedPurchases() {
 
         {activeTab === "active" ? (
           <div className="space-y-6">
-            <div className="bg-white border rounded-2xl p-5 md:p-6 shadow-sm">
-              <div className="mb-4 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div className="rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/75 md:p-6">
+              <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Search, Filter & Sort
-                  </h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Drag reorder works only when sort is set to Manual and filters are cleared.
+                  <h3 className="text-lg font-black text-slate-950 dark:text-white">Search, Filter & Sort</h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    Drag reorder works only when sort is Manual and all filters are cleared.
                   </p>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => setFilters(initialFilters)}
-                  className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium hover:bg-gray-50"
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
-                  Clear Filters
+                  Clear Filters {filterCount ? `(${filterCount})` : ""}
                 </button>
               </div>
 
-              <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-4">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                 <div className="xl:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Search
-                  </label>
+                  <FieldLabel>Search</FieldLabel>
                   <input
                     type="text"
                     name="search"
                     value={filters.search}
                     onChange={handleFilterChange}
                     placeholder="Search by name, brand, category, note, person"
-                    className="w-full rounded-xl border px-3 py-2.5 outline-none focus:ring-2 focus:ring-gray-900"
+                    className={inputClass()}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Priority
-                  </label>
-                  <select
-                    name="priority"
-                    value={filters.priority}
-                    onChange={handleFilterChange}
-                    className="w-full rounded-xl border px-3 py-2.5 outline-none focus:ring-2 focus:ring-gray-900"
-                  >
+                  <FieldLabel>Priority</FieldLabel>
+                  <select name="priority" value={filters.priority} onChange={handleFilterChange} className={inputClass()}>
                     <option value="all">All</option>
                     <option value="high">High</option>
                     <option value="medium">Medium</option>
@@ -1213,15 +1460,8 @@ export default function PlannedPurchases() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Ownership
-                  </label>
-                  <select
-                    name="ownershipType"
-                    value={filters.ownershipType}
-                    onChange={handleFilterChange}
-                    className="w-full rounded-xl border px-3 py-2.5 outline-none focus:ring-2 focus:ring-gray-900"
-                  >
+                  <FieldLabel>Ownership</FieldLabel>
+                  <select name="ownershipType" value={filters.ownershipType} onChange={handleFilterChange} className={inputClass()}>
                     <option value="all">All</option>
                     <option value="shared">Shared</option>
                     <option value="personal">Personal</option>
@@ -1229,15 +1469,8 @@ export default function PlannedPurchases() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Payment
-                  </label>
-                  <select
-                    name="paymentMode"
-                    value={filters.paymentMode}
-                    onChange={handleFilterChange}
-                    className="w-full rounded-xl border px-3 py-2.5 outline-none focus:ring-2 focus:ring-gray-900"
-                  >
+                  <FieldLabel>Payment</FieldLabel>
+                  <select name="paymentMode" value={filters.paymentMode} onChange={handleFilterChange} className={inputClass()}>
                     <option value="all">All</option>
                     <option value="undecided">Undecided</option>
                     <option value="cash">Cash</option>
@@ -1247,17 +1480,10 @@ export default function PlannedPurchases() {
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4 mt-4">
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Sort By
-                  </label>
-                  <select
-                    name="sortBy"
-                    value={filters.sortBy}
-                    onChange={handleFilterChange}
-                    className="w-full rounded-xl border px-3 py-2.5 outline-none focus:ring-2 focus:ring-gray-900"
-                  >
+                  <FieldLabel>Sort By</FieldLabel>
+                  <select name="sortBy" value={filters.sortBy} onChange={handleFilterChange} className={inputClass()}>
                     <option value="manual">Manual Order</option>
                     <option value="latest">Latest Added</option>
                     <option value="price-high">Price High to Low</option>
@@ -1268,37 +1494,39 @@ export default function PlannedPurchases() {
               </div>
             </div>
 
-            <div className="bg-white border rounded-2xl p-5 md:p-6 shadow-sm">
-              <div className="mb-4 flex items-start justify-between gap-4">
+            <div className="rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/75 md:p-6">
+              <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Active Planned Items
-                  </h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Organize these by drag and drop when using manual order.
+                  <h3 className="text-lg font-black text-slate-950 dark:text-white">Active Planned Items</h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    Organize by drag and drop when using manual order.
                   </p>
                 </div>
 
-                <div className="text-xs text-gray-500">
-                  {reordering ? "Saving order..." : `${filteredActiveItems.length} item(s) shown`}
+                <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                  {reordering ? "Saving order..." : `${filteredActiveItems.length} shown`}
                 </div>
               </div>
 
               {loading ? (
                 <div className="space-y-3">
-                  <div className="h-20 bg-gray-100 rounded-xl animate-pulse" />
-                  <div className="h-20 bg-gray-100 rounded-xl animate-pulse" />
-                  <div className="h-20 bg-gray-100 rounded-xl animate-pulse" />
+                  <div className="h-24 animate-pulse rounded-3xl bg-slate-100 dark:bg-slate-800" />
+                  <div className="h-24 animate-pulse rounded-3xl bg-slate-100 dark:bg-slate-800" />
+                  <div className="h-24 animate-pulse rounded-3xl bg-slate-100 dark:bg-slate-800" />
                 </div>
               ) : filteredActiveItems.length === 0 ? (
-                <div className="border border-dashed rounded-2xl p-10 text-center">
-                  <div className="text-lg font-semibold text-gray-900 mb-2">
-                    No matching active planned purchases
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    Try changing search, filters, or add a new item.
-                  </div>
-                </div>
+                <EmptyState
+                  title="No matching active planned purchases"
+                  text="Try changing search, filters, or add a new item to your purchase plan."
+                  action={
+                    <button
+                      onClick={openAddModal}
+                      className="rounded-2xl bg-gradient-to-r from-indigo-600 to-fuchsia-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-500/20"
+                    >
+                      Add Purchase
+                    </button>
+                  }
+                />
               ) : (
                 <DndContext
                   sensors={sensors}
@@ -1331,30 +1559,30 @@ export default function PlannedPurchases() {
             </div>
           </div>
         ) : (
-          <div className="bg-white border rounded-2xl p-5 md:p-6 shadow-sm">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Bought History
-              </h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Items already completed are kept here instead of being removed.
-              </p>
+          <div className="rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/75 md:p-6">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-950 dark:text-white">Bought History</h3>
+                <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  Completed items are kept here instead of being removed.
+                </p>
+              </div>
+
+              <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
+                {boughtItems.length} bought
+              </div>
             </div>
 
             {loading ? (
               <div className="space-y-3">
-                <div className="h-20 bg-gray-100 rounded-xl animate-pulse" />
-                <div className="h-20 bg-gray-100 rounded-xl animate-pulse" />
+                <div className="h-24 animate-pulse rounded-3xl bg-slate-100 dark:bg-slate-800" />
+                <div className="h-24 animate-pulse rounded-3xl bg-slate-100 dark:bg-slate-800" />
               </div>
             ) : boughtItems.length === 0 ? (
-              <div className="border border-dashed rounded-2xl p-10 text-center">
-                <div className="text-lg font-semibold text-gray-900 mb-2">
-                  No bought items yet
-                </div>
-                <div className="text-sm text-gray-500">
-                  When you mark an active item as bought, it will appear here.
-                </div>
-              </div>
+              <EmptyState
+                title="No bought items yet"
+                text="When you mark an active item as bought, it will appear here as a clean purchase history."
+              />
             ) : (
               <div className="space-y-4">
                 {boughtItems.map((item) => (
