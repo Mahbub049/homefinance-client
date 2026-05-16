@@ -18,10 +18,23 @@ body {
 
 body {
   background: #ffffff;
+  color: #0f172a;
 }
 
 .dark body {
   background: #020617;
+  color: #f8fafc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
 }
 
 @layer components {
@@ -37,7 +50,11 @@ body {
   .app-modal-panel {
     width: min(100%, calc(100vw - 24px));
     max-height: min(92dvh, 92vh);
-    @apply overflow-y-auto border bg-white shadow-xl;
+    @apply overflow-y-auto border border-slate-200 bg-white text-slate-950 shadow-xl;
+  }
+
+  .dark .app-modal-panel {
+    @apply border-white/10 bg-slate-950 text-slate-100;
   }
 
   @screen sm {
@@ -51,7 +68,36 @@ body {
   }
 }
 
-/* Grocery page input/select readability */
+/* ============================= */
+/* Common hidden scrollbar helper */
+/* ============================= */
+
+.no-visible-scrollbar,
+.grocery-modal-scroll,
+.ledger-no-scrollbar,
+.fixed-no-scrollbar,
+.wallet-no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.no-visible-scrollbar::-webkit-scrollbar,
+.grocery-modal-scroll::-webkit-scrollbar,
+.ledger-no-scrollbar::-webkit-scrollbar,
+.fixed-no-scrollbar::-webkit-scrollbar,
+.wallet-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================= */
+/* Grocery page */
+/* ============================= */
+
+.grocery-page {
+  overflow-x: hidden;
+}
+
 .grocery-page input,
 .grocery-page select,
 .grocery-page textarea {
@@ -74,17 +120,6 @@ body {
   color: #f8fafc;
 }
 
-/* Modal scrollbar hidden but still scrollable */
-.grocery-modal-scroll {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.grocery-modal-scroll::-webkit-scrollbar {
-  display: none;
-}
-
-/* Grocery page scrollbar polish */
 .grocery-page ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -107,7 +142,6 @@ body {
   background-clip: content-box;
 }
 
-/* Mobile grocery sizing */
 @media (max-width: 640px) {
   .grocery-page {
     font-size: 13px;
@@ -152,19 +186,12 @@ body {
   }
 }
 
+/* ============================= */
+/* Ledger page */
+/* ============================= */
 
-/* Ledger page polish: hidden horizontal scrollbars but still touch/trackpad scrollable */
 .ledger-page {
   overflow-x: hidden;
-}
-
-.ledger-no-scrollbar {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.ledger-no-scrollbar::-webkit-scrollbar {
-  display: none;
 }
 
 .ledger-page input,
@@ -199,5 +226,358 @@ body {
   .ledger-page textarea,
   .ledger-page button {
     font-size: 12px;
+  }
+
+  .ledger-page input,
+  .ledger-page select,
+  .ledger-page textarea {
+    min-height: 40px;
+  }
+
+  .ledger-page * {
+    max-width: 100%;
+  }
+}
+
+/* ============================= */
+/* Fixed expenses page */
+/* ============================= */
+
+.fixed-page {
+  overflow-x: hidden;
+}
+
+.fixed-page input,
+.fixed-page select,
+.fixed-page textarea {
+  color-scheme: light;
+}
+
+.dark .fixed-page input,
+.dark .fixed-page select,
+.dark .fixed-page textarea {
+  color-scheme: dark;
+}
+
+.fixed-page select option {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.dark .fixed-page select option {
+  background: #020617;
+  color: #f8fafc;
+}
+
+@media (max-width: 640px) {
+  .fixed-page {
+    font-size: 13px;
+  }
+
+  .fixed-page input,
+  .fixed-page select,
+  .fixed-page textarea,
+  .fixed-page button {
+    font-size: 12px;
+  }
+
+  .fixed-page input,
+  .fixed-page select,
+  .fixed-page textarea {
+    min-height: 40px;
+  }
+
+  .fixed-page * {
+    max-width: 100%;
+  }
+
+  .fixed-page article {
+    transform: none !important;
+  }
+
+  .fixed-page article:hover {
+    transform: none !important;
+  }
+}
+
+/* ============================= */
+/* Wallet page */
+/* ============================= */
+
+.wallet-page {
+  overflow-x: hidden;
+}
+
+.wallet-page input,
+.wallet-page select,
+.wallet-page textarea {
+  color-scheme: light;
+}
+
+.dark .wallet-page input,
+.dark .wallet-page select,
+.dark .wallet-page textarea {
+  color-scheme: dark;
+}
+
+.wallet-page select option {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.dark .wallet-page select option {
+  background: #020617;
+  color: #f8fafc;
+}
+
+.wallet-page input[type="month"],
+.wallet-page input[type="date"] {
+  cursor: pointer;
+}
+
+.wallet-page button {
+  touch-action: manipulation;
+}
+
+@media (max-width: 640px) {
+  .wallet-page {
+    font-size: 13px;
+  }
+
+  .wallet-page h1,
+  .wallet-page h2 {
+    font-size: 1.45rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .wallet-page h3,
+  .wallet-page h4 {
+    font-size: 1rem !important;
+    line-height: 1.35 !important;
+  }
+
+  .wallet-page .text-4xl {
+    font-size: 1.7rem !important;
+    line-height: 2rem !important;
+  }
+
+  .wallet-page .text-3xl {
+    font-size: 1.45rem !important;
+    line-height: 1.85rem !important;
+  }
+
+  .wallet-page .text-2xl {
+    font-size: 1.25rem !important;
+    line-height: 1.7rem !important;
+  }
+
+  .wallet-page input,
+  .wallet-page select,
+  .wallet-page textarea,
+  .wallet-page button {
+    font-size: 12px;
+  }
+
+  .wallet-page input,
+  .wallet-page select,
+  .wallet-page textarea {
+    min-height: 40px;
+  }
+
+  .wallet-page * {
+    max-width: 100%;
+  }
+
+  .wallet-page article,
+  .wallet-page .group {
+    transform: none !important;
+  }
+
+  .wallet-page article:hover,
+  .wallet-page .group:hover {
+    transform: none !important;
+  }
+}
+
+/* ============================= */
+/* Wallet mobile overflow fix */
+/* ============================= */
+
+.wallet-page {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.wallet-page * {
+  box-sizing: border-box;
+}
+
+.wallet-page article,
+.wallet-page section,
+.wallet-page div {
+  min-width: 0;
+}
+
+.wallet-page .wallet-card,
+.wallet-page .wallet-card * {
+  min-width: 0;
+}
+
+.wallet-page .wallet-details-panel {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.wallet-page .wallet-details-grid {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.wallet-page .wallet-no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.wallet-page .wallet-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  html,
+  body,
+  #root {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .wallet-page {
+    overflow-x: hidden;
+  }
+
+  .wallet-page article,
+  .wallet-page .wallet-card {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    transform: none !important;
+  }
+
+  .wallet-page article:hover,
+  .wallet-page .wallet-card:hover {
+    transform: none !important;
+  }
+
+  .wallet-page .wallet-details-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+
+  .wallet-page .wallet-details-panel {
+    margin-top: 10px;
+    padding: 10px !important;
+    border-radius: 16px !important;
+  }
+
+  .wallet-page .wallet-details-panel p,
+  .wallet-page .wallet-details-panel div,
+  .wallet-page .wallet-details-panel span {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Wallet details opening scrollbar fix */
+.wallet-page {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.wallet-page .wallet-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.wallet-page .wallet-card * {
+  min-width: 0;
+}
+
+.wallet-page .wallet-details-grid {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@media (max-width: 640px) {
+  .wallet-page,
+  .wallet-page .wallet-card,
+  .wallet-page .wallet-details-grid {
+    overflow-x: hidden !important;
+  }
+
+  .wallet-page .wallet-details-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .wallet-page .wallet-card {
+    transform: none !important;
+  }
+
+  .wallet-page .wallet-card:hover {
+    transform: none !important;
+  }
+}
+
+/* Wallet right-gap and overflow correction */
+.wallet-page {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.wallet-page > div {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.wallet-page section,
+.wallet-page article,
+.wallet-page .wallet-card {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.wallet-page input,
+.wallet-page button {
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .wallet-page {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  .wallet-page section {
+    width: 100%;
+  }
+
+  .wallet-page article,
+  .wallet-page .wallet-card {
+    width: 100%;
+    transform: none !important;
+  }
+
+  .wallet-page article:hover,
+  .wallet-page .wallet-card:hover {
+    transform: none !important;
   }
 }
