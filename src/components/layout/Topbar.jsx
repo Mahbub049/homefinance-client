@@ -99,7 +99,10 @@ export default function Topbar({ onToggleSidebar, onOpenDrawer }) {
 
   function logout() {
     clearAuth();
-    nav("/login", { replace: true });
+
+    requestAnimationFrame(() => {
+      nav("/login", { replace: true });
+    });
   }
 
   const firstName = user?.name?.split(" ")?.[0] || "Guest";

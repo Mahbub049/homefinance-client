@@ -253,6 +253,125 @@ function Field({ label, children, className = "" }) {
   );
 }
 
+function ChevronDownIcon({ className = "h-4 w-4" }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+function SmartTextDropdown({
+  value,
+  onTextChange,
+  onPick,
+  options = [],
+  open,
+  setOpen,
+  placeholder = "Type or choose",
+  emptyText = "No saved option found",
+  getKey,
+  getLabel,
+  getSubLabel,
+  iconName = "tag",
+}) {
+  return (
+    <div
+      className="relative"
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+          setOpen(false);
+        }
+      }}
+    >
+      <div className="relative">
+        <input
+          className={`${fieldClass} pr-12`}
+          value={value}
+          onFocus={() => setOpen(true)}
+          onChange={(e) => {
+            onTextChange(e.target.value);
+            setOpen(true);
+          }}
+          placeholder={placeholder}
+        />
+
+        <button
+          type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setOpen(!open);
+          }}
+          className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
+        >
+          <ChevronDownIcon
+            className={`h-4 w-4 transition duration-200 ${open ? "rotate-180" : ""
+              }`}
+          />
+        </button>
+      </div>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-full z-[90] mt-2 max-h-64 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_20px_55px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-slate-950 dark:shadow-[0_24px_70px_rgba(0,0,0,0.45)]">
+          {options.length > 0 ? (
+            <div className="space-y-1">
+              {options.map((option) => {
+                const label = getLabel(option);
+                const subLabel = getSubLabel?.(option);
+
+                return (
+                  <button
+                    key={getKey(option)}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      onPick(option);
+                      setOpen(false);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-emerald-50 dark:hover:bg-emerald-400/10"
+                  >
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-400/10 dark:text-emerald-200 dark:ring-emerald-400/20">
+                      <Icon name={iconName} className="h-4 w-4" />
+                    </span>
+
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-black text-slate-900 dark:text-white">
+                        {label}
+                      </span>
+
+                      {subLabel && (
+                        <span className="mt-0.5 block truncate text-xs font-medium text-slate-500 dark:text-slate-400">
+                          {subLabel}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
+              {emptyText}
+            </div>
+          )}
+
+          <div className="mt-2 border-t border-slate-100 px-3 pt-2 text-[11px] font-bold text-slate-400 dark:border-white/10 dark:text-slate-500">
+            You can also type manually.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Grocery() {
   const me = getUser();
   const currentUserId = String(me?.id || me?._id || "");
@@ -266,6 +385,7 @@ export default function Grocery() {
   const [methods, setMethods] = useState([]);
   const [cards, setCards] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [groceryShops, setGroceryShops] = useState([]);
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -305,6 +425,8 @@ export default function Grocery() {
 
   const [txnItems, setTxnItems] = useState([blankTxnItem()]);
   const [fixedEditedField, setFixedEditedField] = useState("fixedMe");
+  const [shopDropdownOpen, setShopDropdownOpen] = useState(false);
+  const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
 
   useEffect(() => {
     const selectedMonth = day.slice(0, 7);
@@ -322,6 +444,172 @@ export default function Grocery() {
     return map;
   }, [members]);
 
+  function normalizeText(value = "") {
+    return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  }
+
+  function normalizeWords(value = "") {
+    return String(value || "")
+      .toLowerCase()
+      .split(/[^a-z0-9]+/g)
+      .filter(Boolean);
+  }
+
+  function isEmiCategory(category) {
+    return normalizeText(category?.name) === "emi";
+  }
+
+  function isHiddenGroceryAccount(account) {
+    const type = normalizeText(account?.type);
+    const name = normalizeText(account?.name);
+
+    return (
+      type === "savings" ||
+      type === "investment" ||
+      name.includes("dps") ||
+      name.includes("savings") ||
+      name.includes("saving")
+    );
+  }
+
+  function getAccountById(accountId) {
+    return (accounts || []).find((a) => String(a._id) === String(accountId));
+  }
+
+  function methodMatches(method, keywords = []) {
+    const name = normalizeText(method?.name);
+    return keywords.some((key) => name.includes(normalizeText(key)));
+  }
+
+  function isPaymentMethodCard(methodId) {
+    const method = (methods || []).find((m) => String(m._id) === String(methodId));
+    return methodMatches(method, ["card", "debit", "credit"]);
+  }
+
+  function getAllowedPaymentMethodsForAccount(accountId) {
+    const account = getAccountById(accountId);
+    const type = normalizeText(account?.type);
+
+    if (!account) return methods || [];
+
+    if (type === "bank") {
+      return (methods || []).filter((m) =>
+        methodMatches(m, ["card", "check", "cheque"])
+      );
+    }
+
+    if (type === "cash") {
+      return (methods || []).filter((m) => methodMatches(m, ["cash"]));
+    }
+
+    if (type === "wallet") {
+      return (methods || []).filter((m) =>
+        methodMatches(m, ["bkash", "nagad"])
+      );
+    }
+
+    return methods || [];
+  }
+
+  function getDefaultPaymentMethodId(accountId) {
+    const account = getAccountById(accountId);
+    const type = normalizeText(account?.type);
+    const allowed = getAllowedPaymentMethodsForAccount(accountId);
+
+    if (type === "bank") {
+      return (
+        allowed.find((m) => methodMatches(m, ["card"]))?._id ||
+        allowed.find((m) => methodMatches(m, ["check", "cheque"]))?._id ||
+        allowed[0]?._id ||
+        ""
+      );
+    }
+
+    if (type === "cash") {
+      return allowed.find((m) => methodMatches(m, ["cash"]))?._id || allowed[0]?._id || "";
+    }
+
+    if (type === "wallet") {
+      return (
+        allowed.find((m) => methodMatches(m, ["bkash"]))?._id ||
+        allowed.find((m) => methodMatches(m, ["nagad"]))?._id ||
+        allowed[0]?._id ||
+        ""
+      );
+    }
+
+    return allowed[0]?._id || "";
+  }
+
+  function getDefaultCardLabelId(accountId) {
+    const account = getAccountById(accountId);
+    if (!account || normalizeText(account.type) !== "bank") return "";
+
+    const ignoredWords = new Set([
+      "account",
+      "bank",
+      "debit",
+      "credit",
+      "card",
+      "saving",
+      "savings",
+      "current",
+      "joint",
+    ]);
+
+    const accountWords = normalizeWords(account.name).filter(
+      (word) => !ignoredWords.has(word) && word.length >= 2
+    );
+
+    const activeCards = (cards || []).filter((card) => card.isActive !== false);
+    if (!activeCards.length) return "";
+
+    const scoredCards = activeCards
+      .map((card) => {
+        const text = normalizeText(`${card.label || ""} ${card.last4 || ""}`);
+        const wordScore = accountWords.reduce(
+          (score, word) => score + (text.includes(normalizeText(word)) ? 1 : 0),
+          0
+        );
+        const debitScore = text.includes("debit") ? 0.5 : 0;
+        const cardScore = text.includes("card") ? 0.25 : 0;
+        return { card, score: wordScore + debitScore + cardScore };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    if (scoredCards[0]?.score > 0) return scoredCards[0].card._id;
+
+    return (
+      activeCards.find((card) =>
+        normalizeText(card.label).includes("debitcard")
+      )?._id ||
+      activeCards.find((card) => normalizeText(card.label).includes("debit"))?._id ||
+      activeCards.find((card) => normalizeText(card.label).includes("card"))?._id ||
+      activeCards[0]?._id ||
+      ""
+    );
+  }
+
+  function getAccountPreferenceKey(userId) {
+    return `grocery:lastAccount:${String(userId || "")}`;
+  }
+
+  function savePreferredAccountForUser(userId, accountId) {
+    if (!userId || !accountId) return;
+    localStorage.setItem(getAccountPreferenceKey(userId), String(accountId));
+  }
+
+  function getPreferredAccountForUser(userId) {
+    if (!userId) return "";
+    return localStorage.getItem(getAccountPreferenceKey(userId)) || "";
+  }
+
+  function findShopByName(shopName) {
+    return (groceryShops || []).find(
+      (shop) => normalizeText(shop.name) === normalizeText(shopName)
+    );
+  }
+
   const resolveAccountOwner = (member) => {
     const name = String(member?.name || "").toLowerCase();
     if (name.includes("mahbub")) return "Mahbub";
@@ -334,10 +622,57 @@ export default function Grocery() {
   }, [memberById, form.paidByUserId]);
 
   const paidByAccounts = useMemo(() => {
-    const activeAccounts = (accounts || []).filter((a) => a.isActive !== false);
+    const activeAccounts = (accounts || []).filter(
+      (a) => a.isActive !== false && !isHiddenGroceryAccount(a)
+    );
     if (!selectedPaidByOwner) return activeAccounts;
     return activeAccounts.filter((a) => a.owner === selectedPaidByOwner);
   }, [accounts, selectedPaidByOwner]);
+
+  const groceryExpenseCats = useMemo(() => {
+    return (expenseCats || []).filter((category) => !isEmiCategory(category));
+  }, [expenseCats]);
+
+  const allowedPaymentMethods = useMemo(() => {
+    return getAllowedPaymentMethodsForAccount(form.fromAccountId);
+  }, [form.fromAccountId, accounts, methods]);
+
+  const activeCardLabels = useMemo(() => {
+    return (cards || []).filter((card) => card.isActive !== false);
+  }, [cards]);
+
+  const groceryLocations = useMemo(() => {
+    const values = new Set();
+    for (const shop of groceryShops || []) {
+      if (shop?.location) values.add(shop.location);
+    }
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [groceryShops]);
+
+  const visibleGroceryShops = useMemo(() => {
+    const q = normalizeText(form.shopName);
+
+    const list = q
+      ? (groceryShops || []).filter((shop) => {
+        const text = normalizeText(`${shop.name || ""} ${shop.location || ""}`);
+        return text.includes(q);
+      })
+      : groceryShops || [];
+
+    return list.slice(0, 8);
+  }, [groceryShops, form.shopName]);
+
+  const visibleGroceryLocations = useMemo(() => {
+    const q = normalizeText(form.location);
+
+    const list = q
+      ? groceryLocations.filter((location) =>
+        normalizeText(location).includes(q)
+      )
+      : groceryLocations;
+
+    return list.slice(0, 8);
+  }, [groceryLocations, form.location]);
 
   const currentMemberName = useMemo(() => {
     return memberById.get(currentUserId)?.name || "My";
@@ -373,17 +708,66 @@ export default function Grocery() {
   useEffect(() => {
     if (!open || !form.paidByUserId) return;
 
-    const selectedAccountStillValid = paidByAccounts.some(
-      (a) => String(a._id) === String(form.fromAccountId)
-    );
+    setForm((prev) => {
+      const selectedAccountStillValid = paidByAccounts.some(
+        (a) => String(a._id) === String(prev.fromAccountId)
+      );
 
-    if (selectedAccountStillValid) return;
+      let nextAccountId = prev.fromAccountId;
 
-    setForm((prev) => ({
-      ...prev,
-      fromAccountId: paidByAccounts?.[0]?._id || "",
-    }));
-  }, [open, form.paidByUserId, form.fromAccountId, paidByAccounts]);
+      if (!selectedAccountStillValid) {
+        const preferredAccountId = getPreferredAccountForUser(prev.paidByUserId);
+        const preferredStillValid = paidByAccounts.some(
+          (a) => String(a._id) === String(preferredAccountId)
+        );
+
+        nextAccountId = preferredStillValid
+          ? preferredAccountId
+          : paidByAccounts?.[0]?._id || "";
+      }
+
+      const allowed = getAllowedPaymentMethodsForAccount(nextAccountId);
+      const selectedMethodStillValid = allowed.some(
+        (m) => String(m._id) === String(prev.paymentMethodId)
+      );
+
+      const nextPaymentMethodId = selectedMethodStillValid
+        ? prev.paymentMethodId
+        : getDefaultPaymentMethodId(nextAccountId);
+
+      const nextCardLabelId = isPaymentMethodCard(nextPaymentMethodId)
+        ? String(prev.fromAccountId || "") === String(nextAccountId || "") &&
+          prev.cardLabelId
+          ? prev.cardLabelId
+          : getDefaultCardLabelId(nextAccountId)
+        : "";
+
+      if (
+        String(prev.fromAccountId || "") === String(nextAccountId || "") &&
+        String(prev.paymentMethodId || "") === String(nextPaymentMethodId || "") &&
+        String(prev.cardLabelId || "") === String(nextCardLabelId || "")
+      ) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        fromAccountId: nextAccountId,
+        paymentMethodId: nextPaymentMethodId,
+        cardLabelId: nextCardLabelId,
+      };
+    });
+  }, [
+    open,
+    form.paidByUserId,
+    form.fromAccountId,
+    form.paymentMethodId,
+    form.cardLabelId,
+    paidByAccounts,
+    accounts,
+    methods,
+    cards,
+  ]);
 
   useEffect(() => {
     if (!open || form.splitType !== "fixed" || !otherMember) return;
@@ -474,12 +858,13 @@ export default function Grocery() {
   async function loadBasics() {
     setMsg("");
     try {
-      const [mRes, exp, pm, cl, acc] = await Promise.all([
+      const [mRes, exp, pm, cl, acc, shopRes] = await Promise.all([
         api.get("/api/family/members"),
         api.get("/api/categories", { params: { kind: "expense" } }),
         api.get("/api/payment-methods"),
         api.get("/api/card-labels"),
         api.get("/api/accounts"),
+        api.get("/api/grocery-shops"),
       ]);
 
       setMembers(mRes.data.members || []);
@@ -487,6 +872,7 @@ export default function Grocery() {
       setMethods(pm.data.items || []);
       setCards(cl.data.items || []);
       setAccounts(acc.data.items || []);
+      setGroceryShops(shopRes.data.items || []);
     } catch (e) {
       setMsg(e?.response?.data?.message || "Failed to load setup data");
     }
@@ -515,7 +901,9 @@ export default function Grocery() {
 
   function getAccountsForUser(userId) {
     const owner = resolveAccountOwner(memberById.get(String(userId)));
-    const activeAccounts = (accounts || []).filter((a) => a.isActive !== false);
+    const activeAccounts = (accounts || []).filter(
+      (a) => a.isActive !== false && !isHiddenGroceryAccount(a)
+    );
     if (!owner) return activeAccounts;
     return activeAccounts.filter((a) => a.owner === owner);
   }
@@ -526,19 +914,38 @@ export default function Grocery() {
 
   function getDefaultForm(next = {}) {
     const defaultUser = getId(members?.[0]) || currentUserId || "";
-    const defaultAccount = getFirstAccountForUser(
-      next.paidByUserId || defaultUser
+    const selectedUserId = next.paidByUserId || defaultUser;
+    const preferredAccountId = getPreferredAccountForUser(selectedUserId);
+    const userAccounts = getAccountsForUser(selectedUserId);
+    const preferredStillValid = userAccounts.some(
+      (a) => String(a._id) === String(preferredAccountId)
     );
+
+    const defaultAccount = next.fromAccountId
+      ? next.fromAccountId
+      : preferredStillValid
+        ? preferredAccountId
+        : getFirstAccountForUser(selectedUserId);
+
+    const defaultPaymentMethod = next.paymentMethodId
+      ? next.paymentMethodId
+      : getDefaultPaymentMethodId(defaultAccount);
+
+    const defaultCardLabel = next.cardLabelId
+      ? next.cardLabelId
+      : isPaymentMethodCard(defaultPaymentMethod)
+        ? getDefaultCardLabelId(defaultAccount)
+        : "";
 
     return {
       txnDate: next.txnDate || day || dayNow(),
       shopName: next.shopName || "",
       location: next.location || "",
-      paymentMethodId: next.paymentMethodId || "",
-      cardLabelId: next.cardLabelId || "",
+      paymentMethodId: defaultPaymentMethod,
+      cardLabelId: defaultCardLabel,
       categoryId: next.categoryId || "",
-      paidByUserId: next.paidByUserId || defaultUser,
-      fromAccountId: next.fromAccountId || defaultAccount,
+      paidByUserId: selectedUserId,
+      fromAccountId: defaultAccount,
       discountTotal: next.discountTotal ?? 0,
       deliveryFee: next.deliveryFee ?? 0,
       vatAmount: next.vatAmount ?? 0,
@@ -645,11 +1052,81 @@ export default function Grocery() {
   }
 
   function handlePaidByChange(userId) {
+    const preferredAccountId = getPreferredAccountForUser(userId);
+    const userAccounts = getAccountsForUser(userId);
+    const preferredStillValid = userAccounts.some(
+      (a) => String(a._id) === String(preferredAccountId)
+    );
+
+    const nextAccountId = preferredStillValid
+      ? preferredAccountId
+      : getFirstAccountForUser(userId);
+
+    const nextPaymentMethodId = getDefaultPaymentMethodId(nextAccountId);
+
     setForm((prev) => ({
       ...prev,
       paidByUserId: userId,
-      fromAccountId: getFirstAccountForUser(userId),
+      fromAccountId: nextAccountId,
+      paymentMethodId: nextPaymentMethodId,
+      cardLabelId: isPaymentMethodCard(nextPaymentMethodId)
+        ? getDefaultCardLabelId(nextAccountId)
+        : "",
       personalUserId: prev.splitType === "personal" ? userId : prev.personalUserId,
+    }));
+  }
+
+  function handleFromAccountChange(accountId) {
+    savePreferredAccountForUser(form.paidByUserId, accountId);
+
+    const nextPaymentMethodId = getDefaultPaymentMethodId(accountId);
+
+    setForm((prev) => ({
+      ...prev,
+      fromAccountId: accountId,
+      paymentMethodId: nextPaymentMethodId,
+      cardLabelId: isPaymentMethodCard(nextPaymentMethodId)
+        ? getDefaultCardLabelId(accountId)
+        : "",
+    }));
+  }
+
+  function handlePaymentMethodChange(methodId) {
+    setForm((prev) => ({
+      ...prev,
+      paymentMethodId: methodId,
+      cardLabelId: isPaymentMethodCard(methodId)
+        ? prev.cardLabelId || getDefaultCardLabelId(prev.fromAccountId)
+        : "",
+    }));
+  }
+
+  function handleShopNameChange(shopName) {
+    const selectedShop = findShopByName(shopName);
+
+    setForm((prev) => ({
+      ...prev,
+      shopName,
+      location: selectedShop?.location || prev.location,
+    }));
+  }
+
+  function handleLocationChange(location) {
+    setForm((prev) => ({ ...prev, location }));
+  }
+
+  function handleShopPick(shop) {
+    setForm((prev) => ({
+      ...prev,
+      shopName: shop.name || "",
+      location: shop.location || prev.location,
+    }));
+  }
+
+  function handleLocationPick(location) {
+    setForm((prev) => ({
+      ...prev,
+      location,
     }));
   }
 
@@ -819,7 +1296,7 @@ export default function Grocery() {
 
         <div className="space-y-5">
           {/* Hero */}
-          <section className="relative overflow-hidden rounded-[30px] border border-white/60 bg-[radial-gradient(circle_at_top_left,#34d399_0%,#0f766e_38%,#0f172a_100%)] p-5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.14)] dark:border-white/10 dark:shadow-[0_24px_70px_rgba(0,0,0,0.35)] sm:p-6 lg:p-7">
+          <section className="relative overflow-hidden rounded-[30px] border border-white/60 bg-[radial-gradient(circle_at_top_left,#059669_0%,#065f46_38%,#0f172a_100%)] p-5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.14)] dark:border-white/10 dark:shadow-[0_24px_70px_rgba(0,0,0,0.35)] sm:p-6 lg:p-7">
             <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/15 blur-3xl" />
             <div className="absolute -bottom-24 left-12 h-64 w-64 rounded-full bg-emerald-300/20 blur-3xl" />
             <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(255,255,255,0.12),transparent_45%,rgba(255,255,255,0.07))]" />
@@ -1027,7 +1504,7 @@ export default function Grocery() {
                   className={fieldClass}
                 >
                   <option value="">All categories</option>
-                  {expenseCats.map((c) => (
+                  {groceryExpenseCats.map((c) => (
                     <option key={c._id} value={c._id}>
                       {c.name}
                     </option>
@@ -1383,24 +1860,36 @@ export default function Grocery() {
                     </Field>
 
                     <Field label="Shop">
-                      <input
-                        className={fieldClass}
+                      <SmartTextDropdown
                         value={form.shopName}
-                        onChange={(e) =>
-                          setForm({ ...form, shopName: e.target.value })
-                        }
-                        placeholder="e.g., Agora, Local Shop"
+                        onTextChange={handleShopNameChange}
+                        onPick={handleShopPick}
+                        options={visibleGroceryShops}
+                        open={shopDropdownOpen}
+                        setOpen={setShopDropdownOpen}
+                        placeholder="Choose saved shop or type manually"
+                        emptyText="No saved shop found"
+                        iconName="bag"
+                        getKey={(shop) => shop._id}
+                        getLabel={(shop) => shop.name}
+                        getSubLabel={(shop) => shop.location || "No saved location"}
                       />
                     </Field>
 
                     <Field label="Location">
-                      <input
-                        className={fieldClass}
+                      <SmartTextDropdown
                         value={form.location}
-                        onChange={(e) =>
-                          setForm({ ...form, location: e.target.value })
-                        }
-                        placeholder="Optional"
+                        onTextChange={handleLocationChange}
+                        onPick={handleLocationPick}
+                        options={visibleGroceryLocations}
+                        open={locationDropdownOpen}
+                        setOpen={setLocationDropdownOpen}
+                        placeholder="Choose saved location or type manually"
+                        emptyText="No saved location found"
+                        iconName="tag"
+                        getKey={(location) => location}
+                        getLabel={(location) => location}
+                        getSubLabel={() => "Saved grocery location"}
                       />
                     </Field>
 
@@ -1413,7 +1902,7 @@ export default function Grocery() {
                         }
                       >
                         <option value="">Select</option>
-                        {expenseCats.map((c) => (
+                        {groceryExpenseCats.map((c) => (
                           <option key={c._id} value={c._id}>
                             {c.name}
                           </option>
@@ -1439,9 +1928,7 @@ export default function Grocery() {
                       <select
                         className={fieldClass}
                         value={form.fromAccountId}
-                        onChange={(e) =>
-                          setForm({ ...form, fromAccountId: e.target.value })
-                        }
+                        onChange={(e) => handleFromAccountChange(e.target.value)}
                       >
                         <option value="">
                           {paidByAccounts.length
@@ -1451,7 +1938,7 @@ export default function Grocery() {
                         </option>
                         {paidByAccounts.map((a) => (
                           <option key={a._id} value={a._id}>
-                            {a.name} ({a.type})
+                            {a.name}
                           </option>
                         ))}
                       </select>
@@ -1461,12 +1948,12 @@ export default function Grocery() {
                       <select
                         className={fieldClass}
                         value={form.paymentMethodId}
-                        onChange={(e) =>
-                          setForm({ ...form, paymentMethodId: e.target.value })
-                        }
+                        onChange={(e) => handlePaymentMethodChange(e.target.value)}
                       >
-                        <option value="">Optional</option>
-                        {methods.map((m) => (
+                        <option value="">
+                          {form.fromAccountId ? "Select payment method" : "Select account first"}
+                        </option>
+                        {allowedPaymentMethods.map((m) => (
                           <option key={m._id} value={m._id}>
                             {m.name}
                           </option>
@@ -1481,9 +1968,14 @@ export default function Grocery() {
                         onChange={(e) =>
                           setForm({ ...form, cardLabelId: e.target.value })
                         }
+                        disabled={!isPaymentMethodCard(form.paymentMethodId)}
                       >
-                        <option value="">Optional</option>
-                        {cards.map((c) => (
+                        <option value="">
+                          {isPaymentMethodCard(form.paymentMethodId)
+                            ? "Select card label"
+                            : "Not required"}
+                        </option>
+                        {activeCardLabels.map((c) => (
                           <option key={c._id} value={c._id}>
                             {c.label}
                             {c.last4 ? ` (${c.last4})` : ""}

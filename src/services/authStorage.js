@@ -16,10 +16,15 @@ export function getToken() {
 }
 
 export function getUser() {
-  const raw = localStorage.getItem(USER_KEY);
-  return raw ? JSON.parse(raw) : null;
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    clearAuth();
+    return null;
+  }
 }
 
 export function isLoggedIn() {
-  return !!getToken();
+  return Boolean(getToken());
 }

@@ -112,11 +112,11 @@ export default function Login() {
               </div>
 
               <h1 className="mt-7 max-w-2xl text-5xl font-black leading-[0.98] tracking-[-0.055em] text-white xl:text-7xl">
-                Control your money with a cleaner budget system.
+                HomeFinance
               </h1>
 
               <p className="mt-6 max-w-xl text-lg leading-8 text-slate-300">
-                Track grocery, EMI, savings, ledger entries, transfers, and family-wise wallet balances from one organized finance dashboard.
+                Control your money with a cleaner budget system. Track grocery, ledger entries, transfers, and family-wise wallet balances from one organized finance dashboard.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">

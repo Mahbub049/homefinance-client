@@ -1019,3 +1019,49 @@ button {
     touch-action: pan-y;
   }
 }
+
+.app-modal-panel {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.app-modal-panel::-webkit-scrollbar {
+  display: none;
+}
+
+.ledger-modal-panel {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ledger-modal-panel::-webkit-scrollbar {
+  display: none;
+}
+
+.ledger-modal-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ledger-modal-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .ledger-modal-panel {
+    max-height: calc(100dvh - 16px);
+  }
+}
+
+.ledger-date-input {
+  position: relative;
+}
+
+.ledger-date-input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}

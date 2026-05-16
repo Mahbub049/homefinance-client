@@ -4,7 +4,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import FamilySetup from "./pages/FamilySetup";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { isLoggedIn } from "./services/authStorage";
+import PublicRoute from "./components/PublicRoute";
 import Settings from "./pages/Settings";
 import Ledger from "./pages/Ledger";
 import Fixed from "./pages/Fixed";
@@ -20,8 +20,23 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={isLoggedIn() ? <Navigate to="/dashboard" replace /> : <Login />} />
-        <Route path="/register" element={isLoggedIn() ? <Navigate to="/dashboard" replace /> : <Register />} />
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <Login />
+            </PublicRoute>
+          }
+        />
+
+        <Route
+          path="/register"
+          element={
+            <PublicRoute>
+              <Register />
+            </PublicRoute>
+          }
+        />
 
         <Route
           path="/family"
@@ -34,6 +49,15 @@ export default function App() {
 
         <Route
           path="/"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <Dashboard />
@@ -87,15 +111,6 @@ export default function App() {
         />
 
         <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
           path="/savings"
           element={
             <ProtectedRoute>
@@ -104,11 +119,32 @@ export default function App() {
           }
         />
 
-        <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
+        <Route
+          path="/wallet"
+          element={
+            <ProtectedRoute>
+              <Wallet />
+            </ProtectedRoute>
+          }
+        />
 
-        <Route path="/carry-forward" element={<ProtectedRoute><CarryForward /></ProtectedRoute>} />
+        <Route
+          path="/carry-forward"
+          element={
+            <ProtectedRoute>
+              <CarryForward />
+            </ProtectedRoute>
+          }
+        />
 
-        <Route path="/year-overview" element={<ProtectedRoute><YearOverview /></ProtectedRoute>} />
+        <Route
+          path="/year-overview"
+          element={
+            <ProtectedRoute>
+              <YearOverview />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/planned-purchases"

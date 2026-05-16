@@ -880,8 +880,8 @@ export default function Fixed() {
         className={classNames(
           "fixed-page -m-3 min-h-[calc(100vh-64px)] overflow-x-hidden p-3 transition-colors sm:-m-4 sm:p-4 md:-m-6 md:p-6",
           dark
-            ? "bg-[radial-gradient(circle_at_top_left,#1e1b4b_0,#020617_34%,#020617_100%)] text-slate-100"
-            : "bg-[radial-gradient(circle_at_top_left,#e0f2fe_0,#f8fafc_38%,#fef3c7_100%)] text-slate-950"
+            ? "text-slate-100"
+            : "text-slate-950"
         )}
       >
         <div className="mx-auto space-y-3 sm:space-y-5">
