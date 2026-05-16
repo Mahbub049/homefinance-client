@@ -7,14 +7,8 @@ export default function AppLayout({ children }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
-    <div className="min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-sky-50/60 to-rose-50/50 text-slate-900 transition-colors dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-slate-100">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -left-32 top-12 h-72 w-72 rounded-full bg-cyan-300/30 blur-3xl dark:bg-cyan-600/10" />
-        <div className="absolute -right-32 top-36 h-80 w-80 rounded-full bg-fuchsia-300/30 blur-3xl dark:bg-fuchsia-600/10" />
-        <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-amber-200/30 blur-3xl dark:bg-amber-600/10" />
-      </div>
-
-      <div className="relative flex min-h-screen">
+    <div className="app-clean-shell min-h-screen overflow-hidden bg-white text-slate-900 transition-colors dark:bg-[#020617] dark:text-slate-100">
+      <div className="relative flex min-h-screen bg-white dark:bg-[#020617]">
         {/* Desktop sidebar */}
         <div className="hidden md:block">
           <Sidebar
@@ -32,15 +26,15 @@ export default function AppLayout({ children }) {
         </div>
 
         {/* Main column */}
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col bg-white dark:bg-[#020617]">
           <Topbar
             onToggleSidebar={() => setCollapsed((v) => !v)}
             onOpenDrawer={() => setDrawerOpen(true)}
           />
 
           {/* Scroll area */}
-          <main className="flex-1 overflow-y-auto">
-            <div className="mx-auto w-full max-w-[1600px] p-3 sm:p-4 md:p-6">
+          <main className="app-clean-main flex-1 overflow-y-auto bg-white dark:bg-[#020617]">
+            <div className="app-clean-content mx-auto w-full max-w-full bg-white p-3 dark:bg-[#020617] sm:p-4 md:p-6">
               {children}
             </div>
           </main>

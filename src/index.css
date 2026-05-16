@@ -2,11 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   width: 100%;
@@ -14,18 +17,21 @@ html, body {
 }
 
 body {
-  background: #f8fafc;
-  /* font-family: 'Montserrat', sans-serif; */
+  background: #ffffff;
+}
+
+.dark body {
+  background: #020617;
 }
 
 @layer components {
   .app-modal-overlay {
-    @apply fixed inset-0 z-50 flex justify-center bg-black/40 px-3 py-4 sm:px-4;
+    @apply fixed inset-0 z-50 flex justify-center bg-black/45 px-3 py-4 sm:px-4;
     align-items: flex-end;
   }
 
   .app-modal-overlay--center {
-    @apply fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3 py-4 sm:px-4;
+    @apply fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-3 py-4 sm:px-4;
   }
 
   .app-modal-panel {
@@ -42,5 +48,156 @@ body {
     .app-modal-panel {
       width: 100%;
     }
+  }
+}
+
+/* Grocery page input/select readability */
+.grocery-page input,
+.grocery-page select,
+.grocery-page textarea {
+  color-scheme: light;
+}
+
+.dark .grocery-page input,
+.dark .grocery-page select,
+.dark .grocery-page textarea {
+  color-scheme: dark;
+}
+
+.grocery-page select option {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.dark .grocery-page select option {
+  background: #020617;
+  color: #f8fafc;
+}
+
+/* Modal scrollbar hidden but still scrollable */
+.grocery-modal-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.grocery-modal-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Grocery page scrollbar polish */
+.grocery-page ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.grocery-page ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.grocery-page ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.grocery-page ::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.55);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* Mobile grocery sizing */
+@media (max-width: 640px) {
+  .grocery-page {
+    font-size: 13px;
+  }
+
+  .grocery-page h2 {
+    font-size: 1.35rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .grocery-page h3,
+  .grocery-page h4 {
+    font-size: 1rem !important;
+    line-height: 1.35 !important;
+  }
+
+  .grocery-page .text-3xl {
+    font-size: 1.5rem !important;
+    line-height: 1.9rem !important;
+  }
+
+  .grocery-page .text-2xl {
+    font-size: 1.25rem !important;
+    line-height: 1.7rem !important;
+  }
+
+  .grocery-page input,
+  .grocery-page select,
+  .grocery-page textarea,
+  .grocery-page button {
+    font-size: 13px !important;
+  }
+
+  .grocery-page input,
+  .grocery-page select,
+  .grocery-page textarea {
+    padding: 0.7rem 0.9rem !important;
+  }
+
+  .grocery-page .app-modal-panel {
+    border-radius: 22px !important;
+  }
+}
+
+
+/* Ledger page polish: hidden horizontal scrollbars but still touch/trackpad scrollable */
+.ledger-page {
+  overflow-x: hidden;
+}
+
+.ledger-no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ledger-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.ledger-page input,
+.ledger-page select,
+.ledger-page textarea {
+  color-scheme: light;
+}
+
+.dark .ledger-page input,
+.dark .ledger-page select,
+.dark .ledger-page textarea {
+  color-scheme: dark;
+}
+
+.ledger-page select option {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.dark .ledger-page select option {
+  background: #020617;
+  color: #f8fafc;
+}
+
+@media (max-width: 640px) {
+  .ledger-page {
+    font-size: 13px;
+  }
+
+  .ledger-page input,
+  .ledger-page select,
+  .ledger-page textarea,
+  .ledger-page button {
+    font-size: 12px;
   }
 }

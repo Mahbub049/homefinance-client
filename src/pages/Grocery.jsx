@@ -69,7 +69,18 @@ function blankTxnItem(next = {}) {
   };
 }
 
-const UNITS = ["pcs", "kg", "g", "lb", "liter", "ml", "pack", "bottle", "box", "dozen"];
+const UNITS = [
+  "pcs",
+  "kg",
+  "g",
+  "lb",
+  "liter",
+  "ml",
+  "pack",
+  "bottle",
+  "box",
+  "dozen",
+];
 
 const splitLabels = {
   equal: "Equal Split",
@@ -79,11 +90,168 @@ const splitLabels = {
 };
 
 const splitBadgeClass = {
-  equal: "bg-cyan-50 text-cyan-700 ring-cyan-200",
-  personal: "bg-violet-50 text-violet-700 ring-violet-200",
-  ratio: "bg-amber-50 text-amber-700 ring-amber-200",
-  fixed: "bg-rose-50 text-rose-700 ring-rose-200",
+  equal:
+    "bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-400/10 dark:text-sky-200 dark:ring-sky-400/20",
+  personal:
+    "bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-400/10 dark:text-violet-200 dark:ring-violet-400/20",
+  ratio:
+    "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-400/10 dark:text-amber-200 dark:ring-amber-400/20",
+  fixed:
+    "bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-400/10 dark:text-rose-200 dark:ring-rose-400/20",
 };
+
+const fieldClass =
+  "w-full rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition duration-200 placeholder:text-slate-400 hover:border-slate-300 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-white/20 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/10";
+
+const smallFieldClass =
+  "w-full rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none transition duration-200 placeholder:text-slate-400 hover:border-slate-300 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-slate-950/50 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-white/20 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/10";
+
+const labelClass =
+  "mb-1.5 block text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400";
+
+function Icon({ name, className = "h-5 w-5" }) {
+  const common = {
+    className,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "1.8",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+  };
+
+  const icons = {
+    receipt: (
+      <svg {...common}>
+        <path d="M7 3h10a2 2 0 0 1 2 2v16l-3-1.5L13 21l-3-1.5L7 21l-3-1.5V5a2 2 0 0 1 2-2Z" />
+        <path d="M8 8h8M8 12h8M8 16h5" />
+      </svg>
+    ),
+    cart: (
+      <svg {...common}>
+        <path d="M6 6h15l-1.5 8.5a2 2 0 0 1-2 1.5H9a2 2 0 0 1-2-1.7L5.2 3H3" />
+        <circle cx="9" cy="20" r="1.4" />
+        <circle cx="18" cy="20" r="1.4" />
+      </svg>
+    ),
+    chart: (
+      <svg {...common}>
+        <path d="M4 19V5" />
+        <path d="M20 19H4" />
+        <path d="M8 16v-5" />
+        <path d="M12 16V8" />
+        <path d="M16 16v-3" />
+      </svg>
+    ),
+    flame: (
+      <svg {...common}>
+        <path d="M12 22c4 0 7-2.7 7-6.7 0-2.7-1.5-4.9-3.5-6.7-.7 2-2 3.2-3.5 3.8.4-3-1-5.5-3.5-7.4.1 3.7-3.5 5.5-3.5 10.2C5 19.3 8 22 12 22Z" />
+      </svg>
+    ),
+    bag: (
+      <svg {...common}>
+        <path d="M6 8h12l-1 13H7L6 8Z" />
+        <path d="M9 8a3 3 0 0 1 6 0" />
+      </svg>
+    ),
+    plus: (
+      <svg {...common}>
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+    ),
+    edit: (
+      <svg {...common}>
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z" />
+      </svg>
+    ),
+    trash: (
+      <svg {...common}>
+        <path d="M4 7h16" />
+        <path d="M10 11v6M14 11v6" />
+        <path d="M6 7l1 14h10l1-14" />
+        <path d="M9 7V4h6v3" />
+      </svg>
+    ),
+    close: (
+      <svg {...common}>
+        <path d="M6 6l12 12M18 6 6 18" />
+      </svg>
+    ),
+    search: (
+      <svg {...common}>
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-3.5-3.5" />
+      </svg>
+    ),
+    wallet: (
+      <svg {...common}>
+        <path d="M4 7a2 2 0 0 1 2-2h13v14H6a2 2 0 0 1-2-2V7Z" />
+        <path d="M16 12h3" />
+      </svg>
+    ),
+    tag: (
+      <svg {...common}>
+        <path d="M20 13 13 20 4 11V4h7l9 9Z" />
+        <path d="M7.5 7.5h.01" />
+      </svg>
+    ),
+    users: (
+      <svg {...common}>
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M22 21v-2a4 4 0 0 0-3-3.9" />
+        <path d="M16 3.2a4 4 0 0 1 0 7.6" />
+      </svg>
+    ),
+    split: (
+      <svg {...common}>
+        <path d="M6 3v6a3 3 0 0 0 3 3h6a3 3 0 0 1 3 3v6" />
+        <path d="M18 3v6a3 3 0 0 1-3 3H9a3 3 0 0 0-3 3v6" />
+      </svg>
+    ),
+    calendar: (
+      <svg {...common}>
+        <path d="M8 2v4M16 2v4" />
+        <rect x="3" y="4" width="18" height="18" rx="4" />
+        <path d="M3 10h18" />
+      </svg>
+    ),
+  };
+
+  return icons[name] || icons.receipt;
+}
+
+function IconBox({ name, tone = "slate" }) {
+  const tones = {
+    emerald:
+      "bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-400/10 dark:text-emerald-200 dark:ring-emerald-400/20",
+    sky: "bg-sky-50 text-sky-700 ring-sky-100 dark:bg-sky-400/10 dark:text-sky-200 dark:ring-sky-400/20",
+    violet:
+      "bg-violet-50 text-violet-700 ring-violet-100 dark:bg-violet-400/10 dark:text-violet-200 dark:ring-violet-400/20",
+    amber:
+      "bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-400/10 dark:text-amber-200 dark:ring-amber-400/20",
+    slate:
+      "bg-slate-100 text-slate-700 ring-slate-200 dark:bg-white/10 dark:text-slate-200 dark:ring-white/10",
+  };
+
+  return (
+    <div
+      className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ring-1 ${tones[tone]}`}
+    >
+      <Icon name={name} className="h-5 w-5" />
+    </div>
+  );
+}
+
+function Field({ label, children, className = "" }) {
+  return (
+    <div className={className}>
+      <label className={labelClass}>{label}</label>
+      {children}
+    </div>
+  );
+}
 
 export default function Grocery() {
   const me = getUser();
@@ -136,6 +304,7 @@ export default function Grocery() {
   });
 
   const [txnItems, setTxnItems] = useState([blankTxnItem()]);
+  const [fixedEditedField, setFixedEditedField] = useState("fixedMe");
 
   useEffect(() => {
     const selectedMonth = day.slice(0, 7);
@@ -146,6 +315,33 @@ export default function Grocery() {
     () => members.find((m) => String(getId(m)) !== currentUserId) || null,
     [members, currentUserId]
   );
+
+  const memberById = useMemo(() => {
+    const map = new Map();
+    for (const member of members || []) map.set(getId(member), member);
+    return map;
+  }, [members]);
+
+  const resolveAccountOwner = (member) => {
+    const name = String(member?.name || "").toLowerCase();
+    if (name.includes("mahbub")) return "Mahbub";
+    if (name.includes("mirza")) return "Mirza";
+    return "";
+  };
+
+  const selectedPaidByOwner = useMemo(() => {
+    return resolveAccountOwner(memberById.get(String(form.paidByUserId)));
+  }, [memberById, form.paidByUserId]);
+
+  const paidByAccounts = useMemo(() => {
+    const activeAccounts = (accounts || []).filter((a) => a.isActive !== false);
+    if (!selectedPaidByOwner) return activeAccounts;
+    return activeAccounts.filter((a) => a.owner === selectedPaidByOwner);
+  }, [accounts, selectedPaidByOwner]);
+
+  const currentMemberName = useMemo(() => {
+    return memberById.get(currentUserId)?.name || "My";
+  }, [memberById, currentUserId]);
 
   const itemsSubtotal = useMemo(() => {
     let sum = 0;
@@ -173,6 +369,42 @@ export default function Grocery() {
     form.vatAmount,
     form.vatIncluded,
   ]);
+
+  useEffect(() => {
+    if (!open || !form.paidByUserId) return;
+
+    const selectedAccountStillValid = paidByAccounts.some(
+      (a) => String(a._id) === String(form.fromAccountId)
+    );
+
+    if (selectedAccountStillValid) return;
+
+    setForm((prev) => ({
+      ...prev,
+      fromAccountId: paidByAccounts?.[0]?._id || "",
+    }));
+  }, [open, form.paidByUserId, form.fromAccountId, paidByAccounts]);
+
+  useEffect(() => {
+    if (!open || form.splitType !== "fixed" || !otherMember) return;
+    if (form.fixedMe === "" && form.fixedOther === "") return;
+
+    setForm((prev) => {
+      if (fixedEditedField === "fixedOther") {
+        const nextMe = Math.max(
+          0,
+          money(totalPayable - Number(prev.fixedOther || 0))
+        );
+        return { ...prev, fixedMe: nextMe };
+      }
+
+      const nextOther = Math.max(
+        0,
+        money(totalPayable - Number(prev.fixedMe || 0))
+      );
+      return { ...prev, fixedOther: nextOther };
+    });
+  }, [totalPayable, open, form.splitType, otherMember, fixedEditedField]);
 
   const dayTxns = useMemo(() => {
     return (items || []).filter((t) => toLocalYMD(t.txnDate) === day);
@@ -281,9 +513,22 @@ export default function Grocery() {
     loadMonth();
   }, [month]);
 
+  function getAccountsForUser(userId) {
+    const owner = resolveAccountOwner(memberById.get(String(userId)));
+    const activeAccounts = (accounts || []).filter((a) => a.isActive !== false);
+    if (!owner) return activeAccounts;
+    return activeAccounts.filter((a) => a.owner === owner);
+  }
+
+  function getFirstAccountForUser(userId) {
+    return getAccountsForUser(userId)?.[0]?._id || "";
+  }
+
   function getDefaultForm(next = {}) {
     const defaultUser = getId(members?.[0]) || currentUserId || "";
-    const defaultAccount = accounts?.[0]?._id || "";
+    const defaultAccount = getFirstAccountForUser(
+      next.paidByUserId || defaultUser
+    );
 
     return {
       txnDate: next.txnDate || day || dayNow(),
@@ -313,6 +558,7 @@ export default function Grocery() {
     setMsg("");
     setIsEditing(false);
     setEditId(null);
+    setFixedEditedField("fixedMe");
     setForm(getDefaultForm());
     setTxnItems([blankTxnItem()]);
     setOpen(true);
@@ -322,6 +568,18 @@ export default function Grocery() {
     setMsg("");
     setIsEditing(true);
     setEditId(txn._id);
+    setFixedEditedField("fixedMe");
+
+    const savedSplit = txn.split || txn.splitSnapshot || { type: "equal" };
+    const ratioRows = savedSplit.ratios || [];
+    const fixedRows = savedSplit.fixed || [];
+    const otherId = getId(otherMember);
+    const ratioFor = (userId, fallback) =>
+      ratioRows.find((r) => getId(r.userId) === String(userId))?.ratio ??
+      fallback;
+    const fixedFor = (userId, fallback = "") =>
+      fixedRows.find((r) => getId(r.userId) === String(userId))?.amount ??
+      fallback;
 
     setForm(
       getDefaultForm({
@@ -338,22 +596,26 @@ export default function Grocery() {
         vatAmount: txn.vatAmount ?? 0,
         vatIncluded: txn.vatIncluded ?? true,
         note: txn.note || "",
-        splitType: txn.split?.type || "equal",
-        personalUserId: getId(txn.split?.personalUserId) || getId(txn.paidByUserId),
+        splitType: savedSplit.type || "equal",
+        personalUserId: getId(savedSplit.personalUserId) || getId(txn.paidByUserId),
+        ratioMe: ratioFor(currentUserId, 50),
+        ratioOther: ratioFor(otherId, 50),
+        fixedMe: fixedFor(currentUserId, ""),
+        fixedOther: fixedFor(otherId, ""),
       })
     );
 
     setTxnItems(
       (txn.items || []).length
         ? (txn.items || []).map((it) =>
-            blankTxnItem({
-              name: it.name || "",
-              unit: it.unit || "pcs",
-              qty: it.qty ?? 1,
-              unitPrice: it.unitPrice ?? 0,
-              note: it.note || "",
-            })
-          )
+          blankTxnItem({
+            name: it.name || "",
+            unit: it.unit || "pcs",
+            qty: it.qty ?? 1,
+            unitPrice: it.unitPrice ?? 0,
+            note: it.note || "",
+          })
+        )
         : [blankTxnItem()]
     );
 
@@ -380,6 +642,40 @@ export default function Grocery() {
     const copy = [...txnItems];
     copy[idx] = { ...copy[idx], [key]: val };
     setTxnItems(copy);
+  }
+
+  function handlePaidByChange(userId) {
+    setForm((prev) => ({
+      ...prev,
+      paidByUserId: userId,
+      fromAccountId: getFirstAccountForUser(userId),
+      personalUserId: prev.splitType === "personal" ? userId : prev.personalUserId,
+    }));
+  }
+
+  function handleSplitTypeChange(splitType) {
+    setFixedEditedField("fixedMe");
+    setForm((prev) => ({
+      ...prev,
+      splitType,
+      fixedMe: splitType === "fixed" ? prev.fixedMe : prev.fixedMe,
+      fixedOther: splitType === "fixed" ? prev.fixedOther : prev.fixedOther,
+    }));
+  }
+
+  function handleFixedAmountChange(field, value) {
+    setFixedEditedField(field);
+
+    const numericValue = Number(value || 0);
+    const opposite = Math.max(0, money(totalPayable - numericValue));
+
+    setForm((prev) => {
+      if (field === "fixedMe") {
+        return { ...prev, fixedMe: value, fixedOther: value === "" ? "" : opposite };
+      }
+
+      return { ...prev, fixedOther: value, fixedMe: value === "" ? "" : opposite };
+    });
   }
 
   async function saveTxn() {
@@ -480,7 +776,9 @@ export default function Grocery() {
         await loadMonth();
       }
     } catch (e) {
-      setMsg(e?.response?.data?.message || (isEditing ? "Update failed" : "Save failed"));
+      setMsg(
+        e?.response?.data?.message || (isEditing ? "Update failed" : "Save failed")
+      );
     }
   }
 
@@ -510,7 +808,7 @@ export default function Grocery() {
 
   return (
     <AppLayout>
-      <div className="w-full max-w-full overflow-x-hidden bg-slate-50/60 px-0 pb-8">
+      <div className="grocery-page min-h-screen w-full max-w-full overflow-x-hidden bg-white px-0 pb-8 text-[13px] text-slate-900 dark:bg-[#020617] dark:text-slate-100 sm:text-sm">
         <ConfirmModal
           open={confirmOpen}
           title="Delete Grocery Transaction"
@@ -521,36 +819,66 @@ export default function Grocery() {
 
         <div className="space-y-5">
           {/* Hero */}
-          <section className="relative overflow-hidden rounded-[28px] border border-white/40 bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 p-5 text-white shadow-xl shadow-emerald-900/10 sm:p-6 lg:p-7">
-            <div className="absolute -right-12 -top-16 h-44 w-44 rounded-full bg-white/20 blur-2xl" />
-            <div className="absolute -bottom-20 left-16 h-56 w-56 rounded-full bg-lime-300/20 blur-3xl" />
+          <section className="relative overflow-hidden rounded-[30px] border border-white/60 bg-[radial-gradient(circle_at_top_left,#34d399_0%,#0f766e_38%,#0f172a_100%)] p-5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.14)] dark:border-white/10 dark:shadow-[0_24px_70px_rgba(0,0,0,0.35)] sm:p-6 lg:p-7">
+            <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/15 blur-3xl" />
+            <div className="absolute -bottom-24 left-12 h-64 w-64 rounded-full bg-emerald-300/20 blur-3xl" />
+            <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(255,255,255,0.12),transparent_45%,rgba(255,255,255,0.07))]" />
 
             <div className="relative z-10 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
               <div className="max-w-3xl">
-                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold ring-1 ring-white/25">
-                  <span className="h-2 w-2 rounded-full bg-lime-300" />
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-50 ring-1 ring-white/20 backdrop-blur">
+                  <span className="grid h-5 w-5 place-items-center rounded-full bg-white/15">
+                    <Icon name="cart" className="h-3.5 w-3.5" />
+                  </span>
                   Grocery tracker
                 </div>
-                <h2 className="text-2xl font-black tracking-tight sm:text-3xl lg:text-4xl">
+
+                <h2 className="text-[1.65rem] font-black tracking-tight sm:text-3xl lg:text-4xl">
                   Grocery Transactions
                 </h2>
-                <p className="mt-2 max-w-2xl text-sm text-emerald-50 sm:text-base">
-                  Add receipt-style grocery entries, calculate payable amount, and keep member-wise split records clean.
+
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-50/90 sm:text-base">
+                  Track receipt-wise grocery expenses, payable amount, accounts,
+                  and member-wise split records with a clean monthly overview.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:w-[520px]">
-                <div className="rounded-2xl bg-white/15 p-4 ring-1 ring-white/20 backdrop-blur">
-                  <div className="text-xs text-emerald-50">Month Total</div>
-                  <div className="mt-1 text-2xl font-black">{bdt(monthlyStats.monthTotal)}</div>
-                  <div className="mt-1 text-xs text-emerald-50">{monthLabel(month)}</div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:w-[520px]">
+                <div className="rounded-[24px] border border-white/15 bg-white/12 p-4 shadow-inner shadow-white/5 backdrop-blur-xl">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-50/80">
+                        Month Total
+                      </div>
+                      <div className="mt-1 text-2xl font-black">
+                        {bdt(monthlyStats.monthTotal)}
+                      </div>
+                      <div className="mt-1 text-xs text-emerald-50/80">
+                        {monthLabel(month)}
+                      </div>
+                    </div>
+                    <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white/12 ring-1 ring-white/15">
+                      <Icon name="wallet" className="h-5 w-5" />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="rounded-2xl bg-white/15 p-4 ring-1 ring-white/20 backdrop-blur">
-                  <div className="text-xs text-emerald-50">Selected Day</div>
-                  <div className="mt-1 text-2xl font-black">{bdt(monthlyStats.dayTotal)}</div>
-                  <div className="mt-1 text-xs text-emerald-50">
-                    {filteredTxns.length} shown transaction(s)
+                <div className="rounded-[24px] border border-white/15 bg-white/12 p-4 shadow-inner shadow-white/5 backdrop-blur-xl">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-50/80">
+                        Selected Day
+                      </div>
+                      <div className="mt-1 text-2xl font-black">
+                        {bdt(monthlyStats.dayTotal)}
+                      </div>
+                      <div className="mt-1 text-xs text-emerald-50/80">
+                        {filteredTxns.length} shown transaction(s)
+                      </div>
+                    </div>
+                    <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white/12 ring-1 ring-white/15">
+                      <Icon name="calendar" className="h-5 w-5" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -558,19 +886,21 @@ export default function Grocery() {
           </section>
 
           {/* Top controls */}
-          <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <section className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_14px_40px_rgba(15,23,42,0.05)] backdrop-blur dark:border-white/10 dark:bg-slate-900/70 dark:shadow-[0_20px_60px_rgba(0,0,0,0.25)] sm:p-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
-                <h3 className="text-lg font-bold text-slate-950">Control Center</h3>
-                <p className="text-sm text-slate-500">
-                  Choose a month and date, then add or review daily grocery transactions.
+                <h3 className="text-lg font-black text-slate-950 dark:text-white">
+                  Control Center
+                </h3>
+                <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
+                  Choose a month and date, then add or review daily grocery records.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 xl:min-w-[660px]">
                 <input
                   type="month"
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                  className={fieldClass}
                   value={month}
                   onChange={(e) => setMonth(e.target.value)}
                 />
@@ -579,122 +909,122 @@ export default function Grocery() {
                   type="date"
                   value={day}
                   onChange={(e) => setDay(e.target.value)}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                  className={fieldClass}
                 />
 
                 <button
                   onClick={openModal}
-                  className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 hover:bg-emerald-700"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)] transition duration-200 hover:-translate-y-0.5 hover:bg-slate-800 active:translate-y-0 dark:bg-white dark:text-slate-950 dark:shadow-[0_14px_30px_rgba(255,255,255,0.08)] dark:hover:bg-slate-100"
                 >
-                  + Add Transaction
+                  <Icon name="plus" className="h-4 w-4" />
+                  Add Transaction
                 </button>
               </div>
             </div>
           </section>
 
           {msg && (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200">
               {msg}
             </div>
           )}
 
           {/* Stats */}
           <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-[24px] border border-emerald-100 bg-white p-5 shadow-sm">
+            <div className="group rounded-[26px] border border-slate-200/70 bg-white p-5 shadow-[0_14px_35px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_22px_45px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900/70 dark:hover:border-emerald-400/25">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-emerald-600">
+                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-300">
                     Transactions
                   </p>
-                  <h4 className="mt-2 text-2xl font-black text-slate-950">
+                  <h4 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">
                     {monthlyStats.txnCount}
                   </h4>
                 </div>
-                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-50 text-xl">
-                  🧾
-                </div>
+                <IconBox name="receipt" tone="emerald" />
               </div>
-              <p className="mt-3 text-xs text-slate-500">Total grocery entries this month</p>
+              <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">
+                Total grocery entries this month
+              </p>
             </div>
 
-            <div className="rounded-[24px] border border-cyan-100 bg-white p-5 shadow-sm">
+            <div className="group rounded-[26px] border border-slate-200/70 bg-white p-5 shadow-[0_14px_35px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-[0_22px_45px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900/70 dark:hover:border-sky-400/25">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-cyan-600">
+                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-sky-600 dark:text-sky-300">
                     Total Items
                   </p>
-                  <h4 className="mt-2 text-2xl font-black text-slate-950">
+                  <h4 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">
                     {monthlyStats.totalItemCount}
                   </h4>
                 </div>
-                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-cyan-50 text-xl">
-                  🛒
-                </div>
+                <IconBox name="cart" tone="sky" />
               </div>
-              <p className="mt-3 text-xs text-slate-500">Item rows recorded in receipts</p>
+              <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">
+                Item rows recorded in receipts
+              </p>
             </div>
 
-            <div className="rounded-[24px] border border-violet-100 bg-white p-5 shadow-sm">
+            <div className="group rounded-[26px] border border-slate-200/70 bg-white p-5 shadow-[0_14px_35px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-[0_22px_45px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900/70 dark:hover:border-violet-400/25">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-violet-600">
+                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-violet-600 dark:text-violet-300">
                     Average
                   </p>
-                  <h4 className="mt-2 text-2xl font-black text-slate-950">
+                  <h4 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">
                     {bdt(monthlyStats.avgTxn)}
                   </h4>
                 </div>
-                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-violet-50 text-xl">
-                  📊
-                </div>
+                <IconBox name="chart" tone="violet" />
               </div>
-              <p className="mt-3 text-xs text-slate-500">Average payable per transaction</p>
+              <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">
+                Average payable per transaction
+              </p>
             </div>
 
-            <div className="rounded-[24px] border border-amber-100 bg-white p-5 shadow-sm">
+            <div className="group rounded-[26px] border border-slate-200/70 bg-white p-5 shadow-[0_14px_35px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-[0_22px_45px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900/70 dark:hover:border-amber-400/25">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-bold uppercase tracking-wide text-amber-600">
+                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-amber-600 dark:text-amber-300">
                     Biggest Bill
                   </p>
-                  <h4 className="mt-2 truncate text-xl font-black text-slate-950">
-                    {monthlyStats.biggest ? bdt(monthlyStats.biggest.totalPayable) : "৳ 0"}
+                  <h4 className="mt-2 truncate text-xl font-black text-slate-950 dark:text-white">
+                    {monthlyStats.biggest
+                      ? bdt(monthlyStats.biggest.totalPayable)
+                      : "৳ 0"}
                   </h4>
                 </div>
-                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-amber-50 text-xl">
-                  🔥
-                </div>
+                <IconBox name="flame" tone="amber" />
               </div>
-              <p className="mt-3 truncate text-xs text-slate-500">
+              <p className="mt-3 truncate text-xs font-medium text-slate-500 dark:text-slate-400">
                 {monthlyStats.biggest?.shopName || "No transaction yet"}
               </p>
             </div>
           </section>
 
           {/* Filters */}
-          <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <section className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_14px_40px_rgba(15,23,42,0.05)] backdrop-blur dark:border-white/10 dark:bg-slate-900/70 sm:p-5">
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.5fr_1fr_1fr_auto]">
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Search
-                </label>
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search shop, item, account, note..."
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
-                />
-              </div>
+              <Field label="Search">
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
+                    <Icon name="search" className="h-4 w-4" />
+                  </span>
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search shop, item, account, note..."
+                    className={`${fieldClass} pl-10`}
+                  />
+                </div>
+              </Field>
 
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Category
-                </label>
+              <Field label="Category">
                 <select
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                  className={fieldClass}
                 >
                   <option value="">All categories</option>
                   {expenseCats.map((c) => (
@@ -703,16 +1033,13 @@ export default function Grocery() {
                     </option>
                   ))}
                 </select>
-              </div>
+              </Field>
 
-              <div>
-                <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Paid By
-                </label>
+              <Field label="Paid By">
                 <select
                   value={paidByFilter}
                   onChange={(e) => setPaidByFilter(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                  className={fieldClass}
                 >
                   <option value="">All members</option>
                   {members.map((m) => (
@@ -721,7 +1048,7 @@ export default function Grocery() {
                     </option>
                   ))}
                 </select>
-              </div>
+              </Field>
 
               <div className="flex items-end">
                 <button
@@ -732,7 +1059,7 @@ export default function Grocery() {
                     setCategoryFilter("");
                     setPaidByFilter("");
                   }}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                  className="w-full rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-sm font-black text-slate-700 transition duration-200 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.99] dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-200 dark:hover:border-white/20 dark:hover:bg-white/5"
                 >
                   Today + Reset
                 </button>
@@ -741,19 +1068,20 @@ export default function Grocery() {
           </section>
 
           {/* Transactions */}
-          <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-100 p-4 sm:p-5">
+          <section className="overflow-hidden rounded-[28px] border border-slate-200/70 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900/70">
+            <div className="border-b border-slate-100 p-4 dark:border-white/10 sm:p-5">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <h3 className="text-lg font-black text-slate-950">
+                  <h3 className="text-lg font-black text-slate-950 dark:text-white">
                     Transactions on {day}
                   </h3>
-                  <p className="text-sm text-slate-500">
-                    Showing {filteredTxns.length} of {dayTxns.length} transaction(s) for the selected day.
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Showing {filteredTxns.length} of {dayTxns.length} transaction(s)
+                    for the selected day.
                   </p>
                 </div>
 
-                <div className="inline-flex w-fit items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100">
+                <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
                   Daily total: {bdt(monthlyStats.dayTotal)}
                 </div>
               </div>
@@ -763,71 +1091,97 @@ export default function Grocery() {
               <Loader text="Loading grocery data" subtext="Preparing your entries" />
             ) : items.length === 0 ? (
               <div className="p-8 text-center">
-                <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-emerald-50 text-3xl">
-                  🛒
+                <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-400/10 dark:text-emerald-200 dark:ring-emerald-400/20">
+                  <Icon name="cart" className="h-7 w-7" />
                 </div>
-                <h4 className="mt-4 text-lg font-black text-slate-950">No grocery data yet</h4>
-                <p className="mt-1 text-sm text-slate-500">
+                <h4 className="mt-4 text-lg font-black text-slate-950 dark:text-white">
+                  No grocery data yet
+                </h4>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   Add your first grocery transaction to start tracking.
                 </p>
                 <button
                   onClick={openModal}
-                  className="mt-4 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-700"
+                  className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
                 >
-                  + Add Transaction
+                  <Icon name="plus" className="h-4 w-4" />
+                  Add Transaction
                 </button>
               </div>
             ) : filteredTxns.length === 0 ? (
               <div className="p-8 text-center">
-                <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-slate-100 text-3xl">
-                  🔎
+                <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-slate-100 text-slate-600 ring-1 ring-slate-200 dark:bg-white/10 dark:text-slate-200 dark:ring-white/10">
+                  <Icon name="search" className="h-7 w-7" />
                 </div>
-                <h4 className="mt-4 text-lg font-black text-slate-950">No matching transaction</h4>
-                <p className="mt-1 text-sm text-slate-500">
+                <h4 className="mt-4 text-lg font-black text-slate-950 dark:text-white">
+                  No matching transaction
+                </h4>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   Change the date, search text, or filters to see more results.
                 </p>
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-slate-100 dark:divide-white/10">
                 {filteredTxns.map((t) => {
                   const splitType = t.split?.type || "equal";
+
                   return (
-                    <article key={t._id} className="p-4 transition hover:bg-slate-50/70 sm:p-5">
+                    <article
+                      key={t._id}
+                      className="p-4 transition duration-200 hover:bg-slate-50/80 dark:hover:bg-white/[0.03] sm:p-5"
+                    >
                       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-500 text-lg text-white shadow-sm">
-                              🛍️
-                            </span>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-950 text-white shadow-lg shadow-slate-900/10 dark:bg-white dark:text-slate-950">
+                              <Icon name="bag" className="h-5 w-5" />
+                            </div>
+
                             <div className="min-w-0">
-                              <h4 className="truncate text-base font-black text-slate-950 sm:text-lg">
+                              <h4 className="truncate text-base font-black text-slate-950 dark:text-white sm:text-lg">
                                 {t.shopName || "Grocery Transaction"}
                               </h4>
-                              <p className="text-xs text-slate-500">
+                              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                                 {toLocalYMD(t.txnDate)} • {t.location || "No location"}
                               </p>
                             </div>
                           </div>
 
-                          <div className="mt-4 grid grid-cols-1 gap-2 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
-                            <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                              <span className="block text-slate-400">Category</span>
-                              <strong className="text-slate-800">{getName(t.categoryId)}</strong>
+                          <div className="mt-4 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
+                            <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
+                              <span className="block text-slate-400 dark:text-slate-500">
+                                Category
+                              </span>
+                              <strong className="text-slate-800 dark:text-slate-100">
+                                {getName(t.categoryId)}
+                              </strong>
                             </div>
-                            <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                              <span className="block text-slate-400">Paid By</span>
-                              <strong className="text-slate-800">{getName(t.paidByUserId)}</strong>
+
+                            <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
+                              <span className="block text-slate-400 dark:text-slate-500">
+                                Paid By
+                              </span>
+                              <strong className="text-slate-800 dark:text-slate-100">
+                                {getName(t.paidByUserId)}
+                              </strong>
                             </div>
-                            <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                              <span className="block text-slate-400">From Account</span>
-                              <strong className="text-slate-800">{getName(t.fromAccountId)}</strong>
+
+                            <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
+                              <span className="block text-slate-400 dark:text-slate-500">
+                                From Account
+                              </span>
+                              <strong className="text-slate-800 dark:text-slate-100">
+                                {getName(t.fromAccountId)}
+                              </strong>
                             </div>
-                            <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                              <span className="block text-slate-400">Split</span>
+
+                            <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
+                              <span className="block text-slate-400 dark:text-slate-500">
+                                Split
+                              </span>
                               <strong
-                                className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ring-1 ${
-                                  splitBadgeClass[splitType] || splitBadgeClass.equal
-                                }`}
+                                className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ring-1 ${splitBadgeClass[splitType] || splitBadgeClass.equal
+                                  }`}
                               >
                                 {splitLabels[splitType] || splitType}
                               </strong>
@@ -836,22 +1190,29 @@ export default function Grocery() {
                         </div>
 
                         <div className="flex flex-col gap-3 xl:items-end">
-                          <div className="rounded-3xl bg-gradient-to-br from-slate-950 to-slate-700 px-5 py-4 text-white shadow-lg shadow-slate-900/10">
-                            <div className="text-xs text-slate-300">Total Payable</div>
-                            <div className="text-2xl font-black">{bdt(t.totalPayable)}</div>
+                          <div className="rounded-[24px] border border-slate-200 bg-slate-950 px-5 py-4 text-white shadow-[0_18px_35px_rgba(15,23,42,0.16)] dark:border-emerald-400/20 dark:bg-slate-950/80 dark:text-white dark:shadow-[0_18px_35px_rgba(0,0,0,0.35)]">
+                            <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-300 dark:text-emerald-200">
+                              Total Payable
+                            </div>
+                            <div className="mt-1 text-2xl font-black">
+                              {bdt(t.totalPayable)}
+                            </div>
                           </div>
 
                           <div className="flex flex-col gap-2 sm:flex-row xl:justify-end">
                             <button
                               onClick={() => openEditModal(t)}
-                              className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition duration-200 hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-200 dark:hover:border-white/20 dark:hover:bg-white/5"
                             >
+                              <Icon name="edit" className="h-4 w-4" />
                               Edit
                             </button>
+
                             <button
                               onClick={() => deleteTxn(t._id)}
-                              className="rounded-2xl border border-rose-200 bg-white px-4 py-2 text-sm font-bold text-rose-600 transition hover:bg-rose-50"
+                              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-white px-4 py-2 text-sm font-black text-rose-600 transition duration-200 hover:bg-rose-50 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200 dark:hover:bg-rose-400/15"
                             >
+                              <Icon name="trash" className="h-4 w-4" />
                               Delete
                             </button>
                           </div>
@@ -859,9 +1220,9 @@ export default function Grocery() {
                       </div>
 
                       {/* Desktop table */}
-                      <div className="mt-5 hidden overflow-x-auto rounded-2xl border border-slate-100 md:block">
+                      <div className="mt-5 hidden overflow-x-auto rounded-2xl border border-slate-100 dark:border-white/10 md:block">
                         <table className="w-full min-w-[680px] text-sm">
-                          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/50 dark:text-slate-400">
                             <tr className="text-left">
                               <th className="p-3">Item</th>
                               <th className="p-3">Qty</th>
@@ -870,14 +1231,22 @@ export default function Grocery() {
                               <th className="p-3 text-right">Line Total</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-100">
+                          <tbody className="divide-y divide-slate-100 dark:divide-white/10">
                             {(t.items || []).map((it, idx) => (
                               <tr key={it._id || idx}>
-                                <td className="p-3 font-semibold text-slate-800">{it.name}</td>
-                                <td className="p-3 text-slate-600">{it.qty}</td>
-                                <td className="p-3 text-slate-600">{it.unit}</td>
-                                <td className="p-3 text-slate-600">{bdt(it.unitPrice)}</td>
-                                <td className="p-3 text-right font-black text-slate-950">
+                                <td className="p-3 font-bold text-slate-800 dark:text-slate-100">
+                                  {it.name}
+                                </td>
+                                <td className="p-3 text-slate-600 dark:text-slate-300">
+                                  {it.qty}
+                                </td>
+                                <td className="p-3 text-slate-600 dark:text-slate-300">
+                                  {it.unit}
+                                </td>
+                                <td className="p-3 text-slate-600 dark:text-slate-300">
+                                  {bdt(it.unitPrice)}
+                                </td>
+                                <td className="p-3 text-right font-black text-slate-950 dark:text-white">
                                   {bdt(lineTotal(it))}
                                 </td>
                               </tr>
@@ -891,16 +1260,18 @@ export default function Grocery() {
                         {(t.items || []).map((it, idx) => (
                           <div
                             key={it._id || idx}
-                            className="rounded-2xl border border-slate-100 bg-slate-50 p-3"
+                            className="rounded-2xl border border-slate-100 bg-slate-50 p-3 dark:border-white/10 dark:bg-slate-950/40"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
-                                <div className="font-bold text-slate-900">{it.name}</div>
-                                <div className="mt-1 text-xs text-slate-500">
+                                <div className="font-black text-slate-900 dark:text-white">
+                                  {it.name}
+                                </div>
+                                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                                   {it.qty} {it.unit} × {bdt(it.unitPrice)}
                                 </div>
                               </div>
-                              <div className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-black text-slate-900 ring-1 ring-slate-200">
+                              <div className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-black text-slate-900 ring-1 ring-slate-200 dark:bg-white/10 dark:text-white dark:ring-white/10">
                                 {bdt(lineTotal(it))}
                               </div>
                             </div>
@@ -908,19 +1279,30 @@ export default function Grocery() {
                         ))}
                       </div>
 
-                      <div className="mt-4 grid grid-cols-1 gap-2 text-xs text-slate-500 sm:grid-cols-4">
-                        <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                          Subtotal: <strong className="text-slate-800">{bdt(t.itemsSubtotal)}</strong>
+                      <div className="mt-4 grid grid-cols-1 gap-2 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-4">
+                        <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
+                          Subtotal:{" "}
+                          <strong className="text-slate-800 dark:text-slate-100">
+                            {bdt(t.itemsSubtotal)}
+                          </strong>
                         </div>
-                        <div className="rounded-2xl bg-slate-50 px-3 py-2">
+                        <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
                           Txn Discount:{" "}
-                          <strong className="text-slate-800">{bdt(t.discountTotal)}</strong>
+                          <strong className="text-slate-800 dark:text-slate-100">
+                            {bdt(t.discountTotal)}
+                          </strong>
                         </div>
-                        <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                          Delivery: <strong className="text-slate-800">{bdt(t.deliveryFee)}</strong>
+                        <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
+                          Delivery:{" "}
+                          <strong className="text-slate-800 dark:text-slate-100">
+                            {bdt(t.deliveryFee)}
+                          </strong>
                         </div>
-                        <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                          VAT: <strong className="text-slate-800">{bdt(t.vatAmount)}</strong>{" "}
+                        <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
+                          VAT:{" "}
+                          <strong className="text-slate-800 dark:text-slate-100">
+                            {bdt(t.vatAmount)}
+                          </strong>{" "}
                           ({t.vatIncluded ? "included" : "added"})
                         </div>
                       </div>
@@ -934,77 +1316,101 @@ export default function Grocery() {
 
         {open && (
           <div className="app-modal-overlay">
-            <div className="app-modal-panel max-h-[92vh] max-w-6xl overflow-y-auto rounded-[28px] border border-white/50 bg-white p-0 shadow-2xl">
-              <div className="sticky top-0 z-20 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
+            <div className="app-modal-panel grocery-modal-scroll max-h-[92vh] max-w-6xl overflow-y-auto rounded-[30px] border border-white/70 bg-white p-0 shadow-2xl dark:border-white/10 dark:bg-slate-950">
+              {/* Modal Header */}
+              <div className="sticky top-0 z-20 overflow-hidden border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 sm:px-6">
+                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-sky-400" />
+
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="mb-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">
-                      {isEditing ? "Update receipt" : "New receipt"}
+                  <div className="flex gap-3">
+                    <div className="hidden h-12 w-12 shrink-0 place-items-center rounded-2xl bg-slate-950 text-white shadow-lg shadow-slate-900/10 dark:bg-white dark:text-slate-950 sm:grid">
+                      <Icon name="receipt" className="h-5 w-5" />
                     </div>
-                    <h3 className="text-xl font-black text-slate-950">
-                      {isEditing ? "Edit Grocery Transaction" : "Add Grocery Transaction"}
-                    </h3>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Add only essential item details: name, unit, quantity, and unit price.
-                    </p>
+
+                    <div>
+                      <div className="mb-2 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
+                        {isEditing ? "Update receipt" : "New receipt"}
+                      </div>
+
+                      <h3 className="text-xl font-black text-slate-950 dark:text-white">
+                        {isEditing
+                          ? "Edit Grocery Transaction"
+                          : "Add Grocery Transaction"}
+                      </h3>
+
+                      <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
+                        Add receipt details, account source, item rows, payable total,
+                        and split type in one clean form.
+                      </p>
+                    </div>
                   </div>
 
                   <button
                     onClick={closeModal}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
                   >
+                    <Icon name="close" className="h-4 w-4" />
                     Close
                   </button>
                 </div>
               </div>
 
-              <div className="p-5 sm:p-6">
-                <div className="mb-5 rounded-[24px] border border-emerald-100 bg-gradient-to-br from-emerald-50 to-cyan-50 p-4">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="p-5 dark:bg-slate-950 sm:p-6">
+                {/* Basic Info */}
+                <div className="mb-5 rounded-[26px] border border-slate-200/70 bg-slate-50/80 p-4 shadow-inner shadow-white/60 dark:border-white/10 dark:bg-white/[0.035] dark:shadow-none">
+                  <div className="mb-4 flex items-center gap-3">
+                    <IconBox name="tag" tone="emerald" />
                     <div>
-                      <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                        Date
-                      </label>
+                      <h4 className="text-base font-black text-slate-950 dark:text-white">
+                        Transaction Information
+                      </h4>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Keep the top section minimal, readable, and balanced in both themes.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <Field label="Date">
                       <input
                         type="date"
-                        className="w-full rounded-2xl border border-white bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                        className={fieldClass}
                         value={form.txnDate}
-                        onChange={(e) => setForm({ ...form, txnDate: e.target.value })}
+                        onChange={(e) =>
+                          setForm({ ...form, txnDate: e.target.value })
+                        }
                       />
-                    </div>
+                    </Field>
 
-                    <div>
-                      <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                        Shop
-                      </label>
+                    <Field label="Shop">
                       <input
-                        className="w-full rounded-2xl border border-white bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                        className={fieldClass}
                         value={form.shopName}
-                        onChange={(e) => setForm({ ...form, shopName: e.target.value })}
+                        onChange={(e) =>
+                          setForm({ ...form, shopName: e.target.value })
+                        }
                         placeholder="e.g., Agora, Local Shop"
                       />
-                    </div>
+                    </Field>
 
-                    <div>
-                      <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                        Location
-                      </label>
+                    <Field label="Location">
                       <input
-                        className="w-full rounded-2xl border border-white bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                        className={fieldClass}
                         value={form.location}
-                        onChange={(e) => setForm({ ...form, location: e.target.value })}
+                        onChange={(e) =>
+                          setForm({ ...form, location: e.target.value })
+                        }
                         placeholder="Optional"
                       />
-                    </div>
+                    </Field>
 
-                    <div>
-                      <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                        Expense Category
-                      </label>
+                    <Field label="Expense Category">
                       <select
-                        className="w-full rounded-2xl border border-white bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                        className={fieldClass}
                         value={form.categoryId}
-                        onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+                        onChange={(e) =>
+                          setForm({ ...form, categoryId: e.target.value })
+                        }
                       >
                         <option value="">Select</option>
                         {expenseCats.map((c) => (
@@ -1013,23 +1419,13 @@ export default function Grocery() {
                           </option>
                         ))}
                       </select>
-                    </div>
+                    </Field>
 
-                    <div>
-                      <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                        Paid By
-                      </label>
+                    <Field label="Paid By">
                       <select
-                        className="w-full rounded-2xl border border-white bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                        className={fieldClass}
                         value={form.paidByUserId}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            paidByUserId: e.target.value,
-                            personalUserId:
-                              form.splitType === "personal" ? e.target.value : form.personalUserId,
-                          })
-                        }
+                        onChange={(e) => handlePaidByChange(e.target.value)}
                       >
                         {members.map((m) => (
                           <option key={getId(m)} value={getId(m)}>
@@ -1037,34 +1433,37 @@ export default function Grocery() {
                           </option>
                         ))}
                       </select>
-                    </div>
+                    </Field>
 
-                    <div>
-                      <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                        From Account
-                      </label>
+                    <Field label="From Account">
                       <select
-                        className="w-full rounded-2xl border border-white bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                        className={fieldClass}
                         value={form.fromAccountId}
-                        onChange={(e) => setForm({ ...form, fromAccountId: e.target.value })}
+                        onChange={(e) =>
+                          setForm({ ...form, fromAccountId: e.target.value })
+                        }
                       >
-                        <option value="">Select</option>
-                        {accounts.map((a) => (
+                        <option value="">
+                          {paidByAccounts.length
+                            ? "Select"
+                            : `No ${selectedPaidByOwner || "selected member"
+                            } account found`}
+                        </option>
+                        {paidByAccounts.map((a) => (
                           <option key={a._id} value={a._id}>
                             {a.name} ({a.type})
                           </option>
                         ))}
                       </select>
-                    </div>
+                    </Field>
 
-                    <div>
-                      <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                        Payment Method
-                      </label>
+                    <Field label="Payment Method">
                       <select
-                        className="w-full rounded-2xl border border-white bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                        className={fieldClass}
                         value={form.paymentMethodId}
-                        onChange={(e) => setForm({ ...form, paymentMethodId: e.target.value })}
+                        onChange={(e) =>
+                          setForm({ ...form, paymentMethodId: e.target.value })
+                        }
                       >
                         <option value="">Optional</option>
                         {methods.map((m) => (
@@ -1073,16 +1472,15 @@ export default function Grocery() {
                           </option>
                         ))}
                       </select>
-                    </div>
+                    </Field>
 
-                    <div>
-                      <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                        Card Label
-                      </label>
+                    <Field label="Card Label">
                       <select
-                        className="w-full rounded-2xl border border-white bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                        className={fieldClass}
                         value={form.cardLabelId}
-                        onChange={(e) => setForm({ ...form, cardLabelId: e.target.value })}
+                        onChange={(e) =>
+                          setForm({ ...form, cardLabelId: e.target.value })
+                        }
                       >
                         <option value="">Optional</option>
                         {cards.map((c) => (
@@ -1092,44 +1490,47 @@ export default function Grocery() {
                           </option>
                         ))}
                       </select>
-                    </div>
+                    </Field>
 
-                    <div className="sm:col-span-2 xl:col-span-4">
-                      <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                        Note
-                      </label>
+                    <Field label="Note" className="sm:col-span-2 xl:col-span-4">
                       <input
-                        className="w-full rounded-2xl border border-white bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                        className={fieldClass}
                         value={form.note}
                         onChange={(e) => setForm({ ...form, note: e.target.value })}
                         placeholder="Optional note"
                       />
-                    </div>
+                    </Field>
                   </div>
                 </div>
 
                 {/* Items */}
-                <div className="mb-5 rounded-[24px] border border-slate-200 bg-white p-4">
+                <div className="mb-5 rounded-[26px] border border-slate-200/70 bg-white p-4 shadow-[0_14px_35px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-slate-900/60">
                   <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h4 className="text-base font-black text-slate-950">Receipt Items</h4>
-                      <p className="text-sm text-slate-500">
-                        Brand, item discount, start date, and end date are removed.
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <IconBox name="cart" tone="sky" />
+                      <div>
+                        <h4 className="text-base font-black text-slate-950 dark:text-white">
+                          Receipt Items
+                        </h4>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                          Add item name, unit, quantity, and unit price.
+                        </p>
+                      </div>
                     </div>
 
                     <button
                       onClick={addItemRow}
-                      className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+                      className="hidden items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 lg:inline-flex"
                     >
-                      + Add Item
+                      <Icon name="plus" className="h-4 w-4" />
+                      Add Item
                     </button>
                   </div>
 
                   {/* Desktop item table */}
-                  <div className="hidden overflow-x-auto rounded-2xl border border-slate-100 lg:block">
+                  <div className="hidden overflow-x-auto rounded-2xl border border-slate-100 dark:border-white/10 lg:block">
                     <table className="w-full min-w-[780px] text-sm">
-                      <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                      <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/50 dark:text-slate-400">
                         <tr className="text-left">
                           <th className="p-3">Item Name</th>
                           <th className="p-3">Unit</th>
@@ -1139,23 +1540,27 @@ export default function Grocery() {
                           <th className="p-3 text-center">Remove</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-slate-100 dark:divide-white/10">
                         {txnItems.map((it, idx) => (
                           <tr key={idx}>
                             <td className="p-3">
                               <input
-                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                                className={smallFieldClass}
                                 value={it.name}
-                                onChange={(e) => updateItem(idx, "name", e.target.value)}
+                                onChange={(e) =>
+                                  updateItem(idx, "name", e.target.value)
+                                }
                                 placeholder="Rice, Oil, Milk..."
                               />
                             </td>
 
                             <td className="p-3">
                               <select
-                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                                className={smallFieldClass}
                                 value={it.unit}
-                                onChange={(e) => updateItem(idx, "unit", e.target.value)}
+                                onChange={(e) =>
+                                  updateItem(idx, "unit", e.target.value)
+                                }
                               >
                                 {UNITS.map((u) => (
                                   <option key={u} value={u}>
@@ -1170,9 +1575,11 @@ export default function Grocery() {
                                 type="number"
                                 min="0"
                                 step="1"
-                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                                className={smallFieldClass}
                                 value={it.qty}
-                                onChange={(e) => updateItem(idx, "qty", e.target.value)}
+                                onChange={(e) =>
+                                  updateItem(idx, "qty", e.target.value)
+                                }
                               />
                             </td>
 
@@ -1181,23 +1588,25 @@ export default function Grocery() {
                                 type="number"
                                 min="0"
                                 step="0.01"
-                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                                className={smallFieldClass}
                                 value={it.unitPrice}
-                                onChange={(e) => updateItem(idx, "unitPrice", e.target.value)}
+                                onChange={(e) =>
+                                  updateItem(idx, "unitPrice", e.target.value)
+                                }
                               />
                             </td>
 
-                            <td className="p-3 font-black text-slate-950">
+                            <td className="p-3 font-black text-slate-950 dark:text-white">
                               {bdt(Number(it.qty || 0) * Number(it.unitPrice || 0))}
                             </td>
 
                             <td className="p-3 text-center">
                               <button
                                 onClick={() => removeItemRow(idx)}
-                                className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-bold text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200 dark:hover:bg-rose-400/15"
                                 disabled={txnItems.length === 1}
                               >
-                                ✕
+                                <Icon name="close" className="h-4 w-4" />
                               </button>
                             </td>
                           </tr>
@@ -1209,39 +1618,43 @@ export default function Grocery() {
                   {/* Mobile / tablet item cards */}
                   <div className="space-y-3 lg:hidden">
                     {txnItems.map((it, idx) => (
-                      <div key={idx} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                      <div
+                        key={idx}
+                        className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-950/40"
+                      >
                         <div className="mb-3 flex items-center justify-between gap-3">
-                          <div className="font-black text-slate-950">Item {idx + 1}</div>
+                          <div className="font-black text-slate-950 dark:text-white">
+                            Item {idx + 1}
+                          </div>
                           <button
                             onClick={() => removeItemRow(idx)}
                             disabled={txnItems.length === 1}
-                            className="rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-xs font-black text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200 dark:hover:bg-rose-400/15"
                           >
+                            <Icon name="trash" className="h-3.5 w-3.5" />
                             Remove
                           </button>
                         </div>
 
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <div className="sm:col-span-2">
-                            <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                              Item Name
-                            </label>
+                          <Field label="Item Name" className="sm:col-span-2">
                             <input
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                              className={fieldClass}
                               value={it.name}
-                              onChange={(e) => updateItem(idx, "name", e.target.value)}
+                              onChange={(e) =>
+                                updateItem(idx, "name", e.target.value)
+                              }
                               placeholder="Rice, Oil, Milk..."
                             />
-                          </div>
+                          </Field>
 
-                          <div>
-                            <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                              Unit
-                            </label>
+                          <Field label="Unit">
                             <select
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                              className={fieldClass}
                               value={it.unit}
-                              onChange={(e) => updateItem(idx, "unit", e.target.value)}
+                              onChange={(e) =>
+                                updateItem(idx, "unit", e.target.value)
+                              }
                             >
                               {UNITS.map((u) => (
                                 <option key={u} value={u}>
@@ -1249,41 +1662,39 @@ export default function Grocery() {
                                 </option>
                               ))}
                             </select>
-                          </div>
+                          </Field>
 
-                          <div>
-                            <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                              Qty
-                            </label>
+                          <Field label="Qty">
                             <input
                               type="number"
                               min="0"
                               step="1"
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                              className={fieldClass}
                               value={it.qty}
-                              onChange={(e) => updateItem(idx, "qty", e.target.value)}
+                              onChange={(e) =>
+                                updateItem(idx, "qty", e.target.value)
+                              }
                             />
-                          </div>
+                          </Field>
 
-                          <div>
-                            <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                              Unit Price
-                            </label>
+                          <Field label="Unit Price">
                             <input
                               type="number"
                               min="0"
                               step="0.01"
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                              className={fieldClass}
                               value={it.unitPrice}
-                              onChange={(e) => updateItem(idx, "unitPrice", e.target.value)}
+                              onChange={(e) =>
+                                updateItem(idx, "unitPrice", e.target.value)
+                              }
                             />
-                          </div>
+                          </Field>
 
-                          <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
-                            <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                          <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/5">
+                            <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
                               Line Total
                             </div>
-                            <div className="mt-1 text-lg font-black text-slate-950">
+                            <div className="mt-1 text-lg font-black text-slate-950 dark:text-white">
                               {bdt(Number(it.qty || 0) * Number(it.unitPrice || 0))}
                             </div>
                           </div>
@@ -1291,119 +1702,138 @@ export default function Grocery() {
                       </div>
                     ))}
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={addItemRow}
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 lg:hidden"
+                  >
+                    <Icon name="plus" className="h-4 w-4" />
+                    Add Item
+                  </button>
                 </div>
 
                 {/* Totals */}
                 <div className="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-4">
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  <div className="rounded-[24px] border border-slate-200/70 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.035]">
+                    <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
                       Items Subtotal
                     </div>
-                    <div className="mt-2 text-2xl font-black text-slate-950">
+                    <div className="mt-2 text-2xl font-black text-slate-950 dark:text-white">
                       {bdt(itemsSubtotal)}
                     </div>
                   </div>
 
-                  <div>
-                    <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                      Transaction Discount
-                    </label>
+                  <Field label="Transaction Discount">
                     <input
                       type="number"
                       min="0"
                       step="0.01"
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                      className={fieldClass}
                       value={form.discountTotal}
-                      onChange={(e) => setForm({ ...form, discountTotal: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, discountTotal: e.target.value })
+                      }
                     />
-                  </div>
+                  </Field>
 
-                  <div>
-                    <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                      Delivery Fee
-                    </label>
+                  <Field label="Delivery Fee">
                     <input
                       type="number"
                       min="0"
                       step="0.01"
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                      className={fieldClass}
                       value={form.deliveryFee}
-                      onChange={(e) => setForm({ ...form, deliveryFee: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, deliveryFee: e.target.value })
+                      }
                     />
-                  </div>
+                  </Field>
 
-                  <div>
-                    <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                      VAT Amount
-                    </label>
+                  <Field label="VAT Amount">
                     <input
                       type="number"
                       min="0"
                       step="0.01"
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                      className={fieldClass}
                       value={form.vatAmount}
-                      onChange={(e) => setForm({ ...form, vatAmount: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, vatAmount: e.target.value })
+                      }
                     />
-                  </div>
+                  </Field>
 
-                  <label className="flex items-start gap-3 rounded-[24px] border border-slate-200 bg-white p-4 lg:col-span-2">
+                  <label className="flex items-start gap-3 rounded-[24px] border border-slate-200/70 bg-white p-4 dark:border-white/10 dark:bg-white/[0.035] lg:col-span-2">
                     <input
                       type="checkbox"
-                      className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 dark:border-white/20 dark:bg-slate-950"
                       checked={form.vatIncluded}
-                      onChange={(e) => setForm({ ...form, vatIncluded: e.target.checked })}
+                      onChange={(e) =>
+                        setForm({ ...form, vatIncluded: e.target.checked })
+                      }
                     />
                     <span>
-                      <span className="block text-sm font-bold text-slate-800">
+                      <span className="block text-sm font-black text-slate-800 dark:text-slate-100">
                         VAT already included in item prices
                       </span>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
                         Uncheck this if VAT should be added with total payable.
                       </span>
                     </span>
                   </label>
 
-                  <div className="rounded-[24px] bg-gradient-to-br from-slate-950 to-emerald-800 p-4 text-white lg:col-span-2">
-                    <div className="text-xs font-bold uppercase tracking-wide text-emerald-100">
-                      Total Payable
+                  <div className="relative overflow-hidden rounded-[24px] border border-slate-200/70 bg-slate-950 p-4 text-white shadow-[0_18px_35px_rgba(15,23,42,0.16)] dark:border-emerald-400/20 dark:bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.20),rgba(15,23,42,0.96)_45%,rgba(2,6,23,1)_100%)] dark:text-white dark:shadow-[0_18px_45px_rgba(0,0,0,0.35)] lg:col-span-2">
+                    <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-emerald-400/20 blur-2xl" />
+                    <div className="pointer-events-none absolute -bottom-12 left-8 h-28 w-28 rounded-full bg-cyan-400/10 blur-2xl" />
+
+                    <div className="relative z-10">
+                      <div className="inline-flex rounded-lg bg-white/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100 ring-1 ring-white/10">
+                        Total Payable
+                      </div>
+
+                      <div className="mt-3 text-3xl font-black tracking-tight text-white">
+                        {bdt(totalPayable)}
+                      </div>
+
+                      <p className="mt-1 text-xs font-medium text-slate-300">
+                        Final amount after discount, delivery fee, and VAT.
+                      </p>
                     </div>
-                    <div className="mt-2 text-3xl font-black">{bdt(totalPayable)}</div>
                   </div>
                 </div>
 
                 {/* Split */}
-                <div className="mb-5 rounded-[24px] border border-slate-200 bg-white p-4">
-                  <div className="mb-4 flex flex-col gap-1">
-                    <h4 className="text-base font-black text-slate-950">Split Details</h4>
-                    <p className="text-sm text-slate-500">
-                      This split will be reflected in the ledger summary automatically.
-                    </p>
+                <div className="mb-5 rounded-[26px] border border-slate-200/70 bg-white p-4 shadow-[0_14px_35px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-slate-900/60">
+                  <div className="mb-4 flex items-center gap-3">
+                    <IconBox name="split" tone="violet" />
+                    <div>
+                      <h4 className="text-base font-black text-slate-950 dark:text-white">
+                        Split Details
+                      </h4>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        This split will be reflected in the ledger summary automatically.
+                      </p>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="sm:col-span-2">
-                      <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                        Split Type
-                      </label>
+                    <Field label="Split Type" className="sm:col-span-2">
                       <select
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                        className={fieldClass}
                         value={form.splitType}
-                        onChange={(e) => setForm({ ...form, splitType: e.target.value })}
+                        onChange={(e) => handleSplitTypeChange(e.target.value)}
                       >
                         <option value="equal">Equal</option>
                         <option value="personal">Personal</option>
                         <option value="ratio">Ratio</option>
                         <option value="fixed">Fixed Amount</option>
                       </select>
-                    </div>
+                    </Field>
 
                     {form.splitType === "personal" && (
-                      <div className="sm:col-span-2">
-                        <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                          Personal For
-                        </label>
+                      <Field label="Personal For" className="sm:col-span-2">
                         <select
-                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                          className={fieldClass}
                           value={form.personalUserId}
                           onChange={(e) =>
                             setForm({ ...form, personalUserId: e.target.value })
@@ -1415,36 +1845,34 @@ export default function Grocery() {
                             </option>
                           ))}
                         </select>
-                      </div>
+                      </Field>
                     )}
 
                     {form.splitType === "ratio" && otherMember && (
                       <>
-                        <div>
-                          <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                            My %
-                          </label>
+                        <Field label={`${currentMemberName} %`}>
                           <input
                             type="number"
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                            className={fieldClass}
                             value={form.ratioMe}
-                            onChange={(e) => setForm({ ...form, ratioMe: e.target.value })}
+                            onChange={(e) =>
+                              setForm({ ...form, ratioMe: e.target.value })
+                            }
                           />
-                        </div>
-                        <div>
-                          <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                            {otherMember.name} %
-                          </label>
+                        </Field>
+
+                        <Field label={`${otherMember.name} %`}>
                           <input
                             type="number"
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                            className={fieldClass}
                             value={form.ratioOther}
                             onChange={(e) =>
                               setForm({ ...form, ratioOther: e.target.value })
                             }
                           />
-                        </div>
-                        <div className="rounded-2xl bg-amber-50 px-4 py-3 text-xs font-medium text-amber-700 ring-1 ring-amber-100 sm:col-span-2 xl:col-span-4">
+                        </Field>
+
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200 sm:col-span-2 xl:col-span-4">
                           Ratio values must sum to 100.
                         </div>
                       </>
@@ -1452,31 +1880,29 @@ export default function Grocery() {
 
                     {form.splitType === "fixed" && otherMember && (
                       <>
-                        <div>
-                          <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                            My Amount
-                          </label>
+                        <Field label={`${currentMemberName} Amount`}>
                           <input
                             type="number"
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                            className={fieldClass}
                             value={form.fixedMe}
-                            onChange={(e) => setForm({ ...form, fixedMe: e.target.value })}
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                            {otherMember.name} Amount
-                          </label>
-                          <input
-                            type="number"
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
-                            value={form.fixedOther}
                             onChange={(e) =>
-                              setForm({ ...form, fixedOther: e.target.value })
+                              handleFixedAmountChange("fixedMe", e.target.value)
                             }
                           />
-                        </div>
-                        <div className="rounded-2xl bg-amber-50 px-4 py-3 text-xs font-medium text-amber-700 ring-1 ring-amber-100 sm:col-span-2 xl:col-span-4">
+                        </Field>
+
+                        <Field label={`${otherMember.name} Amount`}>
+                          <input
+                            type="number"
+                            className={fieldClass}
+                            value={form.fixedOther}
+                            onChange={(e) =>
+                              handleFixedAmountChange("fixedOther", e.target.value)
+                            }
+                          />
+                        </Field>
+
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200 sm:col-span-2 xl:col-span-4">
                           Fixed amounts must sum to the total payable.
                         </div>
                       </>
@@ -1484,24 +1910,27 @@ export default function Grocery() {
                   </div>
                 </div>
 
-                <div className="sticky bottom-0 -mx-5 -mb-5 border-t border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:-mx-6 sm:-mb-6 sm:px-6">
+                {/* Footer */}
+                <div className="sticky bottom-0 -mx-5 -mb-5 border-t border-slate-100 bg-white/95 px-5 py-4 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 sm:-mx-6 sm:-mb-6 sm:px-6">
                   <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
                     <button
                       onClick={closeModal}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 sm:w-auto"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 sm:w-auto"
                     >
                       Cancel
                     </button>
+
                     <button
                       onClick={saveTxn}
-                      className="w-full rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/15 transition hover:-translate-y-0.5 hover:bg-emerald-700 sm:w-auto"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-[0_14px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800 active:translate-y-0 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 sm:w-auto"
                     >
+                      <Icon name="receipt" className="h-4 w-4" />
                       {isEditing ? "Update Transaction" : "Save Transaction"}
                     </button>
                   </div>
 
                   {msg && (
-                    <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                    <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200">
                       {msg}
                     </div>
                   )}
