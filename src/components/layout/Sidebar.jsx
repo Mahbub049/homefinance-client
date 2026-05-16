@@ -21,15 +21,6 @@ function Icon({ name, className = "h-5 w-5" }) {
           <path d="M3 17h8v4H3v-4z" />
         </svg>
       );
-    case "family":
-      return (
-        <svg {...common} viewBox="0 0 24 24">
-          <path d="M16 11a4 4 0 1 0-8 0" />
-          <path d="M6 21a6 6 0 0 1 12 0" />
-          <path d="M19 8a3 3 0 1 1 0 6" />
-          <path d="M22 21a5 5 0 0 0-3-4.5" />
-        </svg>
-      );
     case "settings":
       return (
         <svg {...common} viewBox="0 0 24 24">
@@ -77,9 +68,9 @@ function Icon({ name, className = "h-5 w-5" }) {
     case "wallet":
       return (
         <svg {...common} viewBox="0 0 24 24">
-          <path d="M3 7h18v14H3V7z" />
-          <path d="M3 7l2-4h14l2 4" />
-          <path d="M17 14h4" />
+          <path d="M4 7.5h14.5A2.5 2.5 0 0 1 21 10v7a2.5 2.5 0 0 1-2.5 2.5h-14A2.5 2.5 0 0 1 2 17V7a2.5 2.5 0 0 1 2.5-2.5H17" />
+          <path d="M4.5 4.5h12A2.5 2.5 0 0 1 19 7" />
+          <path d="M17 13h4" />
         </svg>
       );
     case "planned":
@@ -125,56 +116,34 @@ function Icon({ name, className = "h-5 w-5" }) {
 }
 
 function GroupTitle({ collapsed, children }) {
-  if (collapsed) return <div className="h-4" />;
+  if (collapsed) {
+    return <div className="my-2 h-px bg-slate-200 dark:bg-white/10" />;
+  }
 
   return (
-    <div className="px-3 pb-2 pt-5 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
+    <div className="px-3 pb-2 pt-4 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
       {children}
     </div>
   );
 }
 
-function Item({ to, label, icon, collapsed }) {
+function Item({ to, label, icon, collapsed, onNavigate }) {
   const className = ({ isActive }) =>
     [
-      "group relative flex items-center gap-3 overflow-hidden rounded-2xl px-3 py-2.5 text-sm font-semibold transition-all duration-200",
+      "group relative flex items-center overflow-hidden rounded-2xl text-sm font-semibold transition-all duration-200",
+      collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5",
       isActive
         ? "active bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white shadow-lg shadow-indigo-500/25"
-        : "text-slate-600 hover:-translate-y-0.5 hover:bg-white hover:text-slate-950 hover:shadow-sm dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white",
+        : "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white",
     ].join(" ");
 
   return (
-    <NavLink to={to} className={className} title={collapsed ? label : undefined}>
+    <NavLink to={to} className={className} title={collapsed ? label : undefined} onClick={onNavigate}>
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition group-hover:bg-slate-200 group-hover:text-slate-950 dark:bg-slate-800 dark:text-slate-300 dark:group-hover:bg-slate-700 dark:group-hover:text-white group-[.active]:bg-white/20 group-[.active]:text-white">
         {icon}
       </span>
-      {!collapsed && <span className="truncate">{label}</span>}
+      {!collapsed && <span className="min-w-0 truncate">{label}</span>}
     </NavLink>
-  );
-}
-
-function SidebarFooter({ collapsed }) {
-  return (
-    <div className="border-t border-slate-200/70 p-3 dark:border-slate-800">
-      <div
-        className={[
-          "rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-white shadow-lg shadow-indigo-500/20",
-          collapsed ? "p-2" : "p-4",
-        ].join(" ")}
-      >
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/20">
-            <Icon name="spark" className="h-5 w-5" />
-          </div>
-          {!collapsed && (
-            <div className="min-w-0">
-              <div className="text-sm font-bold">Smart Budgeting</div>
-              <div className="mt-0.5 text-xs text-white/75">Track • Split • Plan</div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -184,6 +153,8 @@ export default function Sidebar({
   drawerOpen = false,
   onCloseDrawer,
 }) {
+  const isDrawer = typeof onCloseDrawer === "function";
+
   const nav = useMemo(
     () => [
       {
@@ -219,50 +190,49 @@ export default function Sidebar({
   const content = (
     <aside
       className={[
-        "sticky top-0 flex h-screen flex-col border-r border-white/70 bg-white/85 shadow-xl shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 dark:border-slate-800/80 dark:bg-slate-950/90 dark:shadow-black/30",
-        collapsed ? "w-20" : "w-72",
+        "app-sidebar-shell flex h-screen shrink-0 flex-col overflow-hidden border-r border-slate-200/70 bg-white/95 shadow-xl shadow-slate-200/40 backdrop-blur-xl transition-[width] duration-300 dark:border-slate-800/80 dark:bg-slate-950/95 dark:shadow-black/30",
+        isDrawer ? "w-[18rem] max-w-[86vw]" : collapsed ? "w-[4.75rem]" : "w-64",
       ].join(" ")}
     >
-      <div className="border-b border-slate-200/70 p-4 dark:border-slate-800">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-sm font-black text-white shadow-lg shadow-indigo-500/30">
-              {collapsed ? "HF" : <Icon name="spark" className="h-5 w-5" />}
+      <div className={["shrink-0 border-b border-slate-200/70 dark:border-slate-800", collapsed && !isDrawer ? "p-3" : "p-3"].join(" ")}>
+        <div className={["flex items-center gap-3", collapsed && !isDrawer ? "justify-center" : "justify-between"].join(" ")}>
+          <div className={["flex min-w-0 items-center", collapsed && !isDrawer ? "justify-center" : "gap-3"].join(" ")}>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-xs font-black text-white shadow-lg shadow-indigo-500/30">
+              {collapsed && !isDrawer ? "HF" : <Icon name="spark" className="h-5 w-5" />}
             </div>
 
-            {!collapsed && (
+            {(!collapsed || isDrawer) && (
               <div className="min-w-0">
                 <h1 className="truncate text-base font-black leading-5 text-slate-950 dark:text-white">
                   HomeFinance
                 </h1>
-                <p className="mt-1 truncate text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Beautiful budgeting workspace
+                <p className="mt-0.5 truncate text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Budget workspace
                 </p>
               </div>
             )}
           </div>
 
-          {onToggleCollapse && (
+          {!isDrawer && onToggleCollapse && (
             <button
               onClick={onToggleCollapse}
-              className="hidden h-9 w-9 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:-translate-y-0.5 hover:bg-slate-50 hover:text-slate-950 hover:shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 md:inline-flex"
+              className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 md:inline-flex"
               title={collapsed ? "Expand" : "Collapse"}
+              type="button"
             >
               <Icon
                 name="chev"
-                className={[
-                  "h-4 w-4 transition-transform duration-200",
-                  collapsed ? "rotate-180" : "",
-                ].join(" ")}
+                className={["h-4 w-4 transition-transform duration-200", collapsed ? "rotate-180" : ""].join(" ")}
               />
             </button>
           )}
 
-          {onCloseDrawer && (
+          {isDrawer && (
             <button
               onClick={onCloseDrawer}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 md:hidden"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 md:hidden"
               title="Close"
+              type="button"
             >
               <Icon name="close" className="h-4 w-4" />
             </button>
@@ -270,10 +240,10 @@ export default function Sidebar({
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto p-3">
+      <nav className="sidebar-no-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3">
         {nav.map((group) => (
           <div key={group.title}>
-            <GroupTitle collapsed={collapsed}>{group.title}</GroupTitle>
+            <GroupTitle collapsed={collapsed && !isDrawer}>{group.title}</GroupTitle>
             <div className="space-y-1.5">
               {group.items.map((it) => (
                 <Item
@@ -281,32 +251,31 @@ export default function Sidebar({
                   to={it.to}
                   label={it.label}
                   icon={it.icon}
-                  collapsed={collapsed}
+                  collapsed={collapsed && !isDrawer}
+                  onNavigate={isDrawer ? onCloseDrawer : undefined}
                 />
               ))}
             </div>
           </div>
         ))}
       </nav>
-
-      <SidebarFooter collapsed={collapsed} />
     </aside>
   );
 
-  if (typeof onCloseDrawer === "function") {
+  if (isDrawer) {
     return (
       <>
         <div
           className={[
-            "fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm transition-opacity",
-            drawerOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
+            "fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm transition-opacity md:hidden",
+            drawerOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
           ].join(" ")}
           onClick={onCloseDrawer}
         />
 
         <div
           className={[
-            "fixed left-0 top-0 z-50 transition-transform duration-300",
+            "fixed left-0 top-0 z-50 h-screen transition-transform duration-300 md:hidden",
             drawerOpen ? "translate-x-0" : "-translate-x-full",
           ].join(" ")}
         >

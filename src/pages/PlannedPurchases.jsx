@@ -88,7 +88,7 @@ function StatCard({ title, value, hint, tone = "blue", icon }) {
             </div>
           </div>
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/80 text-xl shadow-sm dark:bg-slate-950/60">
-            {icon}
+            {typeof icon === "string" ? <PremiumIcon name={icon} className="h-5 w-5" /> : icon}
           </div>
         </div>
         <div className="text-xs leading-5 text-slate-600 dark:text-slate-300">
@@ -177,6 +177,101 @@ function paymentAccentClass(value) {
   return "from-slate-500 to-slate-400";
 }
 
+function PremiumIcon({ name, className = "h-5 w-5" }) {
+  const common = {
+    className,
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.9,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+  };
+
+  if (name === "cart") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <path d="M6 6h15l-1.4 8.4a2 2 0 0 1-2 1.6H8.2a2 2 0 0 1-2-1.7L5 3H2" />
+        <path d="M9 20h.01" />
+        <path d="M18 20h.01" />
+      </svg>
+    );
+  }
+
+  if (name === "check") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <path d="M20 6 9 17l-5-5" />
+        <path d="M21 12a9 9 0 1 1-3.5-7.1" />
+      </svg>
+    );
+  }
+
+  if (name === "target") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8" />
+        <circle cx="12" cy="12" r="3" />
+        <path d="M22 2 12 12" />
+        <path d="M16 2h6v6" />
+      </svg>
+    );
+  }
+
+  if (name === "spark") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <path d="M12 3l1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3z" />
+        <path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16z" />
+      </svg>
+    );
+  }
+
+  if (name === "settings") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" />
+        <path d="M19.4 15a7.8 7.8 0 0 0 .1-2l2-1.5-2-3.5-2.4.7a7.5 7.5 0 0 0-1.7-1l-.3-2.5H9l-.3 2.5a7.5 7.5 0 0 0-1.7 1L4.6 8l-2 3.5 2 1.5a7.8 7.8 0 0 0 .1 2l-2 1.5 2 3.5 2.4-.7a7.5 7.5 0 0 0 1.7 1l.3 2.5h6l.3-2.5a7.5 7.5 0 0 0 1.7-1l2.4.7 2-3.5-2-1.5z" />
+      </svg>
+    );
+  }
+
+  if (name === "chevron") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <path d="m6 9 6 6 6-6" />
+      </svg>
+    );
+  }
+
+  if (name === "up") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <path d="M12 19V5" />
+        <path d="m5 12 7-7 7 7" />
+      </svg>
+    );
+  }
+
+  if (name === "down") {
+    return (
+      <svg {...common} viewBox="0 0 24 24">
+        <path d="M12 5v14" />
+        <path d="m19 12-7 7-7-7" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg {...common} viewBox="0 0 24 24">
+      <path d="M4 19V5" />
+      <path d="M4 19h16" />
+      <path d="M8 15v-5" />
+      <path d="M12 15V7" />
+      <path d="M16 15v-3" />
+    </svg>
+  );
+}
+
 function DragHandle(props) {
   return (
     <button
@@ -218,7 +313,7 @@ function ActionButton({ children, variant = "neutral", onClick, disabled = false
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-2xl border px-3.5 py-2 text-sm font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${styles[variant]}`}
+      className={`rounded-xl border px-2.5 py-2 text-xs font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 sm:rounded-2xl sm:px-3.5 sm:text-sm ${styles[variant]}`}
     >
       {children}
     </button>
@@ -272,7 +367,7 @@ function PurchaseModal({
       />
       <div className="absolute inset-0 flex items-end justify-center p-0 sm:items-center sm:p-4">
         <div className="relative flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-[2rem] border border-white/60 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-950 sm:rounded-[2rem]">
-          <div className="relative overflow-hidden border-b border-white/40 bg-gradient-to-r from-indigo-600 via-purple-600 to-fuchsia-600 px-5 py-5 text-white sm:px-6">
+          <div className="relative overflow-hidden border-b border-white/40 bg-gradient-to-r from-indigo-600 via-purple-600 to-fuchsia-600 px-4 py-4 text-white sm:px-6 sm:py-5">
             <div className="absolute right-[-70px] top-[-80px] h-44 w-44 rounded-full bg-white/20 blur-2xl" />
             <div className="absolute bottom-[-90px] left-[30%] h-44 w-44 rounded-full bg-amber-300/20 blur-2xl" />
 
@@ -281,10 +376,10 @@ function PurchaseModal({
                 <div className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur">
                   {editingId ? "Update wishlist item" : "Create new purchase plan"}
                 </div>
-                <h3 className="mt-3 text-2xl font-black">
+                <h3 className="mt-2 text-xl font-black sm:mt-3 sm:text-2xl">
                   {editingId ? "Edit Planned Purchase" : "Add Planned Purchase"}
                 </h3>
-                <p className="mt-1 max-w-2xl text-sm text-white/80">
+                <p className="mt-1 max-w-2xl text-xs leading-5 text-white/80 sm:text-sm">
                   Add the product, priority, payment style, and ownership so the buying plan stays clear.
                 </p>
               </div>
@@ -292,26 +387,26 @@ function PurchaseModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+                className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/20 sm:rounded-2xl sm:px-4 sm:text-sm"
               >
                 Close
               </button>
             </div>
           </div>
 
-          <form onSubmit={onSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6">
+          <form onSubmit={onSubmit} className="planned-modal-scroll flex-1 overflow-y-auto p-3 sm:p-6">
             {formErr && (
               <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200">
                 {formErr}
               </div>
             )}
 
-            <div className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr]">
+            <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr] lg:gap-5">
               <div className="space-y-5">
-                <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/60 sm:rounded-3xl sm:p-4">
                   <div className="mb-4 flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-200">
-                      🛍️
+                      <PremiumIcon name="cart" className="h-5 w-5" />
                     </div>
                     <div>
                       <div className="font-bold text-slate-950 dark:text-white">Product Details</div>
@@ -387,10 +482,10 @@ function PurchaseModal({
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+                <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 sm:rounded-3xl sm:p-4">
                   <div className="mb-4 flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/10 dark:text-fuchsia-200">
-                      ⚙️
+                      <PremiumIcon name="settings" className="h-5 w-5" />
                     </div>
                     <div>
                       <div className="font-bold text-slate-950 dark:text-white">Planning Rules</div>
@@ -475,7 +570,7 @@ function PurchaseModal({
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="hidden space-y-4 lg:block">
                 <div className="rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-fuchsia-50 p-5 shadow-sm dark:border-indigo-500/20 dark:from-indigo-500/10 dark:via-slate-900 dark:to-fuchsia-500/10">
                   <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                     Preview
@@ -517,7 +612,7 @@ function PurchaseModal({
             </div>
           </form>
 
-          <div className="border-t border-slate-200 bg-white/90 px-5 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 sm:px-6">
+          <div className="border-t border-slate-200 bg-white/90 px-3 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90 sm:px-6 sm:py-4">
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 type="button"
@@ -571,7 +666,13 @@ function SortablePlannedItem({
   onEdit,
   onMarkBought,
   onDelete,
+  onMoveMobile,
+  index = 0,
+  total = 0,
+  canMobileReorder = false,
+  reordering = false,
 }) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const {
     attributes,
     listeners,
@@ -586,77 +687,137 @@ function SortablePlannedItem({
     transition,
   };
 
+  const price = formatMoney(item.expectedPrice || 0);
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/85 p-4 shadow-sm backdrop-blur transition duration-300 dark:border-white/10 dark:bg-slate-900/75 md:p-5 ${
-        isDragging ? "scale-[0.99] shadow-2xl opacity-90" : "hover:-translate-y-0.5 hover:shadow-xl"
+      className={`planned-card group relative overflow-hidden rounded-[1.4rem] border border-white/70 bg-white/90 p-3 shadow-sm backdrop-blur transition duration-300 dark:border-white/10 dark:bg-slate-900/75 sm:rounded-[2rem] sm:p-5 ${
+        isDragging ? "scale-[0.99] shadow-2xl opacity-90" : "sm:hover:-translate-y-0.5 sm:hover:shadow-xl"
       }`}
     >
-      <div className={`absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b ${paymentAccentClass(item.paymentMode)}`} />
-      <div className="absolute right-[-80px] top-[-80px] h-44 w-44 rounded-full bg-indigo-500/10 blur-3xl transition group-hover:bg-fuchsia-500/10" />
+      <div className={`absolute inset-y-0 left-0 w-1 bg-gradient-to-b ${paymentAccentClass(item.paymentMode)} sm:w-1.5`} />
+      <div className="absolute right-[-80px] top-[-80px] h-44 w-44 rounded-full bg-indigo-500/10 blur-3xl transition sm:group-hover:bg-fuchsia-500/10" />
 
-      <div className="relative flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+      <div className="relative flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between sm:gap-5">
         <div className="flex min-w-0 flex-1 gap-3">
-          <div className="pt-1">
+          <div className="hidden pt-1 sm:block">
             <DragHandle {...attributes} {...listeners} />
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <div className={`h-2.5 w-2.5 rounded-full ${priorityDotClass(item.priority)}`} />
-              <h4 className="break-words text-lg font-black text-slate-950 dark:text-white">
-                {item.productName}
-              </h4>
+            <div className="flex items-start justify-between gap-3 sm:mb-3 sm:block">
+              <div className="min-w-0">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className={`hidden h-2.5 w-2.5 shrink-0 rounded-full ${priorityDotClass(item.priority)} sm:block`} />
+                  <h4 className="min-w-0 break-words text-base font-black leading-6 text-slate-950 dark:text-white sm:text-lg">
+                    {item.productName}
+                  </h4>
+                </div>
 
-              <span className={`rounded-full border px-2.5 py-1 text-xs font-bold capitalize ${badgeClass("priority", item.priority)}`}>
-                {item.priority}
-              </span>
-              <span className={`rounded-full border px-2.5 py-1 text-xs font-bold capitalize ${badgeClass("ownership", item.ownershipType)}`}>
-                {item.ownershipType}
-              </span>
-              <span className={`rounded-full border px-2.5 py-1 text-xs font-bold capitalize ${badgeClass("payment", item.paymentMode)}`}>
-                {item.paymentMode}
-              </span>
-            </div>
-
-            <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
-              <InfoChip label="Brand" value={item.brand || "—"} />
-              <InfoChip label="Category" value={item.category || "—"} />
-              {item.ownershipType === "personal" && (
-                <InfoChip label="Personal For" value={personalName || "Unknown"} />
-              )}
-              <InfoChip label="Estimated Cost" value={formatMoney(item.expectedPrice || 0)} />
-            </div>
-
-            {item.notes ? (
-              <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-6 text-slate-600 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-300">
-                <span className="font-semibold text-slate-500 dark:text-slate-400">Note:</span> {item.notes}
+                <div className="mt-1 flex flex-wrap items-center gap-2 sm:mt-2">
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-black text-slate-800 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 sm:hidden">
+                    {price}
+                  </span>
+                  <span className={`hidden rounded-full border px-2.5 py-1 text-xs font-bold capitalize sm:inline-flex ${badgeClass("priority", item.priority)}`}>
+                    {item.priority}
+                  </span>
+                  <span className={`hidden rounded-full border px-2.5 py-1 text-xs font-bold capitalize sm:inline-flex ${badgeClass("ownership", item.ownershipType)}`}>
+                    {item.ownershipType}
+                  </span>
+                  <span className={`hidden rounded-full border px-2.5 py-1 text-xs font-bold capitalize sm:inline-flex ${badgeClass("payment", item.paymentMode)}`}>
+                    {item.paymentMode}
+                  </span>
+                </div>
               </div>
-            ) : null}
+
+              {canMobileReorder ? (
+                <div className="flex shrink-0 gap-1 sm:hidden">
+                  <button
+                    type="button"
+                    disabled={index === 0 || reordering}
+                    onClick={() => onMoveMobile(item._id, "up")}
+                    className="grid h-8 w-8 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+                    aria-label="Move item up"
+                  >
+                    <PremiumIcon name="up" className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={index === total - 1 || reordering}
+                    onClick={() => onMoveMobile(item._id, "down")}
+                    className="grid h-8 w-8 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+                    aria-label="Move item down"
+                  >
+                    <PremiumIcon name="down" className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-3 grid gap-2 text-sm sm:mt-0 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
+              <InfoChip label="Estimated Cost" value={price} />
+              <div className="hidden sm:block"><InfoChip label="Brand" value={item.brand || "—"} /></div>
+              <div className="hidden sm:block"><InfoChip label="Category" value={item.category || "—"} /></div>
+              {item.ownershipType === "personal" && (
+                <div className="hidden sm:block"><InfoChip label="Personal For" value={personalName || "Unknown"} /></div>
+              )}
+            </div>
 
             {item.productLink ? (
-              <div className="pt-3">
+              <div className="pt-2 sm:pt-3">
                 <a
                   href={item.productLink}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2 break-all text-sm font-bold text-indigo-600 hover:text-indigo-700 hover:underline dark:text-indigo-300 dark:hover:text-indigo-200"
+                  className="inline-flex items-center gap-2 break-all text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:underline dark:text-indigo-300 dark:hover:text-indigo-200 sm:text-sm"
                 >
                   View Product Link →
                 </a>
+              </div>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => setDetailsOpen((v) => !v)}
+              className="mt-3 flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 sm:hidden"
+            >
+              {detailsOpen ? "Hide details" : "View details"}
+              <PremiumIcon name="chevron" className={`h-4 w-4 transition ${detailsOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            <div className={`${detailsOpen ? "grid" : "hidden"} mt-2 grid-cols-1 gap-2 sm:hidden`}>
+              <InfoChip label="Brand" value={item.brand || "—"} />
+              <InfoChip label="Category" value={item.category || "—"} />
+              {item.ownershipType === "personal" && <InfoChip label="Personal For" value={personalName || "Unknown"} />}
+              <div className="flex flex-wrap gap-1.5">
+                <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold capitalize ${badgeClass("priority", item.priority)}`}>
+                  {item.priority}
+                </span>
+                <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold capitalize ${badgeClass("ownership", item.ownershipType)}`}>
+                  {item.ownershipType}
+                </span>
+                <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold capitalize ${badgeClass("payment", item.paymentMode)}`}>
+                  {item.paymentMode}
+                </span>
+              </div>
+            </div>
+
+            {item.notes ? (
+              <div className="mt-3 hidden rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-6 text-slate-600 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-300 sm:block">
+                <span className="font-semibold text-slate-500 dark:text-slate-400">Note:</span> {item.notes}
               </div>
             ) : null}
           </div>
         </div>
 
         <div className="xl:min-w-[230px]">
-          <div className="mb-3 rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-950/60 dark:text-slate-400 xl:text-right">
+          <div className="mb-3 hidden rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-950/60 dark:text-slate-400 sm:block xl:text-right">
             Added {safeDate(item.createdAt)}
           </div>
 
-          <div className="flex flex-wrap gap-2 xl:justify-end">
+          <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:justify-end">
             <ActionButton variant="neutral" onClick={() => onEdit(item)}>
               Edit
             </ActionButton>
@@ -749,7 +910,7 @@ function EmptyState({ title, text, action }) {
   return (
     <div className="rounded-[2rem] border border-dashed border-slate-300 bg-white/60 p-10 text-center dark:border-slate-700 dark:bg-slate-900/40">
       <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-100 to-fuchsia-100 text-3xl dark:from-indigo-500/10 dark:to-fuchsia-500/10">
-        🧺
+        <PremiumIcon name="cart" className="h-8 w-8 text-indigo-600 dark:text-indigo-200" />
       </div>
       <div className="mb-2 text-lg font-black text-slate-950 dark:text-white">{title}</div>
       <div className="mx-auto max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">{text}</div>
@@ -770,6 +931,7 @@ export default function PlannedPurchases() {
   const [editingId, setEditingId] = useState(null);
 
   const [filters, setFilters] = useState(initialFilters);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [reordering, setReordering] = useState(false);
 
   const [activeTab, setActiveTab] = useState("active");
@@ -1192,6 +1354,54 @@ export default function PlannedPurchases() {
     return count;
   }, [filters]);
 
+  async function movePlannedItem(id, direction) {
+    if (
+      filters.search ||
+      filters.priority !== "all" ||
+      filters.ownershipType !== "all" ||
+      filters.paymentMode !== "all" ||
+      filters.sortBy !== "manual"
+    ) {
+      showNotice("error", "Mobile reorder works only in Manual sort without active filters.");
+      return;
+    }
+
+    const currentIndex = activeItems.findIndex((item) => item._id === id);
+    if (currentIndex === -1) return;
+
+    const nextIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (nextIndex < 0 || nextIndex >= activeItems.length) return;
+
+    const reordered = arrayMove(activeItems, currentIndex, nextIndex);
+
+    const updatedItems = items.map((item) => {
+      if (item.status !== "planned") return item;
+      const indexInReordered = reordered.findIndex((x) => x._id === item._id);
+      if (indexInReordered === -1) return item;
+      return { ...item, sortOrder: indexInReordered + 1 };
+    });
+
+    setItems(updatedItems);
+
+    try {
+      setReordering(true);
+      await api.patch("/api/planned-purchases/reorder", {
+        orderedIds: reordered.map((item) => item._id),
+      });
+      showNotice("info", "Planned item order updated.");
+    } catch (e) {
+      await loadItems();
+      showNotice(
+        "error",
+        e?.response?.data?.message ||
+          e?.message ||
+          "Failed to reorder planned purchases"
+      );
+    } finally {
+      setReordering(false);
+    }
+  }
+
   async function handleDragEnd(event) {
     const { active, over } = event;
 
@@ -1248,8 +1458,8 @@ export default function PlannedPurchases() {
 
   return (
     <AppLayout>
-      <div className="mx-auto w-full max-w-7xl px-2 pb-10 sm:px-4">
-        <section className="relative mb-6 overflow-hidden rounded-[2rem] border border-white/70 bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-5 text-white shadow-xl shadow-indigo-500/20 dark:border-white/10 sm:p-6 lg:p-7">
+      <div className="planned-page mx-auto w-full max-w-7xl overflow-x-hidden px-2 pb-10 sm:px-4">
+        <section className="relative mb-4 overflow-hidden rounded-[1.5rem] border border-white/70 bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-4 text-white shadow-xl shadow-indigo-500/20 dark:border-white/10 sm:mb-6 sm:rounded-[2rem] sm:p-6 lg:p-7">
           <div className="absolute right-[-80px] top-[-100px] h-72 w-72 rounded-full bg-white/20 blur-3xl" />
           <div className="absolute bottom-[-120px] left-[20%] h-72 w-72 rounded-full bg-amber-300/20 blur-3xl" />
           <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
@@ -1260,22 +1470,23 @@ export default function PlannedPurchases() {
               <h2 className="text-3xl font-black tracking-tight sm:text-4xl">
                 Planned Purchases
               </h2>
-              <p className="mt-2 text-sm leading-6 text-white/80">
-                Organize future products, compare priorities, estimate required budget, and keep bought items in a clean history.
+              <p className="mt-2 text-xs leading-5 text-white/80 sm:text-sm sm:leading-6">
+                <span className="sm:hidden">Plan upcoming purchases and track what has been bought.</span>
+                <span className="hidden sm:inline">Organize future products, compare priorities, estimate required budget, and keep bought items in a clean history.</span>
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[380px]">
+            <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[380px]">
               <button
                 onClick={loadInitialData}
                 disabled={loading}
-                className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-bold text-white backdrop-blur transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60 sm:rounded-2xl sm:py-3 sm:text-sm"
               >
                 {loading ? "Refreshing..." : "Refresh"}
               </button>
               <button
                 onClick={openAddModal}
-                className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-indigo-700 shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl"
+                className="rounded-xl bg-white px-4 py-2.5 text-xs font-black text-indigo-700 shadow-lg transition hover:shadow-xl sm:rounded-2xl sm:py-3 sm:text-sm sm:hover:-translate-y-0.5"
               >
                 + Add Purchase
               </button>
@@ -1309,86 +1520,26 @@ export default function PlannedPurchases() {
               value={summary.activeCount}
               hint="Items waiting to be bought"
               tone="blue"
-              icon="🧾"
+              icon="cart"
             />
             <StatCard
               title="Bought Items"
               value={summary.boughtCount}
               hint={`Completed plan value: ${formatMoney(summary.boughtTotal)}`}
               tone="green"
-              icon="✅"
+              icon="check"
             />
             <StatCard
               title="Estimated Budget"
               value={formatMoney(summary.estimatedTotal)}
               hint={`${summary.highPriorityCount} high-priority item(s) in active list`}
               tone="purple"
-              icon="🎯"
+              icon="target"
             />
           </div>
         )}
 
-        {!loading && (
-          <div className="mb-6 grid gap-4 lg:grid-cols-3">
-            <div className="rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/75 lg:col-span-2">
-              <div className="mb-4 flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-black text-slate-950 dark:text-white">Priority & Payment Graph</h3>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Budget distribution from active planned items.</p>
-                </div>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                  Active only
-                </span>
-              </div>
 
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-4">
-                  <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Priority Budget</div>
-                  <ProgressRow label="High" value={summary.priorityBudget.high} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-rose-500 to-pink-400" />
-                  <ProgressRow label="Medium" value={summary.priorityBudget.medium} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-amber-500 to-yellow-400" />
-                  <ProgressRow label="Low" value={summary.priorityBudget.low} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-emerald-500 to-teal-400" />
-                </div>
-
-                <div className="space-y-4">
-                  <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Payment Budget</div>
-                  <ProgressRow label="Cash" value={summary.paymentBudget.cash} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-emerald-500 to-teal-400" />
-                  <ProgressRow label="EMI" value={summary.paymentBudget.emi} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-orange-500 to-amber-400" />
-                  <ProgressRow label="Either" value={summary.paymentBudget.either} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-sky-500 to-blue-400" />
-                  <ProgressRow label="Undecided" value={summary.paymentBudget.undecided} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-slate-500 to-slate-400" />
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/75">
-              <h3 className="text-lg font-black text-slate-950 dark:text-white">Plan Snapshot</h3>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Ownership and readiness indicators.</p>
-
-              <div className="mt-5 space-y-4">
-                <ProgressRow
-                  label="Shared Items"
-                  value={summary.sharedCount}
-                  total={Math.max(summary.activeCount, 1)}
-                  right={`${summary.sharedCount} item(s)`}
-                  barClass="bg-gradient-to-r from-blue-500 to-indigo-400"
-                />
-                <ProgressRow
-                  label="Personal Items"
-                  value={summary.personalCount}
-                  total={Math.max(summary.activeCount, 1)}
-                  right={`${summary.personalCount} item(s)`}
-                  barClass="bg-gradient-to-r from-purple-500 to-fuchsia-400"
-                />
-                <ProgressRow
-                  label="High Priority"
-                  value={summary.highPriorityCount}
-                  total={Math.max(summary.activeCount, 1)}
-                  right={`${summary.highPriorityCount} item(s)`}
-                  barClass="bg-gradient-to-r from-rose-500 to-pink-400"
-                />
-              </div>
-            </div>
-          </div>
-        )}
 
         <div className="mb-6 flex w-full rounded-3xl border border-white/70 bg-white/80 p-2 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/70 sm:w-fit">
           <button
@@ -1418,88 +1569,94 @@ export default function PlannedPurchases() {
 
         {activeTab === "active" ? (
           <div className="space-y-6">
-            <div className="rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/75 md:p-6">
-              <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <h3 className="text-lg font-black text-slate-950 dark:text-white">Search, Filter & Sort</h3>
-                  <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                    Drag reorder works only when sort is Manual and all filters are cleared.
-                  </p>
-                </div>
-
+            <div className="rounded-[1.5rem] border border-white/70 bg-white/85 p-3 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/75 sm:rounded-[2rem] sm:p-5 md:p-6">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <button
                   type="button"
-                  onClick={() => setFilters(initialFilters)}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
+                  onClick={() => setFilterOpen((value) => !value)}
+                  className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm font-black text-slate-900 transition hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 md:max-w-sm"
                 >
-                  Clear Filters {filterCount ? `(${filterCount})` : ""}
+                  <span>
+                    Search, Filter & Sort {filterCount ? `(${filterCount})` : ""}
+                  </span>
+                  <PremiumIcon name="chevron" className={`h-4 w-4 transition ${filterOpen ? "rotate-180" : ""}`} />
                 </button>
+
+                {filterOpen && (
+                  <button
+                    type="button"
+                    onClick={() => setFilters(initialFilters)}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    Clear Filters {filterCount ? `(${filterCount})` : ""}
+                  </button>
+                )}
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                <div className="xl:col-span-2">
-                  <FieldLabel>Search</FieldLabel>
-                  <input
-                    type="text"
-                    name="search"
-                    value={filters.search}
-                    onChange={handleFilterChange}
-                    placeholder="Search by name, brand, category, note, person"
-                    className={inputClass()}
-                  />
-                </div>
+              {filterOpen && (
+                <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                  <div className="xl:col-span-2">
+                    <FieldLabel>Search</FieldLabel>
+                    <input
+                      type="text"
+                      name="search"
+                      value={filters.search}
+                      onChange={handleFilterChange}
+                      placeholder="Search by name, brand, category, note, person"
+                      className={inputClass()}
+                    />
+                  </div>
 
-                <div>
-                  <FieldLabel>Priority</FieldLabel>
-                  <select name="priority" value={filters.priority} onChange={handleFilterChange} className={inputClass()}>
-                    <option value="all">All</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                  </select>
-                </div>
+                  <div>
+                    <FieldLabel>Priority</FieldLabel>
+                    <select name="priority" value={filters.priority} onChange={handleFilterChange} className={inputClass()}>
+                      <option value="all">All</option>
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                    </select>
+                  </div>
 
-                <div>
-                  <FieldLabel>Ownership</FieldLabel>
-                  <select name="ownershipType" value={filters.ownershipType} onChange={handleFilterChange} className={inputClass()}>
-                    <option value="all">All</option>
-                    <option value="shared">Shared</option>
-                    <option value="personal">Personal</option>
-                  </select>
-                </div>
+                  <div>
+                    <FieldLabel>Ownership</FieldLabel>
+                    <select name="ownershipType" value={filters.ownershipType} onChange={handleFilterChange} className={inputClass()}>
+                      <option value="all">All</option>
+                      <option value="shared">Shared</option>
+                      <option value="personal">Personal</option>
+                    </select>
+                  </div>
 
-                <div>
-                  <FieldLabel>Payment</FieldLabel>
-                  <select name="paymentMode" value={filters.paymentMode} onChange={handleFilterChange} className={inputClass()}>
-                    <option value="all">All</option>
-                    <option value="undecided">Undecided</option>
-                    <option value="cash">Cash</option>
-                    <option value="emi">EMI</option>
-                    <option value="either">Either</option>
-                  </select>
-                </div>
-              </div>
+                  <div>
+                    <FieldLabel>Payment</FieldLabel>
+                    <select name="paymentMode" value={filters.paymentMode} onChange={handleFilterChange} className={inputClass()}>
+                      <option value="all">All</option>
+                      <option value="undecided">Undecided</option>
+                      <option value="cash">Cash</option>
+                      <option value="emi">EMI</option>
+                      <option value="either">Either</option>
+                    </select>
+                  </div>
 
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <div>
-                  <FieldLabel>Sort By</FieldLabel>
-                  <select name="sortBy" value={filters.sortBy} onChange={handleFilterChange} className={inputClass()}>
-                    <option value="manual">Manual Order</option>
-                    <option value="latest">Latest Added</option>
-                    <option value="price-high">Price High to Low</option>
-                    <option value="price-low">Price Low to High</option>
-                    <option value="priority">Priority</option>
-                  </select>
+                  <div className="md:col-span-2 xl:col-span-1">
+                    <FieldLabel>Sort By</FieldLabel>
+                    <select name="sortBy" value={filters.sortBy} onChange={handleFilterChange} className={inputClass()}>
+                      <option value="manual">Manual Order</option>
+                      <option value="latest">Latest Added</option>
+                      <option value="price-high">Price High to Low</option>
+                      <option value="price-low">Price Low to High</option>
+                      <option value="priority">Priority</option>
+                    </select>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
-            <div className="rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/75 md:p-6">
+            <div className="rounded-[1.5rem] border border-white/70 bg-white/85 p-3 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/75 sm:rounded-[2rem] sm:p-5 md:p-6">
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
                   <h3 className="text-lg font-black text-slate-950 dark:text-white">Active Planned Items</h3>
-                  <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                    Organize by drag and drop when using manual order.
+                  <p className="mt-1 hidden text-sm leading-6 text-slate-500 dark:text-slate-400 sm:block">
+                    Drag reorder works on desktop. On mobile, use the up/down buttons.
                   </p>
                 </div>
 
@@ -1538,10 +1695,22 @@ export default function PlannedPurchases() {
                     strategy={verticalListSortingStrategy}
                   >
                     <div className="space-y-4">
-                      {filteredActiveItems.map((item) => (
+                      {filteredActiveItems.map((item, index) => (
                         <SortablePlannedItem
                           key={item._id}
                           item={item}
+                          index={index}
+                          total={filteredActiveItems.length}
+                          canMobileReorder={
+                            activeTab === "active" &&
+                            !filters.search &&
+                            filters.priority === "all" &&
+                            filters.ownershipType === "all" &&
+                            filters.paymentMode === "all" &&
+                            filters.sortBy === "manual"
+                          }
+                          reordering={reordering}
+                          onMoveMobile={movePlannedItem}
                           personalName={
                             item.ownershipType === "personal"
                               ? memberMap[item.personalForUserId]
@@ -1600,6 +1769,68 @@ export default function PlannedPurchases() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {!loading && (
+          <div className="mt-6 hidden gap-4 lg:grid lg:grid-cols-3">
+            <div className="rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/75 lg:col-span-2">
+              <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-black text-slate-950 dark:text-white">Priority & Payment Graph</h3>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Budget distribution from active planned items.</p>
+                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  Active only
+                </span>
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-4">
+                  <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Priority Budget</div>
+                  <ProgressRow label="High" value={summary.priorityBudget.high} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-rose-500 to-pink-400" />
+                  <ProgressRow label="Medium" value={summary.priorityBudget.medium} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-amber-500 to-yellow-400" />
+                  <ProgressRow label="Low" value={summary.priorityBudget.low} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-emerald-500 to-teal-400" />
+                </div>
+
+                <div className="space-y-4">
+                  <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Payment Budget</div>
+                  <ProgressRow label="Cash" value={summary.paymentBudget.cash} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-emerald-500 to-teal-400" />
+                  <ProgressRow label="EMI" value={summary.paymentBudget.emi} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-orange-500 to-amber-400" />
+                  <ProgressRow label="Either" value={summary.paymentBudget.either} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-sky-500 to-blue-400" />
+                  <ProgressRow label="Undecided" value={summary.paymentBudget.undecided} total={summary.estimatedTotal} barClass="bg-gradient-to-r from-slate-500 to-slate-400" />
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/75">
+              <h3 className="text-lg font-black text-slate-950 dark:text-white">Plan Snapshot</h3>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Ownership and readiness indicators.</p>
+
+              <div className="mt-5 space-y-4">
+                <ProgressRow
+                  label="Shared Items"
+                  value={summary.sharedCount}
+                  total={Math.max(summary.activeCount, 1)}
+                  right={`${summary.sharedCount} item(s)`}
+                  barClass="bg-gradient-to-r from-blue-500 to-indigo-400"
+                />
+                <ProgressRow
+                  label="Personal Items"
+                  value={summary.personalCount}
+                  total={Math.max(summary.activeCount, 1)}
+                  right={`${summary.personalCount} item(s)`}
+                  barClass="bg-gradient-to-r from-purple-500 to-fuchsia-400"
+                />
+                <ProgressRow
+                  label="High Priority"
+                  value={summary.highPriorityCount}
+                  total={Math.max(summary.activeCount, 1)}
+                  right={`${summary.highPriorityCount} item(s)`}
+                  barClass="bg-gradient-to-r from-rose-500 to-pink-400"
+                />
+              </div>
+            </div>
           </div>
         )}
       </div>

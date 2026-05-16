@@ -1045,17 +1045,9 @@ export default function Ledger() {
   const monthLabel = formatMonthLabel(month);
 
   return (
-    <AppLayout>
-      <div className="ledger-page">
-        <div className="min-h-[calc(100vh-7rem)] rounded-2xl bg-slate-100/70 p-2 text-slate-900 transition-colors dark:bg-slate-950 dark:text-white sm:rounded-[2rem] sm:p-3">
-          <div className="relative overflow-hidden rounded-2xl border border-white/70 bg-white/85 shadow-xl shadow-slate-200/60 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/80 dark:shadow-black/20 sm:rounded-[2rem]">
-            <div className="pointer-events-none absolute inset-0 overflow-hidden">
-              <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-fuchsia-400/15 blur-3xl" />
-              <div className="absolute right-0 top-8 h-80 w-80 rounded-full bg-sky-400/15 blur-3xl" />
-              <div className="absolute bottom-0 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-emerald-400/10 blur-3xl" />
-            </div>
-
-            <div className="relative p-3 sm:p-5 lg:p-7">
+<AppLayout>
+  <div className="ledger-page min-h-[calc(100vh-64px)] bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-white">
+    <div className="relative p-3 sm:p-5 lg:p-3">
               <section className="overflow-hidden rounded-2xl border border-white/60 bg-gradient-to-br from-slate-950 via-indigo-950 to-fuchsia-900 p-4 text-white shadow-xl shadow-violet-900/20 dark:border-white/10 sm:rounded-[1.75rem] sm:p-6">
                 <div className="relative z-10 grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
                   <div className="min-w-0">
@@ -1497,8 +1489,6 @@ export default function Ledger() {
                   </div>
                 )}
               </section>
-            </div>
-          </div>
         </div>
 
         <ConfirmModal

@@ -581,3 +581,441 @@ button {
     transform: none !important;
   }
 }
+
+
+/* ============================= */
+/* EMI page polish */
+/* ============================= */
+
+.emi-page {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.emi-page * {
+  box-sizing: border-box;
+}
+
+.emi-page section,
+.emi-page article,
+.emi-page div {
+  min-width: 0;
+}
+
+.emi-page input,
+.emi-page select,
+.emi-page textarea {
+  color-scheme: light;
+}
+
+.dark .emi-page input,
+.dark .emi-page select,
+.dark .emi-page textarea {
+  color-scheme: dark;
+}
+
+.emi-page select option {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.dark .emi-page select option {
+  background: #020617;
+  color: #f8fafc;
+}
+
+.emi-page input[type="month"],
+.emi-page input[type="date"] {
+  cursor: pointer;
+}
+
+.emi-page button {
+  touch-action: manipulation;
+}
+
+.emi-modal {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.emi-modal::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .emi-page {
+    font-size: 13px;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  .emi-page h1,
+  .emi-page h2 {
+    font-size: 1.45rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .emi-page h3,
+  .emi-page h4 {
+    font-size: 1rem !important;
+    line-height: 1.35 !important;
+  }
+
+  .emi-page .text-4xl {
+    font-size: 1.7rem !important;
+    line-height: 2rem !important;
+  }
+
+  .emi-page .text-3xl {
+    font-size: 1.45rem !important;
+    line-height: 1.85rem !important;
+  }
+
+  .emi-page .text-2xl {
+    font-size: 1.25rem !important;
+    line-height: 1.7rem !important;
+  }
+
+  .emi-page input,
+  .emi-page select,
+  .emi-page textarea,
+  .emi-page button {
+    font-size: 12px !important;
+  }
+
+  .emi-page input,
+  .emi-page select,
+  .emi-page textarea {
+    min-height: 40px;
+  }
+
+  .emi-page * {
+    max-width: 100%;
+  }
+
+  .emi-page article,
+  .emi-page .emi-plan-card {
+    width: 100%;
+    transform: none !important;
+  }
+
+  .emi-page article:hover,
+  .emi-page .emi-plan-card:hover {
+    transform: none !important;
+  }
+
+  .emi-page .emi-modal {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
+/* Sidebar fixed desktop + hidden scrollbar polish */
+.app-sidebar-shell {
+  height: 100vh;
+  max-height: 100vh;
+}
+
+.sidebar-no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sidebar-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.app-clean-shell,
+.app-clean-main {
+  overflow-x: hidden;
+}
+
+@media (min-width: 768px) {
+  .app-sidebar-shell {
+    position: sticky;
+    top: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .app-sidebar-shell {
+    width: 18rem;
+    max-width: 86vw;
+  }
+}
+
+/* ============================= */
+/* Loader dark/light mode polish */
+/* ============================= */
+
+.loader-card {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.dark .loader-card {
+  color-scheme: dark;
+}
+
+@media (max-width: 640px) {
+  .loader-card {
+    border-radius: 20px !important;
+    padding: 24px 16px !important;
+  }
+}
+
+/* ============================= */
+/* Savings page polish */
+/* ============================= */
+
+.savings-page {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.savings-page * {
+  box-sizing: border-box;
+}
+
+.savings-page section,
+.savings-page article,
+.savings-page div {
+  min-width: 0;
+}
+
+.savings-page input,
+.savings-page select,
+.savings-page textarea {
+  color-scheme: light;
+}
+
+.dark .savings-page input,
+.dark .savings-page select,
+.dark .savings-page textarea {
+  color-scheme: dark;
+}
+
+.savings-page select option {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.dark .savings-page select option {
+  background: #020617;
+  color: #f8fafc;
+}
+
+.savings-page input[type="month"],
+.savings-page input[type="date"] {
+  cursor: pointer;
+}
+
+.savings-page button {
+  touch-action: manipulation;
+}
+
+.savings-no-scrollbar,
+.savings-modal {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.savings-no-scrollbar::-webkit-scrollbar,
+.savings-modal::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .savings-page {
+    font-size: 13px;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  .savings-page h1,
+  .savings-page h2 {
+    font-size: 1.45rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .savings-page h3,
+  .savings-page h4 {
+    font-size: 1rem !important;
+    line-height: 1.35 !important;
+  }
+
+  .savings-page .text-4xl {
+    font-size: 1.7rem !important;
+    line-height: 2rem !important;
+  }
+
+  .savings-page .text-3xl {
+    font-size: 1.45rem !important;
+    line-height: 1.85rem !important;
+  }
+
+  .savings-page .text-2xl {
+    font-size: 1.25rem !important;
+    line-height: 1.7rem !important;
+  }
+
+  .savings-page input,
+  .savings-page select,
+  .savings-page textarea,
+  .savings-page button {
+    font-size: 12px !important;
+  }
+
+  .savings-page input,
+  .savings-page select,
+  .savings-page textarea {
+    min-height: 40px;
+  }
+
+  .savings-page * {
+    max-width: 100%;
+  }
+
+  .savings-page article,
+  .savings-page .savings-account-card {
+    width: 100%;
+    transform: none !important;
+  }
+
+  .savings-page article:hover,
+  .savings-page .savings-account-card:hover {
+    transform: none !important;
+  }
+
+  .savings-modal {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
+/* ============================= */
+/* Planned Purchases page polish */
+/* ============================= */
+
+.planned-page {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.planned-page *,
+.planned-page *::before,
+.planned-page *::after {
+  box-sizing: border-box;
+}
+
+.planned-page section,
+.planned-page article,
+.planned-page div,
+.planned-card {
+  min-width: 0;
+}
+
+.planned-page input,
+.planned-page select,
+.planned-page textarea {
+  color-scheme: light;
+}
+
+.dark .planned-page input,
+.dark .planned-page select,
+.dark .planned-page textarea {
+  color-scheme: dark;
+}
+
+.planned-page select option {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.dark .planned-page select option {
+  background: #020617;
+  color: #f8fafc;
+}
+
+.planned-modal-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.planned-modal-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .planned-page {
+    font-size: 13px;
+  }
+
+  .planned-page h1,
+  .planned-page h2 {
+    font-size: 1.45rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .planned-page h3,
+  .planned-page h4 {
+    font-size: 1rem !important;
+    line-height: 1.35 !important;
+  }
+
+  .planned-page .text-4xl {
+    font-size: 1.7rem !important;
+    line-height: 2rem !important;
+  }
+
+  .planned-page .text-3xl {
+    font-size: 1.45rem !important;
+    line-height: 1.85rem !important;
+  }
+
+  .planned-page .text-2xl {
+    font-size: 1.25rem !important;
+    line-height: 1.7rem !important;
+  }
+
+  .planned-page input,
+  .planned-page select,
+  .planned-page textarea,
+  .planned-page button {
+    font-size: 12px !important;
+  }
+
+  .planned-page input,
+  .planned-page select,
+  .planned-page textarea {
+    min-height: 40px;
+  }
+
+  .planned-page * {
+    max-width: 100%;
+  }
+
+  .planned-card,
+  .planned-page article,
+  .planned-page .group {
+    width: 100%;
+    transform: none !important;
+  }
+
+  .planned-card:hover,
+  .planned-page article:hover,
+  .planned-page .group:hover {
+    transform: none !important;
+  }
+
+  .planned-page .touch-pan-y {
+    touch-action: pan-y;
+  }
+}

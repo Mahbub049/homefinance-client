@@ -265,7 +265,7 @@ export default function Dashboard() {
 
   return (
     <AppLayout>
-      <div className="dashboard-page mx-auto w-full max-w-[1600px] px-0 pb-8 sm:px-1 lg:px-2">
+      <div className="dashboard-page mx-auto w-full px-0 pb-8 sm:px-1 lg:px-2">
         {/* Hero */}
         <div className="relative mb-4 overflow-hidden rounded-[1.5rem] border border-slate-800 bg-slate-950 p-4 text-white shadow-xl dark:border-slate-700 sm:mb-6 sm:rounded-[2rem] sm:p-6 lg:p-8">
           <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-cyan-400/25 blur-3xl sm:h-64 sm:w-64" />
