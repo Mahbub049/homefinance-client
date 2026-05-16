@@ -50,14 +50,30 @@ function FeaturePill({ children }) {
 
 function EyeIcon({ visible }) {
   return visible ? (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M3 3l18 18" />
       <path d="M10.6 10.6A2 2 0 0 0 12 14a2 2 0 0 0 1.4-.6" />
       <path d="M17.8 17.8A12.8 12.8 0 0 1 12 19C7 19 3.7 16.1 2 12c.8-1.9 2-3.5 3.6-4.7" />
       <path d="M9.9 5.2A11 11 0 0 1 12 5c5 0 8.3 2.9 10 7a12.2 12.2 0 0 1-2.2 3.4" />
     </svg>
   ) : (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
       <circle cx="12" cy="12" r="3" />
     </svg>
@@ -66,27 +82,50 @@ function EyeIcon({ visible }) {
 
 export default function Login() {
   const nav = useNavigate();
-  const [form, setForm] = useState({ email: "", password: "" });
+
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+  });
+
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const canSubmit = useMemo(
-    () => form.email.trim() && form.password.trim() && !loading,
-    [form.email, form.password, loading]
-  );
+  function handleChange(e) {
+    const { name, value } = e.target;
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  }
+
+  const canSubmit = useMemo(() => {
+    return form.email.trim() && form.password && !loading;
+  }, [form.email, form.password, loading]);
 
   async function submit(e) {
     e.preventDefault();
+
+    if (!canSubmit) return;
+
     setErr("");
     setLoading(true);
 
     try {
-      const res = await api.post("/api/auth/login", form);
+      const res = await api.post("/api/auth/login", {
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+      });
+
       setAuth(res.data.token, res.data.user);
       nav("/dashboard", { replace: true });
     } catch (e) {
-      setErr(e?.response?.data?.message || "Login failed. Please check your email and password.");
+      setErr(
+        e?.response?.data?.message ||
+          "Login failed. Please check your email and password."
+      );
     } finally {
       setLoading(false);
     }
@@ -116,7 +155,9 @@ export default function Login() {
               </h1>
 
               <p className="mt-6 max-w-xl text-lg leading-8 text-slate-300">
-                Control your money with a cleaner budget system. Track grocery, ledger entries, transfers, and family-wise wallet balances from one organized finance dashboard.
+                Control your money with a cleaner budget system. Track grocery,
+                ledger entries, transfers, and family-wise wallet balances from
+                one organized finance dashboard.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
@@ -133,12 +174,14 @@ export default function Login() {
                   note="Income, expenses and remaining balance stay connected."
                   className="absolute left-0 top-0 w-72"
                 />
+
                 <FloatingCard
                   title="Savings Goal"
                   value="32%"
                   note="Follow your progress with clear financial signals."
                   className="absolute left-72 top-12 w-72"
                 />
+
                 <FloatingCard
                   title="Settlement"
                   value="Balanced"
@@ -153,6 +196,7 @@ export default function Login() {
             <div className="w-full max-w-md">
               <div className="mb-6 flex flex-col items-center text-center lg:hidden">
                 <LogoMark />
+
                 <div className="mt-4 rounded-full border border-white/15 bg-white/[0.07] px-4 py-2 text-sm font-medium text-slate-200 backdrop-blur-xl">
                   Personal Budgeting App
                 </div>
@@ -168,8 +212,10 @@ export default function Login() {
                     <h2 className="text-3xl font-black tracking-[-0.04em] text-slate-950 dark:text-white">
                       Welcome back
                     </h2>
+
                     <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-                      Login to manage your HomeFinance ledger and budget insights.
+                      Login to manage your HomeFinance ledger and budget
+                      insights.
                     </p>
                   </div>
 
@@ -184,11 +230,17 @@ export default function Login() {
                       <label className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200">
                         Email Address
                       </label>
+
                       <input
                         type="email"
-                        placeholder="Enter your email"
+                        name="email"
                         value={form.email}
-                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        onChange={handleChange}
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        inputMode="email"
+                        placeholder="Enter your email"
                         required
                         className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
                       />
@@ -204,9 +256,13 @@ export default function Login() {
                       <div className="relative">
                         <input
                           type={showPassword ? "text" : "password"}
+                          name="password"
                           placeholder="Enter your password"
                           value={form.password}
-                          onChange={(e) => setForm({ ...form, password: e.target.value })}
+                          onChange={handleChange}
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          spellCheck={false}
                           required
                           className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 pr-16 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
                         />
@@ -228,7 +284,9 @@ export default function Login() {
                       className="group relative flex h-12 w-full items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 text-sm font-black text-white shadow-xl shadow-blue-900/25 transition hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-blue-900/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                     >
                       <span className="absolute inset-0 bg-white/20 opacity-0 transition group-hover:opacity-100" />
-                      <span className="relative">{loading ? "Logging in..." : "Login"}</span>
+                      <span className="relative">
+                        {loading ? "Logging in..." : "Login"}
+                      </span>
                     </button>
                   </form>
 
@@ -247,7 +305,8 @@ export default function Login() {
               </div>
 
               <p className="mt-5 text-center text-xs leading-5 text-slate-400">
-                Secure access for your personal budget, ledger, EMI and savings records.
+                Secure access for your personal budget, ledger, EMI and savings
+                records.
               </p>
             </div>
           </section>
