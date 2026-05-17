@@ -383,7 +383,7 @@ export default function Dashboard() {
         ) : (
           <>
             {/* Mobile KPI order: Income → Spend → Living */}
-            <div className="mb-4 grid gap-3 sm:hidden">
+            <div className="mb-4 grid grid-cols-2 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2 sm:hidden">
               <StatCard
                 title="Income"
                 value={income}
@@ -420,13 +420,13 @@ export default function Dashboard() {
               />
 
               <StatCard
-                title="Personal Finance Score"
+                title="Finance Score"
                 value={`${personalFinanceScore}/100`}
                 hint={
                   personalFinanceScore >= 75
-                    ? "Healthy financial position"
+                    ? "Healthy position"
                     : personalFinanceScore >= 50
-                      ? "Average, needs monitoring"
+                      ? "Needs monitoring"
                       : "Needs attention"
                 }
                 tone={personalFinanceScoreTone}
@@ -445,13 +445,13 @@ export default function Dashboard() {
         )}
 
         {loading && !summary ? (
-          <div className="mb-4 grid gap-3 sm:mb-6 md:grid-cols-3">
+          <div className="mb-4 grid grid-cols-2 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2 sm:mb-6 md:grid-cols-3 md:[&>*:last-child:nth-child(odd)]:col-span-1">
             <SkeletonCard />
             <SkeletonCard />
             <SkeletonCard />
           </div>
         ) : (
-          <div className="mb-4 grid gap-3 sm:mb-6 md:grid-cols-3">
+          <div className="mb-4 grid grid-cols-2 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2 sm:mb-6 md:grid-cols-3 md:[&>*:last-child:nth-child(odd)]:col-span-1">
             <StatCard
               title="Available"
               value={available}

@@ -1065,3 +1065,24 @@ button {
   opacity: 0;
   cursor: pointer;
 }
+
+@media (max-width: 640px) {
+  .app-modal-overlay {
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .app-modal-panel {
+    width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+
+  .grocery-modal-scroll {
+    scrollbar-width: none;
+  }
+
+  .grocery-modal-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}

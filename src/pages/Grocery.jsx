@@ -399,6 +399,7 @@ export default function Grocery() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [paidByFilter, setPaidByFilter] = useState("");
+  const [expandedTxnId, setExpandedTxnId] = useState(null);
 
   const [form, setForm] = useState({
     txnDate: new Date().toISOString().slice(0, 10),
@@ -1310,9 +1311,20 @@ export default function Grocery() {
                   Grocery tracker
                 </div>
 
-                <h2 className="text-[1.65rem] font-black tracking-tight sm:text-3xl lg:text-4xl">
-                  Grocery Transactions
-                </h2>
+                <div className="mt-2 flex items-center justify-between gap-3 sm:mt-0">
+                  <h2 className="min-w-0 text-[1.45rem] font-black tracking-tight sm:text-3xl lg:text-4xl">
+                    Grocery Transactions
+                  </h2>
+
+                  <button
+                    type="button"
+                    onClick={openModal}
+                    className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-white px-3 py-2 text-xs font-black text-emerald-700 shadow-lg shadow-slate-950/10 ring-1 ring-white/30 transition active:scale-95 dark:bg-white dark:text-emerald-700 sm:hidden"
+                  >
+                    <Icon name="plus" className="h-4 w-4" />
+                    Add
+                  </button>
+                </div>
 
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-50/90 sm:text-base">
                   Track receipt-wise grocery expenses, payable amount, accounts,
@@ -1407,7 +1419,7 @@ export default function Grocery() {
           )}
 
           {/* Stats */}
-          <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <section className="grid grid-cols-1 hidden md:grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div className="group rounded-[26px] border border-slate-200/70 bg-white p-5 shadow-[0_14px_35px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_22px_45px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900/70 dark:hover:border-emerald-400/25">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -1602,19 +1614,21 @@ export default function Grocery() {
                 {filteredTxns.map((t) => {
                   const splitType = t.split?.type || "equal";
 
+                  const isExpanded = expandedTxnId === t._id;
+
                   return (
                     <article
                       key={t._id}
                       className="p-4 transition duration-200 hover:bg-slate-50/80 dark:hover:bg-white/[0.03] sm:p-5"
                     >
-                      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-3">
-                            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-950 text-white shadow-lg shadow-slate-900/10 dark:bg-white dark:text-slate-950">
+                      <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-start">
+                        <div className="min-w-0">
+                          <div className="flex items-start gap-3">
+                            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-slate-950 text-white shadow-lg shadow-slate-900/10 dark:bg-white dark:text-slate-950">
                               <Icon name="bag" className="h-5 w-5" />
                             </div>
 
-                            <div className="min-w-0">
+                            <div className="min-w-0 flex-1">
                               <h4 className="truncate text-base font-black text-slate-950 dark:text-white sm:text-lg">
                                 {t.shopName || "Grocery Transaction"}
                               </h4>
@@ -1622,9 +1636,21 @@ export default function Grocery() {
                                 {toLocalYMD(t.txnDate)} • {t.location || "No location"}
                               </p>
                             </div>
+
+                            <div className="shrink-0 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-right dark:border-emerald-400/20 dark:bg-emerald-400/10 md:hidden">
+                              <div className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-200">
+                                Total
+                              </div>
+                              <div className="text-sm font-black text-slate-950 dark:text-white">
+                                {bdt(t.totalPayable)}
+                              </div>
+                            </div>
                           </div>
 
-                          <div className="mt-4 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
+                          <div
+                            className={`${isExpanded ? "grid" : "hidden"
+                              } mt-4 grid-cols-1 gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4 md:grid`}
+                          >
                             <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
                               <span className="block text-slate-400 dark:text-slate-500">
                                 Category
@@ -1666,8 +1692,8 @@ export default function Grocery() {
                           </div>
                         </div>
 
-                        <div className="flex flex-col gap-3 xl:items-end">
-                          <div className="rounded-[24px] border border-slate-200 bg-slate-950 px-5 py-4 text-white shadow-[0_18px_35px_rgba(15,23,42,0.16)] dark:border-emerald-400/20 dark:bg-slate-950/80 dark:text-white dark:shadow-[0_18px_35px_rgba(0,0,0,0.35)]">
+                        <div className="flex flex-col gap-2 md:items-end">
+                          <div className="hidden rounded-[24px] border border-slate-200 bg-slate-950 px-5 py-4 text-white shadow-[0_18px_35px_rgba(15,23,42,0.16)] dark:border-emerald-400/20 dark:bg-slate-950/80 dark:text-white dark:shadow-[0_18px_35px_rgba(0,0,0,0.35)] md:block">
                             <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-300 dark:text-emerald-200">
                               Total Payable
                             </div>
@@ -1676,7 +1702,7 @@ export default function Grocery() {
                             </div>
                           </div>
 
-                          <div className="flex flex-col gap-2 sm:flex-row xl:justify-end">
+                          <div className="grid grid-cols-2 gap-2 md:flex md:justify-end">
                             <button
                               onClick={() => openEditModal(t)}
                               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition duration-200 hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-200 dark:hover:border-white/20 dark:hover:bg-white/5"
@@ -1696,91 +1722,106 @@ export default function Grocery() {
                         </div>
                       </div>
 
-                      {/* Desktop table */}
-                      <div className="mt-5 hidden overflow-x-auto rounded-2xl border border-slate-100 dark:border-white/10 md:block">
-                        <table className="w-full min-w-[680px] text-sm">
-                          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/50 dark:text-slate-400">
-                            <tr className="text-left">
-                              <th className="p-3">Item</th>
-                              <th className="p-3">Qty</th>
-                              <th className="p-3">Unit</th>
-                              <th className="p-3">Unit Price</th>
-                              <th className="p-3 text-right">Line Total</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 dark:divide-white/10">
-                            {(t.items || []).map((it, idx) => (
-                              <tr key={it._id || idx}>
-                                <td className="p-3 font-bold text-slate-800 dark:text-slate-100">
-                                  {it.name}
-                                </td>
-                                <td className="p-3 text-slate-600 dark:text-slate-300">
-                                  {it.qty}
-                                </td>
-                                <td className="p-3 text-slate-600 dark:text-slate-300">
-                                  {it.unit}
-                                </td>
-                                <td className="p-3 text-slate-600 dark:text-slate-300">
-                                  {bdt(it.unitPrice)}
-                                </td>
-                                <td className="p-3 text-right font-black text-slate-950 dark:text-white">
-                                  {bdt(lineTotal(it))}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedTxnId(isExpanded ? null : t._id)}
+                        className="mt-4 flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-800 transition hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 md:hidden"
+                      >
+                        <span>{isExpanded ? "Hide details" : "View details"}</span>
+                        <ChevronDownIcon
+                          className={`h-4 w-4 transition duration-200 ${isExpanded ? "rotate-180" : ""
+                            }`}
+                        />
+                      </button>
 
-                      {/* Mobile cards */}
-                      <div className="mt-5 space-y-2 md:hidden">
-                        {(t.items || []).map((it, idx) => (
-                          <div
-                            key={it._id || idx}
-                            className="rounded-2xl border border-slate-100 bg-slate-50 p-3 dark:border-white/10 dark:bg-slate-950/40"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="font-black text-slate-900 dark:text-white">
-                                  {it.name}
+                      <div className={`${isExpanded ? "block" : "hidden"} md:block`}>
+                        <div className="mt-5 hidden overflow-x-auto rounded-2xl border border-slate-100 dark:border-white/10 md:block">
+                          <table className="w-full min-w-[680px] text-sm">
+                            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/50 dark:text-slate-400">
+                              <tr className="text-left">
+                                <th className="p-3">Item</th>
+                                <th className="p-3">Qty</th>
+                                <th className="p-3">Unit</th>
+                                <th className="p-3">Unit Price</th>
+                                <th className="p-3 text-right">Line Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-white/10">
+                              {(t.items || []).map((it, idx) => (
+                                <tr key={it._id || idx}>
+                                  <td className="p-3 font-bold text-slate-800 dark:text-slate-100">
+                                    {it.name}
+                                  </td>
+                                  <td className="p-3 text-slate-600 dark:text-slate-300">
+                                    {it.qty}
+                                  </td>
+                                  <td className="p-3 text-slate-600 dark:text-slate-300">
+                                    {it.unit}
+                                  </td>
+                                  <td className="p-3 text-slate-600 dark:text-slate-300">
+                                    {bdt(it.unitPrice)}
+                                  </td>
+                                  <td className="p-3 text-right font-black text-slate-950 dark:text-white">
+                                    {bdt(lineTotal(it))}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <div className="mt-4 space-y-2 md:hidden">
+                          {(t.items || []).map((it, idx) => (
+                            <div
+                              key={it._id || idx}
+                              className="rounded-2xl border border-slate-100 bg-slate-50 p-3 dark:border-white/10 dark:bg-slate-950/40"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="font-black text-slate-900 dark:text-white">
+                                    {it.name}
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                    {it.qty} {it.unit} × {bdt(it.unitPrice)}
+                                  </div>
                                 </div>
-                                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                  {it.qty} {it.unit} × {bdt(it.unitPrice)}
+                                <div className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-black text-slate-900 ring-1 ring-slate-200 dark:bg-white/10 dark:text-white dark:ring-white/10">
+                                  {bdt(lineTotal(it))}
                                 </div>
-                              </div>
-                              <div className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-black text-slate-900 ring-1 ring-slate-200 dark:bg-white/10 dark:text-white dark:ring-white/10">
-                                {bdt(lineTotal(it))}
                               </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
 
-                      <div className="mt-4 grid grid-cols-1 gap-2 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-4">
-                        <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
-                          Subtotal:{" "}
-                          <strong className="text-slate-800 dark:text-slate-100">
-                            {bdt(t.itemsSubtotal)}
-                          </strong>
-                        </div>
-                        <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
-                          Txn Discount:{" "}
-                          <strong className="text-slate-800 dark:text-slate-100">
-                            {bdt(t.discountTotal)}
-                          </strong>
-                        </div>
-                        <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
-                          Delivery:{" "}
-                          <strong className="text-slate-800 dark:text-slate-100">
-                            {bdt(t.deliveryFee)}
-                          </strong>
-                        </div>
-                        <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
-                          VAT:{" "}
-                          <strong className="text-slate-800 dark:text-slate-100">
-                            {bdt(t.vatAmount)}
-                          </strong>{" "}
-                          ({t.vatIncluded ? "included" : "added"})
+                        <div className="mt-4 grid grid-cols-1 gap-2 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-4">
+                          <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
+                            Subtotal:{" "}
+                            <strong className="text-slate-800 dark:text-slate-100">
+                              {bdt(t.itemsSubtotal)}
+                            </strong>
+                          </div>
+
+                          <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
+                            Txn Discount:{" "}
+                            <strong className="text-slate-800 dark:text-slate-100">
+                              {bdt(t.discountTotal)}
+                            </strong>
+                          </div>
+
+                          <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
+                            Delivery:{" "}
+                            <strong className="text-slate-800 dark:text-slate-100">
+                              {bdt(t.deliveryFee)}
+                            </strong>
+                          </div>
+
+                          <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
+                            VAT:{" "}
+                            <strong className="text-slate-800 dark:text-slate-100">
+                              {bdt(t.vatAmount)}
+                            </strong>{" "}
+                            ({t.vatIncluded ? "included" : "added"})
+                          </div>
                         </div>
                       </div>
                     </article>
@@ -1793,46 +1834,37 @@ export default function Grocery() {
 
         {open && (
           <div className="app-modal-overlay">
-            <div className="app-modal-panel grocery-modal-scroll max-h-[92vh] max-w-6xl overflow-y-auto rounded-[30px] border border-white/70 bg-white p-0 shadow-2xl dark:border-white/10 dark:bg-slate-950">
+            <div className="app-modal-panel grocery-modal-scroll max-h-[100dvh] max-w-6xl overflow-y-auto rounded-none border border-white/70 bg-white p-0 shadow-2xl dark:border-white/10 dark:bg-slate-950 sm:max-h-[92vh] sm:rounded-[30px]">
               {/* Modal Header */}
-              <div className="sticky top-0 z-20 overflow-hidden border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 sm:px-6">
+              <div className="sticky top-0 z-20 overflow-hidden border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 sm:px-6 sm:py-4">
                 <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-sky-400" />
 
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex gap-3">
-                    <div className="hidden h-12 w-12 shrink-0 place-items-center rounded-2xl bg-slate-950 text-white shadow-lg shadow-slate-900/10 dark:bg-white dark:text-slate-950 sm:grid">
-                      <Icon name="receipt" className="h-5 w-5" />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="mb-1 hidden rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200 sm:inline-flex">
+                      {isEditing ? "Update receipt" : "New receipt"}
                     </div>
 
-                    <div>
-                      <div className="mb-2 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
-                        {isEditing ? "Update receipt" : "New receipt"}
-                      </div>
+                    <h3 className="text-lg pt-2 pl-2 lg:pl-0 lg:pt-0 font-black text-slate-950 dark:text-white sm:text-xl">
+                      {isEditing ? "Edit Grocery Transaction" : "Add Grocery Transaction"}
+                    </h3>
 
-                      <h3 className="text-xl font-black text-slate-950 dark:text-white">
-                        {isEditing
-                          ? "Edit Grocery Transaction"
-                          : "Add Grocery Transaction"}
-                      </h3>
-
-                      <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
-                        Add receipt details, account source, item rows, payable total,
-                        and split type in one clean form.
-                      </p>
-                    </div>
+                    <p className="mt-1 hidden text-sm leading-5 text-slate-500 dark:text-slate-400 sm:block">
+                      Add receipt details, account source, item rows, payable total, and split type in one clean form.
+                    </p>
                   </div>
 
                   <button
                     onClick={closeModal}
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+                    aria-label="Close"
                   >
                     <Icon name="close" className="h-4 w-4" />
-                    Close
                   </button>
                 </div>
               </div>
 
-              <div className="p-5 dark:bg-slate-950 sm:p-6">
+              <div className="p-4 pb-5 dark:bg-slate-950 sm:p-6">
                 {/* Basic Info */}
                 <div className="mb-5 rounded-[26px] border border-slate-200/70 bg-slate-50/80 p-4 shadow-inner shadow-white/60 dark:border-white/10 dark:bg-white/[0.035] dark:shadow-none">
                   <div className="mb-4 flex items-center gap-3">
@@ -2403,21 +2435,21 @@ export default function Grocery() {
                 </div>
 
                 {/* Footer */}
-                <div className="sticky bottom-0 -mx-5 -mb-5 border-t border-slate-100 bg-white/95 px-5 py-4 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 sm:-mx-6 sm:-mb-6 sm:px-6">
-                  <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+                <div className="sticky bottom-0 z-30 -mx-4 -mb-5 border-t border-slate-100 bg-white/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 sm:-mx-6 sm:-mb-6 sm:px-6 sm:py-4">
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
                     <button
-                      onClick={closeModal}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 sm:w-auto"
+                      onClick={saveTxn}
+                      className="order-1 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-xs font-black text-white shadow-[0_14px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800 active:translate-y-0 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 sm:order-2 sm:w-auto sm:px-5 sm:text-sm"
                     >
-                      Cancel
+                      <Icon name="receipt" className="h-4 w-4" />
+                      {isEditing ? "Update" : "Save"}
                     </button>
 
                     <button
-                      onClick={saveTxn}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-[0_14px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800 active:translate-y-0 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 sm:w-auto"
+                      onClick={closeModal}
+                      className="order-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 sm:order-1 sm:w-auto sm:px-5 sm:text-sm"
                     >
-                      <Icon name="receipt" className="h-4 w-4" />
-                      {isEditing ? "Update Transaction" : "Save Transaction"}
+                      Cancel
                     </button>
                   </div>
 

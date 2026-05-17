@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { Capacitor } from "@capacitor/core";
+import { Filesystem, Directory } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
 import AppLayout from "../components/layout/AppLayout";
 import api from "../services/api";
 import { getUser } from "../services/authStorage";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import Loader from "../components/ui/Loader";
+
 
 function monthNow() {
   const d = new Date();
@@ -961,6 +965,68 @@ export default function Ledger() {
     return memberStats.reduce((s, x) => s + Number(x.remaining || 0), 0);
   }, [memberStats]);
 
+  async function savePdfToPhone(doc, fileName) {
+    const dataUri = doc.output("datauristring");
+    const base64Data = dataUri.split(",")[1];
+
+    if (!base64Data) {
+      throw new Error("PDF data generation failed");
+    }
+
+    const folderName = "HomeFinance";
+    const finalPath = `${folderName}/${fileName}`;
+
+    try {
+      await Filesystem.requestPermissions();
+    } catch {
+      // Permission prompt may not appear on newer Android versions.
+    }
+
+    try {
+      await Filesystem.mkdir({
+        path: folderName,
+        directory: Directory.Documents,
+        recursive: true,
+      });
+    } catch {
+      // Folder may already exist.
+    }
+
+    await Filesystem.writeFile({
+      path: finalPath,
+      data: base64Data,
+      directory: Directory.Documents,
+      recursive: true,
+    });
+
+    // Cache copy is for Android share/open dialog.
+    // Share plugin can share cache files by default.
+    await Filesystem.writeFile({
+      path: fileName,
+      data: base64Data,
+      directory: Directory.Cache,
+      recursive: true,
+    });
+
+    const cacheFile = await Filesystem.getUri({
+      path: fileName,
+      directory: Directory.Cache,
+    });
+
+    try {
+      await Share.share({
+        title: fileName,
+        text: `PDF saved to Documents/${finalPath}`,
+        files: [cacheFile.uri],
+        dialogTitle: "Open or share PDF",
+      });
+    } catch {
+      // User may close the share sheet.
+    }
+
+    return finalPath;
+  }
+
   async function exportTransactionsPdf() {
     try {
       const doc = new jsPDF("p", "mm", "a4");
@@ -1079,7 +1145,14 @@ export default function Ledger() {
         },
       });
 
-      doc.save(`Transactions_${month}.pdf`);
+      const fileName = `Transactions_${month}.pdf`;
+
+      if (Capacitor.isNativePlatform()) {
+        const savedPath = await savePdfToPhone(doc, fileName);
+        setMsg(`✅ PDF saved to Documents/${savedPath}`);
+      } else {
+        doc.save(fileName);
+      }
     } catch (error) {
       console.error(error);
       setMsg("PDF export failed");
@@ -1210,7 +1283,7 @@ export default function Ledger() {
             </PillButton>
           </section>
 
-          <section className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-5">
+          <section className="mt-4 grid grid-cols-2 gap-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:mt-5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-5 xl:[&>*:last-child:nth-child(odd)]:col-span-1">
             <MetricCard title="Income" value={money(totals.income)} tone="income" icon="wallet" />
             <MetricCard title="Expense" value={money(totals.expense)} tone="expense" icon="chart" />
             <MetricCard title="Remaining Expense" value={money(remainingExpense)} subtitle={`Expense - Fixed (${money(fixedExpenseTotal)})`} tone="neutral" icon="spark" />
@@ -1551,336 +1624,379 @@ export default function Ledger() {
         />
 
         {open && (
-          <div className="app-modal-overlay items-center overflow-hidden px-3 py-3 sm:px-4 sm:py-5">
-            <div className="app-modal-panel ledger-modal-panel flex w-[min(100%,48rem)] max-w-3xl max-h-[calc(100dvh-24px)] flex-col overflow-hidden rounded-[1.5rem] border-slate-200 bg-white p-0 shadow-2xl dark:border-white/10 dark:bg-slate-900 sm:max-h-[calc(100dvh-48px)] sm:rounded-[1.75rem]">
-              <div className="flex shrink-0 flex-col gap-3 border-b border-slate-100 px-4 py-3 dark:border-white/10 sm:flex-row sm:items-start sm:justify-between sm:px-5 sm:py-4">
-                <div>
-                  <h3 className="text-xl font-black text-slate-950 dark:text-white sm:text-2xl">{isEditing ? "Edit Transaction" : "Add Transaction"}</h3>
-                  <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm">
-                    Use <b>Transfer</b> for moving money between accounts. Expense entries support Personal, Equal, Ratio and Fixed split.
-                  </p>
+          <div className="app-modal-overlay items-stretch p-0 sm:items-center sm:px-4 sm:py-5">
+            <div className="app-modal-panel ledger-modal-panel flex h-[100dvh] w-full max-w-3xl flex-col overflow-hidden rounded-none border border-white/70 bg-white p-0 shadow-2xl dark:border-white/10 dark:bg-slate-950 sm:h-auto sm:max-h-[92vh] sm:rounded-[30px]">
+              {/* Modal Header */}
+              <div className="relative shrink-0 overflow-hidden border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 sm:px-6 sm:py-4">
+                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-fuchsia-500 via-violet-500 to-indigo-500" />
+
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="mb-1 hidden rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-violet-700 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-200 sm:inline-flex">
+                      {isEditing ? "Update ledger" : "New ledger"}
+                    </div>
+
+                    <h3 className="pt-1 text-lg font-black text-slate-950 dark:text-white sm:pt-0 sm:text-xl">
+                      {isEditing ? "Edit Transaction" : "Add Transaction"}
+                    </h3>
+
+                    <p className="mt-1 hidden text-sm leading-5 text-slate-500 dark:text-slate-400 sm:block">
+                      Use Transfer for moving money between accounts. Expense entries support Personal, Equal, Ratio and Fixed split.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-lg font-black leading-none text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"
-                >
-                  Close
-                </button>
               </div>
 
-              <div className="ledger-modal-scroll flex-1 overflow-y-auto px-4 py-3 sm:px-5 sm:py-4">
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 sm:gap-4">
-                  <div>
-                    <FieldLabel>Type</FieldLabel>
-                    <FieldSelect
-                      value={form.txType}
-                      onChange={(e) => {
-                        const nextType = e.target.value;
+              <div className="ledger-modal-scroll flex-1 overflow-y-auto bg-white p-4 pb-5 dark:bg-slate-950 sm:p-6">
+                <div className="rounded-[26px] border border-slate-200/70 bg-slate-50/80 p-4 shadow-inner shadow-white/60 dark:border-white/10 dark:bg-white/[0.035] dark:shadow-none">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-50 text-violet-700 ring-1 ring-violet-100 dark:bg-violet-400/10 dark:text-violet-200 dark:ring-violet-400/20">
+                      <Icon name="wallet" className="h-5 w-5" />
+                    </div>
 
-                        setForm({
-                          ...form,
-                          txType: nextType,
-                          categoryId: "",
-                          splitType: nextType === "expense" ? form.splitType : "personal",
-                        });
-                      }}
-                    >
-                      <option value="income">Income</option>
-                      <option value="expense">Expense</option>
-                      <option value="transfer">Transfer</option>
-                    </FieldSelect>
-                  </div>
-
-                  <div>
-                    <FieldLabel>Date</FieldLabel>
-                    <div className="relative">
-                      <FieldInput
-                        type="date"
-                        value={form.date}
-                        onChange={(e) => setForm({ ...form, date: e.target.value })}
-                        onClick={(e) => {
-                          try {
-                            e.currentTarget.showPicker?.();
-                          } catch {
-                            e.currentTarget.focus();
-                          }
-                        }}
-                        className="ledger-date-input cursor-pointer pr-10"
-                      />
-
-                      <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
-                        <Icon name="calendar" className="h-4 w-4" />
-                      </span>
+                    <div>
+                      <h4 className="text-base font-black text-slate-950 dark:text-white">
+                        Transaction Information
+                      </h4>
+                      <p className="hidden text-sm text-slate-500 dark:text-slate-400 sm:block">
+                        Keep the form compact and readable in both mobile and desktop.
+                      </p>
                     </div>
                   </div>
 
-                  {showCategory && (
-                    <div className="md:col-span-2">
-                      <FieldLabel>Category</FieldLabel>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 sm:gap-4">
+                    <div>
+                      <FieldLabel>Type</FieldLabel>
                       <FieldSelect
-                        value={form.categoryId}
-                        onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-                      >
-                        <option value="">Select category</option>
-
-                        {visibleCategoryList.map((c) => (
-                          <option key={c._id} value={c._id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </FieldSelect>
-                    </div>
-                  )}
-
-                  {form.txType === "expense" && (
-                    <div className="md:col-span-2">
-                      <FieldLabel>Paid By</FieldLabel>
-                      <FieldSelect
-                        value={form.paidByUserId}
+                        value={form.txType}
                         onChange={(e) => {
-                          const nextPaidBy = e.target.value;
-
-                          const availableAccounts = (accounts || []).filter((account) =>
-                            accountMatchesPaidBy(account, nextPaidBy)
-                          );
-
-                          const currentAccountStillValid = availableAccounts.some(
-                            (account) => String(account._id) === String(form.fromAccountId)
-                          );
+                          const nextType = e.target.value;
 
                           setForm({
                             ...form,
-                            paidByUserId: nextPaidBy,
-                            personalUserId:
-                              !form.personalUserId || form.personalUserId === form.paidByUserId
-                                ? nextPaidBy
-                                : form.personalUserId,
-                            fromAccountId: currentAccountStillValid
-                              ? form.fromAccountId
-                              : availableAccounts?.[0]?._id || "",
+                            txType: nextType,
+                            categoryId: "",
+                            splitType: nextType === "expense" ? form.splitType : "personal",
                           });
                         }}
                       >
-                        <option value="">Select member</option>
-                        {members.map((m) => (
-                          <option key={getId(m)} value={getId(m)}>
-                            {m.name}
-                          </option>
-                        ))}
+                        <option value="income">Income</option>
+                        <option value="expense">Expense</option>
+                        <option value="transfer">Transfer</option>
                       </FieldSelect>
                     </div>
-                  )}
 
-                  {showFrom && (
-                    <div className="md:col-span-2">
-                      <FieldLabel>From Account</FieldLabel>
-                      <FieldSelect
-                        value={form.fromAccountId}
-                        onChange={(e) => setForm({ ...form, fromAccountId: e.target.value })}
-                      >
-                        <option value="">Select account</option>
+                    <div>
+                      <FieldLabel>Date</FieldLabel>
+                      <div className="relative">
+                        <FieldInput
+                          type="date"
+                          value={form.date}
+                          onChange={(e) => setForm({ ...form, date: e.target.value })}
+                          onClick={(e) => {
+                            try {
+                              e.currentTarget.showPicker?.();
+                            } catch {
+                              e.currentTarget.focus();
+                            }
+                          }}
+                          className="ledger-date-input cursor-pointer pr-10"
+                        />
 
-                        {fromAccountOptions.map((a) => (
-                          <option key={a._id} value={a._id}>
-                            {a.name} 
-                          </option>
-                        ))}
-                      </FieldSelect>
-                    </div>
-                  )}
-
-                  {showTo && (
-                    <div className="md:col-span-2">
-                      <FieldLabel>To Account</FieldLabel>
-                      <FieldSelect
-                        value={form.toAccountId}
-                        onChange={(e) => setForm({ ...form, toAccountId: e.target.value })}
-                      >
-                        <option value="">Select account</option>
-                        {accounts.map((a) => (
-                          <option key={a._id} value={a._id}>
-                            {a.name} {a.owner ? `(${a.owner})` : ""}
-                          </option>
-                        ))}
-                      </FieldSelect>
-                    </div>
-                  )}
-
-                  {form.txType === "income" && (
-                    <div className="md:col-span-2">
-                      <FieldLabel>Received By</FieldLabel>
-                      <FieldSelect
-                        value={form.receivedByUserId}
-                        onChange={(e) =>
-                          setForm({ ...form, receivedByUserId: e.target.value })
-                        }
-                      >
-                        <option value="">Select member</option>
-                        {members.map((m) => (
-                          <option key={getId(m)} value={getId(m)}>
-                            {m.name}
-                          </option>
-                        ))}
-                      </FieldSelect>
-                    </div>
-                  )}
-
-                  <div className="md:col-span-2">
-                    <FieldLabel>Amount</FieldLabel>
-                    <FieldInput
-                      type="number"
-                      value={form.amount}
-                      onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                      placeholder="e.g., 5000"
-                    />
-                  </div>
-
-                  {form.txType === "expense" && (
-                    <div className="md:col-span-2 rounded-[1.25rem] border border-violet-100 bg-violet-50/70 p-3 dark:border-violet-500/20 dark:bg-violet-500/10 sm:rounded-[1.5rem] sm:p-4">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <div>
-                          <div className="font-black text-slate-950 dark:text-white">
-                            Split Details
-                          </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400">
-                            Select how this expense should affect personal remaining.
-                          </div>
-                        </div>
+                        <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
+                          <Icon name="calendar" className="h-4 w-4" />
+                        </span>
                       </div>
+                    </div>
 
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                        <div className="sm:col-span-2">
-                          <FieldLabel>Split Type</FieldLabel>
-                          <FieldSelect
-                            value={form.splitType}
-                            onChange={(e) => setForm({ ...form, splitType: e.target.value })}
-                          >
-                            <option value="personal">Personal</option>
-                            <option value="equal">Equal</option>
-                            <option value="ratio">Ratio</option>
-                            <option value="fixed">Fixed Amount</option>
-                          </FieldSelect>
+                    {showCategory && (
+                      <div className="md:col-span-2">
+                        <FieldLabel>Category</FieldLabel>
+                        <FieldSelect
+                          value={form.categoryId}
+                          onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+                        >
+                          <option value="">Select category</option>
+
+                          {visibleCategoryList.map((c) => (
+                            <option key={c._id} value={c._id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </FieldSelect>
+                      </div>
+                    )}
+
+                    {form.txType === "expense" && (
+                      <div className="md:col-span-2">
+                        <FieldLabel>Paid By</FieldLabel>
+                        <FieldSelect
+                          value={form.paidByUserId}
+                          onChange={(e) => {
+                            const nextPaidBy = e.target.value;
+
+                            const availableAccounts = (accounts || []).filter((account) =>
+                              accountMatchesPaidBy(account, nextPaidBy)
+                            );
+
+                            const currentAccountStillValid = availableAccounts.some(
+                              (account) => String(account._id) === String(form.fromAccountId)
+                            );
+
+                            setForm({
+                              ...form,
+                              paidByUserId: nextPaidBy,
+                              personalUserId:
+                                !form.personalUserId || form.personalUserId === form.paidByUserId
+                                  ? nextPaidBy
+                                  : form.personalUserId,
+                              fromAccountId: currentAccountStillValid
+                                ? form.fromAccountId
+                                : availableAccounts?.[0]?._id || "",
+                            });
+                          }}
+                        >
+                          <option value="">Select member</option>
+                          {members.map((m) => (
+                            <option key={getId(m)} value={getId(m)}>
+                              {m.name}
+                            </option>
+                          ))}
+                        </FieldSelect>
+                      </div>
+                    )}
+
+                    {showFrom && (
+                      <div className="md:col-span-2">
+                        <FieldLabel>From Account</FieldLabel>
+                        <FieldSelect
+                          value={form.fromAccountId}
+                          onChange={(e) => setForm({ ...form, fromAccountId: e.target.value })}
+                        >
+                          <option value="">Select account</option>
+
+                          {fromAccountOptions.map((a) => (
+                            <option key={a._id} value={a._id}>
+                              {a.name}
+                            </option>
+                          ))}
+                        </FieldSelect>
+                      </div>
+                    )}
+
+                    {showTo && (
+                      <div className="md:col-span-2">
+                        <FieldLabel>To Account</FieldLabel>
+                        <FieldSelect
+                          value={form.toAccountId}
+                          onChange={(e) => setForm({ ...form, toAccountId: e.target.value })}
+                        >
+                          <option value="">Select account</option>
+                          {accounts.map((a) => (
+                            <option key={a._id} value={a._id}>
+                              {a.name} {a.owner ? `(${a.owner})` : ""}
+                            </option>
+                          ))}
+                        </FieldSelect>
+                      </div>
+                    )}
+
+                    {form.txType === "income" && (
+                      <div className="md:col-span-2">
+                        <FieldLabel>Received By</FieldLabel>
+                        <FieldSelect
+                          value={form.receivedByUserId}
+                          onChange={(e) =>
+                            setForm({ ...form, receivedByUserId: e.target.value })
+                          }
+                        >
+                          <option value="">Select member</option>
+                          {members.map((m) => (
+                            <option key={getId(m)} value={getId(m)}>
+                              {m.name}
+                            </option>
+                          ))}
+                        </FieldSelect>
+                      </div>
+                    )}
+
+                    <div className="md:col-span-2">
+                      <FieldLabel>Amount</FieldLabel>
+                      <FieldInput
+                        type="number"
+                        value={form.amount}
+                        onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                        placeholder="e.g., 5000"
+                      />
+                    </div>
+
+                    {form.txType === "expense" && (
+                      <div className="md:col-span-2 rounded-[1.25rem] border border-violet-100 bg-violet-50/70 p-3 dark:border-violet-500/20 dark:bg-violet-500/10 sm:rounded-[1.5rem] sm:p-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <div>
+                            <div className="font-black text-slate-950 dark:text-white">
+                              Split Details
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                              Select how this expense should affect personal remaining.
+                            </div>
+                          </div>
                         </div>
 
-                        {form.splitType === "personal" && (
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                           <div className="sm:col-span-2">
-                            <FieldLabel>Personal For</FieldLabel>
+                            <FieldLabel>Split Type</FieldLabel>
                             <FieldSelect
-                              value={form.personalUserId}
-                              onChange={(e) =>
-                                setForm({ ...form, personalUserId: e.target.value })
-                              }
+                              value={form.splitType}
+                              onChange={(e) => setForm({ ...form, splitType: e.target.value })}
                             >
-                              <option value="">Select member</option>
-                              {members.map((m) => (
-                                <option key={getId(m)} value={getId(m)}>
-                                  {m.name}
-                                </option>
-                              ))}
+                              <option value="personal">Personal</option>
+                              <option value="equal">Equal</option>
+                              <option value="ratio">Ratio</option>
+                              <option value="fixed">Fixed Amount</option>
                             </FieldSelect>
                           </div>
-                        )}
 
-                        {form.splitType === "ratio" && otherMember && (
-                          <>
-                            <div>
-                              <FieldLabel>My %</FieldLabel>
-                              <FieldInput
-                                type="number"
-                                value={form.ratioMe}
+                          {form.splitType === "personal" && (
+                            <div className="sm:col-span-2">
+                              <FieldLabel>Personal For</FieldLabel>
+                              <FieldSelect
+                                value={form.personalUserId}
                                 onChange={(e) =>
-                                  setForm({ ...form, ratioMe: e.target.value })
+                                  setForm({ ...form, personalUserId: e.target.value })
                                 }
-                              />
+                              >
+                                <option value="">Select member</option>
+                                {members.map((m) => (
+                                  <option key={getId(m)} value={getId(m)}>
+                                    {m.name}
+                                  </option>
+                                ))}
+                              </FieldSelect>
                             </div>
+                          )}
 
-                            <div>
-                              <FieldLabel>{otherMember.name} %</FieldLabel>
-                              <FieldInput
-                                type="number"
-                                value={form.ratioOther}
-                                onChange={(e) =>
-                                  setForm({ ...form, ratioOther: e.target.value })
-                                }
-                              />
+                          {form.splitType === "ratio" && otherMember && (
+                            <>
+                              <div>
+                                <FieldLabel>My %</FieldLabel>
+                                <FieldInput
+                                  type="number"
+                                  value={form.ratioMe}
+                                  onChange={(e) =>
+                                    setForm({ ...form, ratioMe: e.target.value })
+                                  }
+                                />
+                              </div>
+
+                              <div>
+                                <FieldLabel>{otherMember.name} %</FieldLabel>
+                                <FieldInput
+                                  type="number"
+                                  value={form.ratioOther}
+                                  onChange={(e) =>
+                                    setForm({ ...form, ratioOther: e.target.value })
+                                  }
+                                />
+                              </div>
+
+                              <div className="sm:col-span-2 text-xs text-slate-500 dark:text-slate-400">
+                                Ratio total must be exactly 100.
+                              </div>
+                            </>
+                          )}
+
+                          {form.splitType === "fixed" && otherMember && (
+                            <>
+                              <div>
+                                <FieldLabel>My Amount</FieldLabel>
+                                <FieldInput
+                                  type="number"
+                                  value={form.fixedMe}
+                                  onChange={(e) =>
+                                    setForm({ ...form, fixedMe: e.target.value })
+                                  }
+                                  placeholder="e.g., 300"
+                                />
+                              </div>
+
+                              <div>
+                                <FieldLabel>{otherMember.name} Amount</FieldLabel>
+                                <FieldInput
+                                  type="number"
+                                  value={form.fixedOther}
+                                  onChange={(e) =>
+                                    setForm({ ...form, fixedOther: e.target.value })
+                                  }
+                                  placeholder="e.g., 200"
+                                />
+                              </div>
+
+                              <div className="sm:col-span-2 text-xs text-slate-500 dark:text-slate-400">
+                                Fixed amounts must be equal to the total expense amount.
+                              </div>
+                            </>
+                          )}
+
+                          {form.splitType === "equal" && (
+                            <div className="sm:col-span-2 rounded-2xl bg-white/80 p-3 text-xs leading-5 text-slate-500 dark:bg-white/5 dark:text-slate-400">
+                              The expense will be shared equally among all family members.
                             </div>
-
-                            <div className="sm:col-span-2 text-xs text-slate-500 dark:text-slate-400">
-                              Ratio total must be exactly 100.
-                            </div>
-                          </>
-                        )}
-
-                        {form.splitType === "fixed" && otherMember && (
-                          <>
-                            <div>
-                              <FieldLabel>My Amount</FieldLabel>
-                              <FieldInput
-                                type="number"
-                                value={form.fixedMe}
-                                onChange={(e) =>
-                                  setForm({ ...form, fixedMe: e.target.value })
-                                }
-                                placeholder="e.g., 300"
-                              />
-                            </div>
-
-                            <div>
-                              <FieldLabel>{otherMember.name} Amount</FieldLabel>
-                              <FieldInput
-                                type="number"
-                                value={form.fixedOther}
-                                onChange={(e) =>
-                                  setForm({ ...form, fixedOther: e.target.value })
-                                }
-                                placeholder="e.g., 200"
-                              />
-                            </div>
-
-                            <div className="sm:col-span-2 text-xs text-slate-500 dark:text-slate-400">
-                              Fixed amounts must be equal to the total expense amount.
-                            </div>
-                          </>
-                        )}
-
-                        {form.splitType === "equal" && (
-                          <div className="sm:col-span-2 rounded-2xl bg-white/80 p-3 text-xs leading-5 text-slate-500 dark:bg-white/5 dark:text-slate-400">
-                            The expense will be shared equally among all family members.
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
+                    )}
+
+                    <div className="md:col-span-2">
+                      <FieldLabel>Note</FieldLabel>
+                      <FieldInput
+                        value={form.note}
+                        onChange={(e) => setForm({ ...form, note: e.target.value })}
+                        placeholder={
+                          form.txType === "transfer"
+                            ? "e.g., DPS deposit"
+                            : "e.g., Electricity bill"
+                        }
+                      />
                     </div>
-                  )}
-
-                  <div className="md:col-span-2">
-                    <FieldLabel>Note</FieldLabel>
-                    <FieldInput
-                      value={form.note}
-                      onChange={(e) => setForm({ ...form, note: e.target.value })}
-                      placeholder={
-                        form.txType === "transfer"
-                          ? "e.g., DPS deposit"
-                          : "e.g., Electricity bill"
-                      }
-                    />
                   </div>
+
+                  {msg ? (
+                    <div className="mt-3 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 dark:bg-rose-500/10 dark:text-rose-200">
+                      {msg}
+                    </div>
+                  ) : null}
                 </div>
-
-                {msg ? (
-                  <div className="mt-3 rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 dark:bg-rose-500/10 dark:text-rose-200">
-                    {msg}
-                  </div>
-                ) : null}
               </div>
 
-              <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 px-4 py-3 dark:border-white/10 sm:flex-row sm:justify-end sm:px-5 sm:py-4">
-                <ActionButton onClick={closeModal} variant="soft">
-                  Cancel
-                </ActionButton>
-                <ActionButton onClick={saveTx} variant="warm">
-                  {isEditing ? "Update Transaction" : "Save Transaction"}
-                </ActionButton>
+              {/* Footer */}
+              <div className="shrink-0 border-t border-slate-100 bg-white/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 sm:px-6 sm:py-4">
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={saveTx}
+                    className="order-1 inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-xs font-black text-white shadow-[0_14px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800 active:translate-y-0 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 sm:order-2 sm:w-auto sm:px-5 sm:text-sm"
+                  >
+                    {isEditing ? "Update" : "Save"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="order-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 sm:order-1 sm:w-auto sm:px-5 sm:text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           </div>
