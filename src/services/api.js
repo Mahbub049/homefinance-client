@@ -3,7 +3,6 @@ import { getToken } from "./authStorage";
 
 const api = axios.create({
   baseURL: "https://homefinance-server.vercel.app",
-  timeout: 20000,
 });
 
 api.interceptors.request.use((config) => {

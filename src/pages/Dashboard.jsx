@@ -200,6 +200,35 @@ export default function Dashboard() {
 
   const savingsRatePct = clamp(Math.round(savingsRate));
 
+  const personalFinanceScore = useMemo(() => {
+    if (!income) return 0;
+
+    let score = 50;
+
+    if (finalBalance >= 0) score += 15;
+    else score -= 20;
+
+    if (savingsRate >= 20) score += 20;
+    else if (savingsRate >= 10) score += 10;
+    else score -= 10;
+
+    if (spendPct <= 70) score += 15;
+    else if (spendPct <= 90) score += 5;
+    else score -= 15;
+
+    if (debt > 0 && debt <= income * 0.3) score += 5;
+    else if (debt > income * 0.5) score -= 10;
+
+    return clamp(Math.round(score));
+  }, [income, finalBalance, savingsRate, spendPct, debt]);
+
+  const personalFinanceScoreTone =
+    personalFinanceScore >= 75
+      ? "positive"
+      : personalFinanceScore >= 50
+        ? "warning"
+        : "danger";
+
   const maxAbsSettlement = useMemo(() => {
     if (!settlement.length) return 1;
     return Math.max(...settlement.map((s) => Math.abs(safeNum(s.net))), 1);
@@ -274,7 +303,7 @@ export default function Dashboard() {
 
           <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-medium text-cyan-100 backdrop-blur sm:text-xs">
+              <div className="mb-3 inline-flex items-center hidden lg:inline-block gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-medium text-cyan-100 backdrop-blur sm:text-xs">
                 Personal Finance Control Center
               </div>
               <h1 className="text-2xl font-black tracking-tight sm:text-4xl lg:text-5xl">
@@ -310,10 +339,14 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="relative z-10 mt-5 grid gap-3 sm:mt-6 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="relative z-10 mt-5 hidden gap-3 sm:mt-6 sm:grid sm:grid-cols-2 xl:grid-cols-4">
             <HeroMetric label="Income" value={formatMoney(income)} sub="Total earning" />
             <HeroMetric label="Spend" value={formatMoney(spendTotal)} sub={`${spendPct}% of income`} />
-            <HeroMetric label="Final Balance" value={formatMoney(finalBalance)} sub={finalBalance >= 0 ? "Positive month" : "Needs attention"} />
+            <HeroMetric
+              label="Final Balance"
+              value={formatMoney(finalBalance)}
+              sub={finalBalance >= 0 ? "Positive month" : "Needs attention"}
+            />
             <HeroMetric label="Net Worth" value={formatMoney(netWorthValue)} sub={`as of ${month}`} />
           </div>
         </div>
@@ -328,19 +361,87 @@ export default function Dashboard() {
 
         {/* KPI Row */}
         {loading && !summary ? (
-          <div className="mb-4 grid gap-3 sm:mb-6 sm:grid-cols-2 xl:grid-cols-4">
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </div>
+          <>
+            {/* Mobile skeleton */}
+            <div className="mb-4 grid gap-3 sm:hidden">
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+
+            {/* Desktop skeleton */}
+            <div className="mb-4 hidden gap-3 sm:mb-6 sm:grid sm:grid-cols-2 xl:grid-cols-4">
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          </>
         ) : (
-          <div className="mb-4 grid gap-3 sm:mb-6 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard title="Income" value={income} hint="Total monthly income" tone="positive" />
-            <StatCard title="Living" value={living} hint="Daily and household spending" tone="danger" />
-            <StatCard title="EMI / Debt" value={debt} hint="Debt payments this month" tone="warning" />
-            <StatCard title="Investment" value={investment} hint="Savings and investments" tone="info" />
-          </div>
+          <>
+            {/* Mobile KPI order: Income → Spend → Living */}
+            <div className="mb-4 grid gap-3 sm:hidden">
+              <StatCard
+                title="Income"
+                value={income}
+                hint="Total monthly income"
+                tone="positive"
+              />
+
+              <StatCard
+                title="Spend"
+                value={spendTotal}
+                hint={`${spendPct}% of income`}
+                tone={spendPct > 90 ? "danger" : "warning"}
+              />
+
+              <StatCard
+                title="Living"
+                value={living}
+                hint="Daily and household spending"
+                tone="danger"
+              />
+
+              <StatCard
+                title="EMI / Debt"
+                value={debt}
+                hint="Debt payments this month"
+                tone="warning"
+              />
+
+              <StatCard
+                title="Investment"
+                value={investment}
+                hint="Savings and investments"
+                tone="info"
+              />
+
+              <StatCard
+                title="Personal Finance Score"
+                value={`${personalFinanceScore}/100`}
+                hint={
+                  personalFinanceScore >= 75
+                    ? "Healthy financial position"
+                    : personalFinanceScore >= 50
+                      ? "Average, needs monitoring"
+                      : "Needs attention"
+                }
+                tone={personalFinanceScoreTone}
+                isText
+              />
+            </div>
+
+            {/* Desktop KPI row unchanged */}
+            <div className="mb-4 hidden gap-3 sm:mb-6 sm:grid sm:grid-cols-2 xl:grid-cols-4">
+              <StatCard title="Income" value={income} hint="Total monthly income" tone="positive" />
+              <StatCard title="Living" value={living} hint="Daily and household spending" tone="danger" />
+              <StatCard title="EMI / Debt" value={debt} hint="Debt payments this month" tone="warning" />
+              <StatCard title="Investment" value={investment} hint="Savings and investments" tone="info" />
+            </div>
+          </>
         )}
 
         {loading && !summary ? (
