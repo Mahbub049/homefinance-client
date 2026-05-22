@@ -467,6 +467,75 @@ export default function Fixed() {
 
   const selectClass = classNames(inputClass, "cursor-pointer");
 
+  function isSavingAccount(account) {
+    const type = String(account?.type || "").trim().toLowerCase();
+    const name = String(account?.name || "").trim().toLowerCase();
+
+    return (
+      type === "saving" ||
+      type === "savings" ||
+      name.includes("saving")
+    );
+  }
+
+  function isNormalPaymentAccount(account) {
+    const type = String(account?.type || "").trim().toLowerCase();
+
+    return (
+      account?.isActive !== false &&
+      ["cash", "bank", "wallet"].includes(type) &&
+      !isSavingAccount(account)
+    );
+  }
+
+  function getOwnerFromMemberId(memberId) {
+    const member = (members || []).find((m) => getId(m) === getId(memberId));
+    const name = String(member?.name || "").trim().toLowerCase();
+
+    if (name.includes("mahbub")) return "Mahbub";
+    if (name.includes("mirza")) return "Mirza";
+
+    return "";
+  }
+
+  function accountBelongsToPayer(account, payerUserId) {
+    if (!payerUserId) return false;
+
+    const payerOwner = getOwnerFromMemberId(payerUserId);
+    const accountOwner = String(account?.owner || "").trim();
+
+    if (!payerOwner) return false;
+
+    return accountOwner === payerOwner;
+  }
+
+  function getPaymentAccountsForUser(userId) {
+    return (accounts || []).filter(
+      (account) =>
+        isNormalPaymentAccount(account) &&
+        accountBelongsToPayer(account, userId)
+    );
+  }
+
+  const paymentAccountOptions = useMemo(() => {
+    return getPaymentAccountsForUser(paymentForm.paidByUserId);
+  }, [accounts, members, paymentForm.paidByUserId]);
+
+  useEffect(() => {
+    if (!paymentOpen) return;
+
+    const selectedAccountStillValid = paymentAccountOptions.some(
+      (account) => getId(account._id) === getId(paymentForm.fromAccountId)
+    );
+
+    if (!selectedAccountStillValid) {
+      setPaymentForm((prev) => ({
+        ...prev,
+        fromAccountId: paymentAccountOptions?.[0]?._id || "",
+      }));
+    }
+  }, [paymentOpen, paymentAccountOptions, paymentForm.fromAccountId]);
+
   async function loadBasics() {
     const [mRes, exp, acc] = await Promise.all([
       api.get("/api/family/members"),
@@ -637,9 +706,12 @@ export default function Fixed() {
     setSelectedTemplate(template);
     setSelectedInstance(null);
 
+    const defaultPayer = members?.[0]?.id || "";
+    const availableAccounts = getPaymentAccountsForUser(defaultPayer);
+
     setPaymentForm({
-      paidByUserId: members?.[0]?.id || "",
-      fromAccountId: accounts?.[0]?._id || "",
+      paidByUserId: defaultPayer,
+      fromAccountId: availableAccounts?.[0]?._id || "",
       paymentDate: todayDate(),
       amount: template?.isVariable ? "" : String(template?.defaultAmount || ""),
       note: "",
@@ -654,11 +726,16 @@ export default function Fixed() {
     setSelectedTemplate(instance.templateId || null);
     setSelectedInstance(instance);
 
+    const defaultPayer = members?.[0]?.id || "";
+    const availableAccounts = getPaymentAccountsForUser(defaultPayer);
+
     setPaymentForm({
-      paidByUserId: members?.[0]?.id || "",
-      fromAccountId: accounts?.[0]?._id || "",
+      paidByUserId: defaultPayer,
+      fromAccountId: availableAccounts?.[0]?._id || "",
       paymentDate: todayDate(),
-      amount: instance?.templateId?.isVariable ? String(instance?.amount || "") : String(instance?.templateId?.defaultAmount || ""),
+      amount: instance?.templateId?.isVariable
+        ? String(instance?.amount || "")
+        : String(instance?.templateId?.defaultAmount || ""),
       note: instance?.note || "",
     });
 
@@ -671,9 +748,19 @@ export default function Fixed() {
     setSelectedTemplate(instance.templateId || null);
     setSelectedInstance(instance);
 
+    const defaultPayer = getId(instance?.paidByUserId) || members?.[0]?.id || "";
+    const availableAccounts = getPaymentAccountsForUser(defaultPayer);
+
+    const existingAccountId = getId(instance?.fromAccountId);
+    const existingAccountStillValid = availableAccounts.some(
+      (account) => getId(account._id) === getId(existingAccountId)
+    );
+
     setPaymentForm({
-      paidByUserId: getId(instance?.paidByUserId) || members?.[0]?.id || "",
-      fromAccountId: getId(instance?.fromAccountId) || accounts?.[0]?._id || "",
+      paidByUserId: defaultPayer,
+      fromAccountId: existingAccountStillValid
+        ? existingAccountId
+        : availableAccounts?.[0]?._id || "",
       paymentDate: toDateInput(instance?.date),
       amount: String(instance?.amount || instance?.templateId?.defaultAmount || ""),
       note: instance?.note || "",
@@ -1067,14 +1154,14 @@ export default function Fixed() {
                         </div>
 
                         <div className="relative mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3">
-                          <div className={classNames("rounded-xl border p-2.5 sm:rounded-2xl sm:p-3", dark ? "border-white/10 bg-slate-950/40" : "border-slate-100 bg-slate-50")}> 
+                          <div className={classNames("rounded-xl border p-2.5 sm:rounded-2xl sm:p-3", dark ? "border-white/10 bg-slate-950/40" : "border-slate-100 bg-slate-50")}>
                             <p className={classNames("text-xs font-semibold uppercase tracking-[0.14em]", dark ? "text-slate-500" : "text-slate-400")}>Default</p>
                             <p className={classNames("mt-1 text-lg font-black", dark ? "text-white" : "text-slate-950")}>
                               {t.isVariable ? "—" : money(t.defaultAmount)}
                             </p>
                           </div>
 
-                          <div className={classNames("rounded-xl border p-2.5 sm:rounded-2xl sm:p-3", dark ? "border-white/10 bg-slate-950/40" : "border-slate-100 bg-slate-50")}> 
+                          <div className={classNames("rounded-xl border p-2.5 sm:rounded-2xl sm:p-3", dark ? "border-white/10 bg-slate-950/40" : "border-slate-100 bg-slate-50")}>
                             <p className={classNames("text-xs font-semibold uppercase tracking-[0.14em]", dark ? "text-slate-500" : "text-slate-400")}>Split</p>
                             <div className="mt-1">
                               <Pill dark={dark} tone={splitTone(t.defaultSplitType)}>{splitLabel(t.defaultSplitType)}</Pill>
@@ -1149,15 +1236,15 @@ export default function Fixed() {
                           </div>
 
                           <div className="hidden gap-2 sm:grid sm:grid-cols-3 xl:grid-cols-3">
-                            <div className={classNames("rounded-2xl border px-3 py-2", dark ? "border-white/10 bg-slate-950/40" : "border-slate-100 bg-slate-50")}> 
+                            <div className={classNames("rounded-2xl border px-3 py-2", dark ? "border-white/10 bg-slate-950/40" : "border-slate-100 bg-slate-50")}>
                               <p className={classNames("text-[11px] font-bold uppercase tracking-[0.14em]", dark ? "text-slate-500" : "text-slate-400")}>Paid By</p>
                               <p className={classNames("mt-1 text-sm font-bold leading-5 break-words", dark ? "text-slate-200" : "text-slate-700")}>{i.paidByUserId?.name || "—"}</p>
                             </div>
-                            <div className={classNames("rounded-2xl border px-3 py-2", dark ? "border-white/10 bg-slate-950/40" : "border-slate-100 bg-slate-50")}> 
+                            <div className={classNames("rounded-2xl border px-3 py-2", dark ? "border-white/10 bg-slate-950/40" : "border-slate-100 bg-slate-50")}>
                               <p className={classNames("text-[11px] font-bold uppercase tracking-[0.14em]", dark ? "text-slate-500" : "text-slate-400")}>Account</p>
                               <p className={classNames("mt-1 text-sm font-bold leading-5 break-words", dark ? "text-slate-200" : "text-slate-700")}>{i.fromAccountId?.name || "—"}</p>
                             </div>
-                            <div className={classNames("rounded-2xl border px-3 py-2", dark ? "border-white/10 bg-slate-950/40" : "border-slate-100 bg-slate-50")}> 
+                            <div className={classNames("rounded-2xl border px-3 py-2", dark ? "border-white/10 bg-slate-950/40" : "border-slate-100 bg-slate-50")}>
                               <p className={classNames("text-[11px] font-bold uppercase tracking-[0.14em]", dark ? "text-slate-500" : "text-slate-400")}>Date</p>
                               <p className={classNames("mt-1 text-sm font-bold leading-5 break-words", dark ? "text-slate-200" : "text-slate-700")}>{prettyDate(i.date)}</p>
                             </div>
@@ -1380,7 +1467,16 @@ export default function Fixed() {
                     <select
                       className={selectClass}
                       value={paymentForm.paidByUserId}
-                      onChange={(e) => setPaymentForm({ ...paymentForm, paidByUserId: e.target.value })}
+                      onChange={(e) => {
+                        const nextPaidBy = e.target.value;
+                        const availableAccounts = getPaymentAccountsForUser(nextPaidBy);
+
+                        setPaymentForm({
+                          ...paymentForm,
+                          paidByUserId: nextPaidBy,
+                          fromAccountId: availableAccounts?.[0]?._id || "",
+                        });
+                      }}
                     >
                       <option value="">Select member</option>
                       {members.map((m) => (
@@ -1396,9 +1492,17 @@ export default function Fixed() {
                       onChange={(e) => setPaymentForm({ ...paymentForm, fromAccountId: e.target.value })}
                     >
                       <option value="">Select account</option>
-                      {accounts.map((a) => (
-                        <option key={a._id} value={a._id}>{a.name}</option>
-                      ))}
+                      {paymentAccountOptions.length === 0 ? (
+                        <option value="" disabled>
+                          No payable account found
+                        </option>
+                      ) : (
+                        paymentAccountOptions.map((a) => (
+                          <option key={a._id} value={a._id}>
+                            {a.name}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </Field>
 

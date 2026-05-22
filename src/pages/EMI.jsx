@@ -49,6 +49,15 @@ function normalizeId(v) {
   return String(v);
 }
 
+function ownerFromMemberName(name) {
+  const n = String(name || "").trim().toLowerCase();
+
+  if (n.includes("mahbub")) return "Mahbub";
+  if (n.includes("mirza")) return "Mirza";
+
+  return "";
+}
+
 function safeDate(dateLike) {
   if (!dateLike) return "-";
   const d = new Date(dateLike);
@@ -660,10 +669,65 @@ export default function EMI() {
     [members, myId]
   );
 
-  const payableAccounts = useMemo(
-    () => accounts.filter((a) => ["cash", "bank", "wallet"].includes(a.type)),
-    [accounts]
+  const selectedPayerOwner = useMemo(() => {
+    const payer = members.find(
+      (m) => normalizeId(m.id || m._id) === normalizeId(payForm.paidByUserId)
+    );
+
+    return ownerFromMemberName(payer?.name);
+  }, [members, payForm.paidByUserId]);
+
+  const payableAccounts = useMemo(() => {
+    return accounts.filter((account) => {
+      const type = String(account.type || "").trim().toLowerCase();
+      const owner = String(account.owner || "").trim();
+      const name = String(account.name || "").trim().toLowerCase();
+
+      const isNormalPaymentAccount = ["cash", "bank", "wallet"].includes(type);
+
+      const isSavingAccount =
+        type === "savings" ||
+        type === "saving" ||
+        name.includes("saving");
+
+      const belongsToSelectedPayer =
+        !selectedPayerOwner ||
+        owner === selectedPayerOwner ||
+        owner === "Joint";
+
+      return (
+        account.isActive !== false &&
+        isNormalPaymentAccount &&
+        !isSavingAccount &&
+        belongsToSelectedPayer
+      );
+    });
+  }, [accounts, selectedPayerOwner]);
+
+  useEffect(() => {
+  if (!payModalOpen) return;
+
+  if (payableAccounts.length === 0) {
+    if (payForm.fromAccountId) {
+      setPayForm((prev) => ({
+        ...prev,
+        fromAccountId: "",
+      }));
+    }
+    return;
+  }
+
+  const selectedAccountStillValid = payableAccounts.some(
+    (account) => normalizeId(account._id) === normalizeId(payForm.fromAccountId)
   );
+
+  if (!selectedAccountStillValid) {
+    setPayForm((prev) => ({
+      ...prev,
+      fromAccountId: payableAccounts[0]._id,
+    }));
+  }
+}, [payModalOpen, payableAccounts, payForm.fromAccountId]);
 
   function calcTotalPayable(originalPrice, emiChargePercent) {
     const op = toNum(originalPrice);
@@ -960,18 +1024,17 @@ export default function EMI() {
     }
   }
 
-  function openPayModalForInstallment(item) {
-    const defaultAccount = payableAccounts[0]?._id || "";
-    setSelectedInstallment(item);
-    setPayForm({
-      paidByUserId: myId || members[0]?.id || "",
-      fromAccountId: defaultAccount,
-      paidDate: item?.dueDate
-        ? new Date(item.dueDate).toISOString().slice(0, 10)
-        : today(),
-    });
-    setPayModalOpen(true);
-  }
+function openPayModalForInstallment(item) {
+  setSelectedInstallment(item);
+  setPayForm({
+    paidByUserId: myId || members[0]?.id || "",
+    fromAccountId: "",
+    paidDate: item?.dueDate
+      ? new Date(item.dueDate).toISOString().slice(0, 10)
+      : today(),
+  });
+  setPayModalOpen(true);
+}
 
   function closePayModal() {
     setPayModalOpen(false);
@@ -1283,7 +1346,7 @@ export default function EMI() {
                           </ActionButton>
                         ) : (
                           <ActionButton onClick={() => openPayModalForInstallment(i)} variant="success" className="w-full px-3">
-                            Paid
+                            Pay
                           </ActionButton>
                         )}
 
@@ -1339,22 +1402,29 @@ export default function EMI() {
                     </select>
                   </Field>
 
-                  <Field label="From which account" className="sm:col-span-2">
-                    <select
-                      className={inputClass()}
-                      value={payForm.fromAccountId}
-                      onChange={(e) =>
-                        setPayForm((p) => ({ ...p, fromAccountId: e.target.value }))
-                      }
-                    >
-                      <option value="">Select account</option>
-                      {payableAccounts.map((a) => (
-                        <option key={a._id} value={a._id}>
-                          {a.name} ({a.type})
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
+<Field label="From which account" className="sm:col-span-2">
+  <select
+    className={inputClass()}
+    value={payForm.fromAccountId}
+    onChange={(e) =>
+      setPayForm((p) => ({ ...p, fromAccountId: e.target.value }))
+    }
+  >
+    <option value="">Select account</option>
+
+    {payableAccounts.length === 0 ? (
+      <option value="" disabled>
+        No payable account found
+      </option>
+    ) : (
+      payableAccounts.map((a) => (
+        <option key={a._id} value={a._id}>
+          {a.name}
+        </option>
+      ))
+    )}
+  </select>
+</Field>
 
                   <Field label="Payment Date" className="sm:col-span-2">
                     <input

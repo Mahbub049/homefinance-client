@@ -21,6 +21,12 @@ function cx(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
+function getId(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return String(value._id || value.id || value.userId || "");
+}
+
 function money(n) {
   const v = Number(n || 0);
   return `৳ ${v.toLocaleString("en-BD", {
@@ -40,6 +46,21 @@ function monthLabel(value) {
   const date = new Date(Number(year), Number(month) - 1, 1);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+function shortMonthLabel(value) {
+  if (!value) return "-";
+  const [year, month] = String(value).split("-");
+  const date = new Date(Number(year), Number(month) - 1, 1);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+}
+
+function savingsRate(saved, totalBeforeSaving) {
+  const savedAmount = Number(saved || 0);
+  const total = Number(totalBeforeSaving || 0);
+  if (!total || total <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((savedAmount / total) * 100)));
 }
 
 function accountTypeLabel(type) {
@@ -295,12 +316,16 @@ function AccountCard({ account, totalBalance }) {
 export default function Savings() {
   const [month, setMonth] = useState(monthNow());
   const [allAccounts, setAllAccounts] = useState([]);
+  const [members, setMembers] = useState([]);
   const [overview, setOverview] = useState(null);
+  const [yearlySummary, setYearlySummary] = useState(null);
+  const [selectedYearlyMemberId, setSelectedYearlyMemberId] = useState("");
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({
+    paidByUserId: "",
     date: todayISO(),
     fromAccountId: "",
     toAccountId: "",
@@ -308,25 +333,87 @@ export default function Savings() {
     note: "",
   });
 
+  function ownerFromMemberId(memberId) {
+    const member = (members || []).find((m) => getId(m) === getId(memberId));
+    const name = String(member?.name || "").trim().toLowerCase();
+
+    if (name.includes("mahbub")) return "Mahbub";
+    if (name.includes("mirza")) return "Mirza";
+
+    return "";
+  }
+
+  function accountBelongsToUser(account, userId) {
+    if (!userId) return false;
+
+    const userOwner = ownerFromMemberId(userId);
+    const accountOwner = String(account?.owner || "").trim();
+
+    if (!userOwner) return false;
+
+    return accountOwner === userOwner;
+  }
+
+  function isNormalSourceAccount(account) {
+    const type = String(account?.type || "").trim().toLowerCase();
+
+    return (
+      account?.isActive !== false &&
+      ["cash", "bank", "wallet"].includes(type)
+    );
+  }
+
+  function isSavingsTargetAccount(account) {
+    const type = String(account?.type || "").trim().toLowerCase();
+
+    return (
+      account?.isActive !== false &&
+      ["savings", "investment"].includes(type)
+    );
+  }
+
+  function getSourceAccountsForUser(userId) {
+    return (allAccounts || []).filter(
+      (account) =>
+        isNormalSourceAccount(account) &&
+        accountBelongsToUser(account, userId)
+    );
+  }
+
+  function getSavingsAccountsForUser(userId) {
+    return (allAccounts || []).filter(
+      (account) =>
+        isSavingsTargetAccount(account) &&
+        accountBelongsToUser(account, userId)
+    );
+  }
+
   const savingsAccounts = useMemo(
-    () =>
-      allAccounts.filter(
-        (a) => ["savings", "investment"].includes(a.type) && a.isActive !== false
-      ),
+    () => (allAccounts || []).filter((account) => isSavingsTargetAccount(account)),
     [allAccounts]
   );
 
   const spendAccounts = useMemo(
-    () =>
-      allAccounts.filter(
-        (a) => !["savings", "investment"].includes(a.type) && a.isActive !== false
-      ),
+    () => (allAccounts || []).filter((account) => isNormalSourceAccount(account)),
     [allAccounts]
   );
+
+  const fromAccountOptions = useMemo(() => {
+    return getSourceAccountsForUser(form.paidByUserId);
+  }, [allAccounts, members, form.paidByUserId]);
+
+  const toAccountOptions = useMemo(() => {
+    return getSavingsAccountsForUser(form.paidByUserId);
+  }, [allAccounts, members, form.paidByUserId]);
 
   async function loadAccounts() {
     const res = await api.get("/api/accounts");
     setAllAccounts(res.data.items || []);
+  }
+
+  async function loadMembers() {
+    const res = await api.get("/api/family/members");
+    setMembers(res.data.members || []);
   }
 
   async function loadOverview(m) {
@@ -334,11 +421,32 @@ export default function Savings() {
     setOverview(res.data);
   }
 
+
+  async function loadYearlySummary(m) {
+    const res = await api.get("/api/savings/yearly-summary", {
+      params: { endMonth: m },
+    });
+
+    const data = res.data || {};
+    const returnedMembers = data.members || [];
+
+    setYearlySummary(data);
+
+    const firstMemberId = returnedMembers?.[0]?.id || "";
+
+    setSelectedYearlyMemberId((prev) => {
+      const stillExists = returnedMembers.some(
+        (member) => getId(member.id) === getId(prev)
+      );
+
+      return stillExists ? prev : firstMemberId;
+    });
+  }
+
   async function loadAll() {
     setLoading(true);
     try {
-      await loadAccounts();
-      await loadOverview(month);
+      await Promise.all([loadMembers(), loadAccounts(), loadOverview(month), loadYearlySummary(month)]);
     } catch (e) {
       toast.error(e?.response?.data?.message || "Failed to load savings");
     } finally {
@@ -354,7 +462,7 @@ export default function Savings() {
   useEffect(() => {
     (async () => {
       try {
-        await loadOverview(month);
+        await Promise.all([loadOverview(month), loadYearlySummary(month)]);
       } catch (e) {
         toast.error(e?.response?.data?.message || "Failed to load overview");
       }
@@ -363,10 +471,12 @@ export default function Savings() {
   }, [month]);
 
   function openDeposit() {
-    const from = spendAccounts?.[0]?._id || "";
-    const to = savingsAccounts?.[0]?._id || "";
+    const defaultUser = getId(members?.[0]) || "";
+    const from = getSourceAccountsForUser(defaultUser)?.[0]?._id || "";
+    const to = getSavingsAccountsForUser(defaultUser)?.[0]?._id || "";
 
     setForm({
+      paidByUserId: defaultUser,
       date: todayISO(),
       fromAccountId: from,
       toAccountId: to,
@@ -379,6 +489,11 @@ export default function Savings() {
 
   async function saveDeposit() {
     try {
+      if (!form.paidByUserId) {
+        toast.error("Select user");
+        return;
+      }
+
       if (!form.fromAccountId || !form.toAccountId) {
         toast.error("Select From and To accounts");
         return;
@@ -391,6 +506,7 @@ export default function Savings() {
       }
 
       await api.post("/api/savings/deposit", {
+        paidByUserId: form.paidByUserId,
         date: form.date,
         fromAccountId: form.fromAccountId,
         toAccountId: form.toAccountId,
@@ -400,8 +516,7 @@ export default function Savings() {
 
       toast.success("Saved as Transfer ✅");
       setModalOpen(false);
-      await loadOverview(month);
-      await loadAccounts();
+      await Promise.all([loadOverview(month), loadYearlySummary(month), loadAccounts()]);
     } catch (e) {
       toast.error(e?.response?.data?.message || "Save failed");
     }
@@ -427,6 +542,36 @@ export default function Savings() {
   }, [list, search]);
 
   const totalSavingsAccounts = list.length;
+
+  const yearlyMembers = yearlySummary?.members || [];
+
+  const selectedYearlyMember = useMemo(() => {
+    if (!yearlyMembers.length) return null;
+    return (
+      yearlyMembers.find((member) => getId(member.id) === getId(selectedYearlyMemberId)) ||
+      yearlyMembers[0]
+    );
+  }, [yearlyMembers, selectedYearlyMemberId]);
+
+  const selectedYearlyTotal =
+    selectedYearlyMember?.totalCashSaved ?? selectedYearlyMember?.totalSaved ?? 0;
+
+  const selectedYearlyMonths = selectedYearlyMember?.months || [];
+
+  const selectedMonthSummary =
+    selectedYearlyMonths.find((item) => item.month === month) ||
+    selectedYearlyMonths[selectedYearlyMonths.length - 1] ||
+    null;
+
+  const selectedMonthIncome = Number(selectedMonthSummary?.income || 0);
+  const selectedMonthExpense = Number(selectedMonthSummary?.expense || 0);
+  const selectedMonthTransferNet = Number(selectedMonthSummary?.transferNet || 0);
+  const selectedMonthCashSaved = Number(
+    selectedMonthSummary?.monthlySaved ?? selectedMonthSummary?.netSaved ?? 0
+  );
+  const selectedMonthCumulative = Number(
+    selectedMonthSummary?.cumulativeSaved ?? selectedYearlyTotal ?? 0
+  );
 
   return (
     <AppLayout>
@@ -644,8 +789,211 @@ export default function Savings() {
                   </div>
                 )}
               </section>
+
+              {/* Individual last 12 months cash savings */}
+              <section className="rounded-[1.5rem] border border-slate-200 bg-white/90 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:rounded-3xl sm:p-5">
+                <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="text-lg font-black text-slate-950 dark:text-white">
+                      Individual Cash Savings History
+                    </div>
+                    <div className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm">
+                      Monthly cash saved = income − expense ± transfer adjustment. Negative months reduce the total saved amount.
+                    </div>
+                  </div>
+
+                  <div className="w-full lg:w-72">
+                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+                      View Member
+                    </label>
+                    <select
+                      className={inputClass()}
+                      value={selectedYearlyMember?.id || selectedYearlyMemberId}
+                      onChange={(e) => setSelectedYearlyMemberId(e.target.value)}
+                    >
+                      {yearlyMembers.length === 0 ? (
+                        <option value="">No member found</option>
+                      ) : (
+                        yearlyMembers.map((member) => (
+                          <option key={member.id} value={member.id}>
+                            {member.name}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                </div>
+
+                {!selectedYearlyMember ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-400">
+                    No cash savings history found yet.
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 dark:border-emerald-400/20 dark:bg-emerald-400/10">
+                        <div className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-200">
+                          Total Cash Saved
+                        </div>
+                        <div className="mt-2 text-2xl font-black text-emerald-950 dark:text-emerald-100">
+                          {money(selectedYearlyTotal)}
+                        </div>
+                        <div className="mt-1 text-xs text-emerald-800 dark:text-emerald-100/80">
+                          Last 12 months • {selectedYearlyMember.name}
+                        </div>
+                      </div>
+
+                      <div
+                        className={cx(
+                          "rounded-2xl border p-4",
+                          selectedMonthCashSaved >= 0
+                            ? "border-sky-100 bg-sky-50 dark:border-sky-400/20 dark:bg-sky-400/10"
+                            : "border-rose-100 bg-rose-50 dark:border-rose-400/20 dark:bg-rose-400/10"
+                        )}
+                      >
+                        <div
+                          className={cx(
+                            "text-xs font-bold uppercase tracking-[0.16em]",
+                            selectedMonthCashSaved >= 0
+                              ? "text-sky-700 dark:text-sky-200"
+                              : "text-rose-700 dark:text-rose-200"
+                          )}
+                        >
+                          Selected Month Saved
+                        </div>
+                        <div
+                          className={cx(
+                            "mt-2 text-2xl font-black",
+                            selectedMonthCashSaved >= 0
+                              ? "text-sky-950 dark:text-sky-100"
+                              : "text-rose-950 dark:text-rose-100"
+                          )}
+                        >
+                          {money(selectedMonthCashSaved)}
+                        </div>
+                        <div
+                          className={cx(
+                            "mt-1 text-xs",
+                            selectedMonthCashSaved >= 0
+                              ? "text-sky-800 dark:text-sky-100/80"
+                              : "text-rose-800 dark:text-rose-100/80"
+                          )}
+                        >
+                          {monthLabel(selectedMonthSummary?.month || month)}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4 dark:border-violet-400/20 dark:bg-violet-400/10">
+                        <div className="text-xs font-bold uppercase tracking-[0.16em] text-violet-700 dark:text-violet-200">
+                          Monthly Income
+                        </div>
+                        <div className="mt-2 text-2xl font-black text-violet-950 dark:text-violet-100">
+                          {money(selectedMonthIncome)}
+                        </div>
+                        <div className="mt-1 text-xs text-violet-800 dark:text-violet-100/80">
+                          Income share for this member
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 dark:border-amber-400/20 dark:bg-amber-400/10">
+                        <div className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-200">
+                          Monthly Expense
+                        </div>
+                        <div className="mt-2 text-2xl font-black text-amber-950 dark:text-amber-100">
+                          {money(selectedMonthExpense)}
+                        </div>
+                        <div className="mt-1 text-xs text-amber-800 dark:text-amber-100/80">
+                          Transfer net: {money(selectedMonthTransferNet)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10">
+                      <div className="savings-no-scrollbar overflow-x-auto">
+                        <table className="w-full min-w-[860px] text-sm">
+                          <thead className="bg-slate-50 dark:bg-slate-950/60">
+                            <tr className="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                              <th className="p-3">Month</th>
+                              <th className="p-3 text-right">Income</th>
+                              <th className="p-3 text-right">Expense</th>
+                              <th className="p-3 text-right">Transfer Net</th>
+                              <th className="p-3 text-right">Monthly Saved</th>
+                              <th className="p-3 text-right">Total Saved</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedYearlyMonths.map((item) => {
+                              const monthlySaved = Number(item.monthlySaved ?? item.netSaved ?? 0);
+                              const cumulativeSaved = Number(item.cumulativeSaved ?? 0);
+                              const transferNet = Number(item.transferNet ?? 0);
+
+                              return (
+                                <tr
+                                  key={item.month}
+                                  className={cx(
+                                    "border-t border-slate-100 transition dark:border-white/10",
+                                    item.month === month
+                                      ? "bg-emerald-50/70 dark:bg-emerald-400/10"
+                                      : "hover:bg-slate-50 dark:hover:bg-white/[0.03]"
+                                  )}
+                                >
+                                  <td className="p-3 font-bold text-slate-950 dark:text-white">
+                                    {shortMonthLabel(item.month)}
+                                  </td>
+
+                                  <td className="p-3 text-right font-bold text-emerald-700 dark:text-emerald-300">
+                                    {money(item.income)}
+                                  </td>
+
+                                  <td className="p-3 text-right font-bold text-rose-700 dark:text-rose-300">
+                                    {money(item.expense)}
+                                  </td>
+
+                                  <td
+                                    className={cx(
+                                      "p-3 text-right font-bold",
+                                      transferNet >= 0
+                                        ? "text-sky-700 dark:text-sky-300"
+                                        : "text-orange-700 dark:text-orange-300"
+                                    )}
+                                  >
+                                    {money(transferNet)}
+                                  </td>
+
+                                  <td
+                                    className={cx(
+                                      "p-3 text-right font-black",
+                                      monthlySaved >= 0
+                                        ? "text-emerald-700 dark:text-emerald-300"
+                                        : "text-rose-700 dark:text-rose-300"
+                                    )}
+                                  >
+                                    {money(monthlySaved)}
+                                  </td>
+
+                                  <td
+                                    className={cx(
+                                      "p-3 text-right font-black",
+                                      cumulativeSaved >= 0
+                                        ? "text-amber-700 dark:text-amber-300"
+                                        : "text-rose-700 dark:text-rose-300"
+                                    )}
+                                  >
+                                    {money(cumulativeSaved)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </section>
             </>
           )}
+
 
           {/* Deposit modal */}
           {modalOpen && (
@@ -666,6 +1014,32 @@ export default function Savings() {
 
                 <div className="p-4 sm:p-6">
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Field label="User" className="sm:col-span-2">
+                      <select
+                        className={inputClass()}
+                        value={form.paidByUserId}
+                        onChange={(e) => {
+                          const nextUserId = e.target.value;
+                          const nextFromAccount = getSourceAccountsForUser(nextUserId)?.[0]?._id || "";
+                          const nextToAccount = getSavingsAccountsForUser(nextUserId)?.[0]?._id || "";
+
+                          setForm((p) => ({
+                            ...p,
+                            paidByUserId: nextUserId,
+                            fromAccountId: nextFromAccount,
+                            toAccountId: nextToAccount,
+                          }));
+                        }}
+                      >
+                        <option value="">Select user</option>
+                        {members.map((m) => (
+                          <option key={getId(m)} value={getId(m)}>
+                            {m.name}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+
                     <Field label="Date">
                       <input
                         type="date"
@@ -694,11 +1068,17 @@ export default function Savings() {
                         onChange={(e) => setForm((p) => ({ ...p, fromAccountId: e.target.value }))}
                       >
                         <option value="">Select source account</option>
-                        {spendAccounts.map((a) => (
-                          <option key={a._id} value={a._id}>
-                            {a.name} ({accountTypeLabel(a.type)})
+                        {fromAccountOptions.length === 0 ? (
+                          <option value="" disabled>
+                            No source account found
                           </option>
-                        ))}
+                        ) : (
+                          fromAccountOptions.map((a) => (
+                            <option key={a._id} value={a._id}>
+                              {a.name}
+                            </option>
+                          ))
+                        )}
                       </select>
                       <div className="mt-1.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
                         This account balance will be reduced because money is being moved out.
@@ -712,11 +1092,17 @@ export default function Savings() {
                         onChange={(e) => setForm((p) => ({ ...p, toAccountId: e.target.value }))}
                       >
                         <option value="">Select destination account</option>
-                        {savingsAccounts.map((a) => (
-                          <option key={a._id} value={a._id}>
-                            {a.name} ({accountTypeLabel(a.type)})
+                        {toAccountOptions.length === 0 ? (
+                          <option value="" disabled>
+                            No savings account found
                           </option>
-                        ))}
+                        ) : (
+                          toAccountOptions.map((a) => (
+                            <option key={a._id} value={a._id}>
+                              {a.name}
+                            </option>
+                          ))
+                        )}
                       </select>
                       <div className="mt-1.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
                         This account balance will be increased as your saved amount.
@@ -753,7 +1139,12 @@ export default function Savings() {
                     <button
                       onClick={saveDeposit}
                       className="w-full rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2.5 text-sm font-black text-white shadow-lg transition hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 lg:hover:-translate-y-0.5 sm:w-auto"
-                      disabled={!form.fromAccountId || !form.toAccountId || !String(form.amount).trim()}
+                      disabled={
+                        !form.paidByUserId ||
+                        !form.fromAccountId ||
+                        !form.toAccountId ||
+                        !String(form.amount).trim()
+                      }
                     >
                       Save Transfer
                     </button>

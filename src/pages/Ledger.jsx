@@ -553,12 +553,41 @@ export default function Ledger() {
     );
   }, [form.txType, incomeCats, expenseCats]);
 
+  function isSavingsAccount(account) {
+    const type = String(account?.type || "").trim().toLowerCase();
+    const name = String(account?.name || "").trim().toLowerCase();
+
+    return (
+      type === "saving" ||
+      type === "savings" ||
+      name.includes("saving")
+    );
+  }
+
+  function isNormalPaymentAccount(account) {
+    const type = String(account?.type || "").trim().toLowerCase();
+
+    return (
+      account?.isActive !== false &&
+      ["cash", "bank", "wallet"].includes(type) &&
+      !isSavingsAccount(account)
+    );
+  }
+
+  function accountLabel(account) {
+    if (!account) return "";
+
+    const name = account.name || "Account";
+    const owner = account.owner ? ` (${account.owner})` : "";
+
+    return `${name}${owner}`;
+  }
+
   function accountMatchesPaidBy(account, paidByUserId) {
     if (!paidByUserId) return true;
 
     const owner = String(account?.owner || "").trim().toLowerCase();
 
-    // Joint/shared accounts will still show for everyone
     if (!owner) return true;
     if (["joint", "shared", "family"].includes(owner)) return true;
 
@@ -576,30 +605,64 @@ export default function Ledger() {
     );
   }
 
-  const fromAccountOptions = useMemo(() => {
-    if (form.txType !== "expense") return accounts;
-
-    return (accounts || []).filter((account) =>
-      accountMatchesPaidBy(account, form.paidByUserId)
+  function getNormalAccountsForMember(memberId) {
+    return (accounts || []).filter(
+      (account) =>
+        isNormalPaymentAccount(account) &&
+        accountMatchesPaidBy(account, memberId)
     );
+  }
+
+  const fromAccountOptions = useMemo(() => {
+    if (form.txType === "expense") {
+      return getNormalAccountsForMember(form.paidByUserId);
+    }
+
+    // Transfer should show all active accounts, including savings.
+    return accounts || [];
   }, [accounts, form.txType, form.paidByUserId, memberById]);
+
+  const toAccountOptions = useMemo(() => {
+    if (form.txType === "income") {
+      return getNormalAccountsForMember(form.receivedByUserId);
+    }
+
+    // Transfer should show all active accounts, including savings.
+    return accounts || [];
+  }, [accounts, form.txType, form.receivedByUserId, memberById]);
 
   function getDefaultForm(next = {}) {
     const defaultUser = getId(members?.[0]) || "";
-    const defaultAccount = accounts?.[0]?._id || "";
     const txType = next.txType || "expense";
 
     const defaultPaidBy = next.paidByUserId || defaultUser;
+    const defaultReceivedBy = next.receivedByUserId || defaultUser;
 
     const availableFromAccounts =
       txType === "expense"
-        ? (accounts || []).filter((account) =>
-          accountMatchesPaidBy(account, defaultPaidBy)
-        )
+        ? getNormalAccountsForMember(defaultPaidBy)
         : accounts || [];
 
-    const defaultFromAccount =
-      next.fromAccountId || availableFromAccounts?.[0]?._id || defaultAccount;
+    const availableToAccounts =
+      txType === "income"
+        ? getNormalAccountsForMember(defaultReceivedBy)
+        : accounts || [];
+
+    const nextFromExists = availableFromAccounts.some(
+      (account) => String(account._id) === String(next.fromAccountId)
+    );
+
+    const nextToExists = availableToAccounts.some(
+      (account) => String(account._id) === String(next.toAccountId)
+    );
+
+    const defaultFromAccount = nextFromExists
+      ? next.fromAccountId
+      : availableFromAccounts?.[0]?._id || "";
+
+    const defaultToAccount = nextToExists
+      ? next.toAccountId
+      : availableToAccounts?.[0]?._id || "";
 
     return {
       txType,
@@ -608,9 +671,9 @@ export default function Ledger() {
       amount: next.amount === 0 || next.amount ? String(next.amount) : "",
       note: next.note || "",
       fromAccountId: defaultFromAccount,
-      toAccountId: next.toAccountId || defaultAccount,
+      toAccountId: defaultToAccount,
       paidByUserId: defaultPaidBy,
-      receivedByUserId: next.receivedByUserId || defaultUser,
+      receivedByUserId: defaultReceivedBy,
       splitType: next.splitType || "personal",
       personalUserId: next.personalUserId || next.paidByUserId || defaultUser,
       ratioMe: next.ratioMe ?? 50,
@@ -1680,12 +1743,42 @@ export default function Ledger() {
                         value={form.txType}
                         onChange={(e) => {
                           const nextType = e.target.value;
+                          const defaultUser = getId(members?.[0]) || "";
+
+                          const nextPaidBy = form.paidByUserId || defaultUser;
+                          const nextReceivedBy = form.receivedByUserId || defaultUser;
+
+                          const availableFromAccounts =
+                            nextType === "expense"
+                              ? getNormalAccountsForMember(nextPaidBy)
+                              : accounts || [];
+
+                          const availableToAccounts =
+                            nextType === "income"
+                              ? getNormalAccountsForMember(nextReceivedBy)
+                              : accounts || [];
+
+                          const fromStillValid = availableFromAccounts.some(
+                            (account) => String(account._id) === String(form.fromAccountId)
+                          );
+
+                          const toStillValid = availableToAccounts.some(
+                            (account) => String(account._id) === String(form.toAccountId)
+                          );
 
                           setForm({
                             ...form,
                             txType: nextType,
                             categoryId: "",
                             splitType: nextType === "expense" ? form.splitType : "personal",
+                            paidByUserId: nextPaidBy,
+                            receivedByUserId: nextReceivedBy,
+                            fromAccountId: fromStillValid
+                              ? form.fromAccountId
+                              : availableFromAccounts?.[0]?._id || "",
+                            toAccountId: toStillValid
+                              ? form.toAccountId
+                              : availableToAccounts?.[0]?._id || "",
                           });
                         }}
                       >
@@ -1744,9 +1837,7 @@ export default function Ledger() {
                           onChange={(e) => {
                             const nextPaidBy = e.target.value;
 
-                            const availableAccounts = (accounts || []).filter((account) =>
-                              accountMatchesPaidBy(account, nextPaidBy)
-                            );
+                            const availableAccounts = getNormalAccountsForMember(nextPaidBy);
 
                             const currentAccountStillValid = availableAccounts.some(
                               (account) => String(account._id) === String(form.fromAccountId)
@@ -1786,7 +1877,39 @@ export default function Ledger() {
 
                           {fromAccountOptions.map((a) => (
                             <option key={a._id} value={a._id}>
-                              {a.name}
+                              {form.txType === "transfer" ? accountLabel(a) : a.name}
+                            </option>
+                          ))}
+                        </FieldSelect>
+                      </div>
+                    )}
+
+                    {form.txType === "income" && (
+                      <div className="md:col-span-2">
+                        <FieldLabel>Received By</FieldLabel>
+                        <FieldSelect
+                          value={form.receivedByUserId}
+                          onChange={(e) => {
+                            const nextReceivedBy = e.target.value;
+                            const availableAccounts = getNormalAccountsForMember(nextReceivedBy);
+
+                            const currentAccountStillValid = availableAccounts.some(
+                              (account) => String(account._id) === String(form.toAccountId)
+                            );
+
+                            setForm({
+                              ...form,
+                              receivedByUserId: nextReceivedBy,
+                              toAccountId: currentAccountStillValid
+                                ? form.toAccountId
+                                : availableAccounts?.[0]?._id || "",
+                            });
+                          }}
+                        >
+                          <option value="">Select member</option>
+                          {members.map((m) => (
+                            <option key={getId(m)} value={getId(m)}>
+                              {m.name}
                             </option>
                           ))}
                         </FieldSelect>
@@ -1801,28 +1924,10 @@ export default function Ledger() {
                           onChange={(e) => setForm({ ...form, toAccountId: e.target.value })}
                         >
                           <option value="">Select account</option>
-                          {accounts.map((a) => (
-                            <option key={a._id} value={a._id}>
-                              {a.name} {a.owner ? `(${a.owner})` : ""}
-                            </option>
-                          ))}
-                        </FieldSelect>
-                      </div>
-                    )}
 
-                    {form.txType === "income" && (
-                      <div className="md:col-span-2">
-                        <FieldLabel>Received By</FieldLabel>
-                        <FieldSelect
-                          value={form.receivedByUserId}
-                          onChange={(e) =>
-                            setForm({ ...form, receivedByUserId: e.target.value })
-                          }
-                        >
-                          <option value="">Select member</option>
-                          {members.map((m) => (
-                            <option key={getId(m)} value={getId(m)}>
-                              {m.name}
+                          {toAccountOptions.map((a) => (
+                            <option key={a._id} value={a._id}>
+                              {form.txType === "transfer" ? accountLabel(a) : a.name}
                             </option>
                           ))}
                         </FieldSelect>
