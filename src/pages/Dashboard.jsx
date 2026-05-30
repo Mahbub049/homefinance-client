@@ -338,17 +338,6 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
-
-          <div className="relative z-10 mt-5 hidden gap-3 sm:mt-6 sm:grid sm:grid-cols-2 xl:grid-cols-4">
-            <HeroMetric label="Income" value={formatMoney(income)} sub="Total earning" />
-            <HeroMetric label="Spend" value={formatMoney(spendTotal)} sub={`${spendPct}% of income`} />
-            <HeroMetric
-              label="Final Balance"
-              value={formatMoney(finalBalance)}
-              sub={finalBalance >= 0 ? "Positive month" : "Needs attention"}
-            />
-            <HeroMetric label="Net Worth" value={formatMoney(netWorthValue)} sub={`as of ${month}`} />
-          </div>
         </div>
 
         {/* Error */}
@@ -434,44 +423,115 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* Desktop KPI row unchanged */}
+            {/* Desktop KPI row */}
             <div className="mb-4 hidden gap-3 sm:mb-6 sm:grid sm:grid-cols-2 xl:grid-cols-4">
-              <StatCard title="Income" value={income} hint="Total monthly income" tone="positive" />
-              <StatCard title="Living" value={living} hint="Daily and household spending" tone="danger" />
-              <StatCard title="EMI / Debt" value={debt} hint="Debt payments this month" tone="warning" />
-              <StatCard title="Investment" value={investment} hint="Savings and investments" tone="info" />
+              <StatCard
+                title="Income"
+                value={income}
+                hint="Total monthly income"
+                tone="positive"
+              />
+
+              <StatCard
+                title="Spend"
+                value={spendTotal}
+                hint={`${spendPct}% of income`}
+                tone={spendPct > 90 ? "danger" : "warning"}
+              />
+
+              <StatCard
+                title="Final Balance"
+                value={finalBalance}
+                hint="End-of-month financial position"
+                tone={finalBalance >= 0 ? "positive" : "danger"}
+              />
+
+              <StatCard
+                title="Available"
+                value={available}
+                hint="Income minus total monthly outflow"
+                tone={available >= 0 ? "positive" : "danger"}
+              />
             </div>
           </>
         )}
 
         {loading && !summary ? (
-          <div className="mb-4 grid grid-cols-2 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2 sm:mb-6 md:grid-cols-3 md:[&>*:last-child:nth-child(odd)]:col-span-1">
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </div>
+          <>
+            {/* Mobile second KPI row */}
+            <div className="mb-4 grid grid-cols-2 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2 sm:hidden">
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+
+            {/* Desktop third KPI row */}
+            <div className="mb-4 hidden gap-3 sm:mb-6 sm:grid sm:grid-cols-2 xl:grid-cols-4">
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          </>
         ) : (
-          <div className="mb-4 grid grid-cols-2 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2 sm:mb-6 md:grid-cols-3 md:[&>*:last-child:nth-child(odd)]:col-span-1">
-            <StatCard
-              title="Available"
-              value={available}
-              hint="Income minus total monthly outflow"
-              tone={available >= 0 ? "positive" : "danger"}
-            />
-            <StatCard
-              title="Final Balance"
-              value={finalBalance}
-              hint="End-of-month financial position"
-              tone={finalBalance >= 0 ? "positive" : "danger"}
-            />
-            <StatCard
-              title="Savings Rate"
-              value={`${savingsRate}%`}
-              hint="Savings as percentage of income"
-              tone={savingsRate >= 20 ? "positive" : "warning"}
-              isText
-            />
-          </div>
+          <>
+            {/* Mobile second KPI row unchanged */}
+            <div className="mb-4 grid grid-cols-2 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2 sm:hidden">
+              <StatCard
+                title="Available"
+                value={available}
+                hint="Income minus total monthly outflow"
+                tone={available >= 0 ? "positive" : "danger"}
+              />
+
+              <StatCard
+                title="Final Balance"
+                value={finalBalance}
+                hint="End-of-month financial position"
+                tone={finalBalance >= 0 ? "positive" : "danger"}
+              />
+
+              <StatCard
+                title="Savings Rate"
+                value={`${savingsRate}%`}
+                hint="Savings as percentage of income"
+                tone={savingsRate >= 20 ? "positive" : "warning"}
+                isText
+              />
+            </div>
+
+            {/* Desktop third KPI row */}
+            <div className="mb-4 hidden gap-3 sm:mb-6 sm:grid sm:grid-cols-2 xl:grid-cols-4">
+              <StatCard
+                title="Living"
+                value={living}
+                hint="Daily and household spending"
+                tone="danger"
+              />
+
+              <StatCard
+                title="EMI / Debt"
+                value={debt}
+                hint="Debt payments this month"
+                tone="warning"
+              />
+
+              <StatCard
+                title="Investment"
+                value={investment}
+                hint="Savings and investments"
+                tone="info"
+              />
+
+              <StatCard
+                title="Savings Rate"
+                value={`${savingsRate}%`}
+                hint="Savings as percentage of income"
+                tone={savingsRate >= 20 ? "positive" : "warning"}
+                isText
+              />
+            </div>
+          </>
         )}
 
         {/* Charts */}
