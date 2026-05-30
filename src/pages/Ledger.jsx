@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Capacitor } from "@capacitor/core";
@@ -407,6 +407,8 @@ export default function Ledger() {
 
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
+  const savingRef = useRef(false);
+  const [savingTx, setSavingTx] = useState(false);
 
   const [open, setOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -750,13 +752,18 @@ export default function Ledger() {
   }
 
   async function saveTx() {
+    if (savingRef.current) return;
+
     setMsg("");
+
     try {
       const amt = Number(form.amount);
+
       if (!amt || amt <= 0) return setMsg("Amount must be > 0");
       if (showCategory && !form.categoryId) return setMsg("Select a category");
       if (showFrom && !form.fromAccountId) return setMsg("Select From account");
       if (showTo && !form.toAccountId) return setMsg("Select To account");
+
       if (form.txType === "transfer" && form.fromAccountId === form.toAccountId) {
         return setMsg("From and To accounts must be different");
       }
@@ -775,9 +782,12 @@ export default function Ledger() {
 
         if (form.splitType === "ratio") {
           if (!otherMember) return setMsg("Need 2 members for Ratio split");
+
           const r1 = Number(form.ratioMe || 0);
           const r2 = Number(form.ratioOther || 0);
+
           if (r1 + r2 !== 100) return setMsg("Ratio split must sum to 100");
+
           split.ratios = [
             { userId: getId(me), ratio: r1 },
             { userId: getId(otherMember), ratio: r2 },
@@ -786,11 +796,14 @@ export default function Ledger() {
 
         if (form.splitType === "fixed") {
           if (!otherMember) return setMsg("Need 2 members for Fixed split");
+
           const f1 = Number(form.fixedMe || 0);
           const f2 = Number(form.fixedOther || 0);
+
           if (Math.round((f1 + f2) * 100) / 100 !== Math.round(amt * 100) / 100) {
             return setMsg("Fixed split amounts must sum to total amount");
           }
+
           split.fixed = [
             { userId: getId(me), amount: f1 },
             { userId: getId(otherMember), amount: f2 },
@@ -811,6 +824,9 @@ export default function Ledger() {
         split,
       };
 
+      savingRef.current = true;
+      setSavingTx(true);
+
       if (isEditing && editId) {
         await api.put(`/api/transactions/${editId}`, payload);
       } else {
@@ -821,9 +837,11 @@ export default function Ledger() {
       await loadTransactions();
     } catch (e) {
       setMsg(e?.response?.data?.message || (isEditing ? "Update failed" : "Create failed"));
+    } finally {
+      savingRef.current = false;
+      setSavingTx(false);
     }
   }
-
   function deleteTx(id) {
     setDeleteId(id);
     setConfirmOpen(true);
@@ -2089,9 +2107,38 @@ export default function Ledger() {
                   <button
                     type="button"
                     onClick={saveTx}
-                    className="order-1 inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-xs font-black text-white shadow-[0_14px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800 active:translate-y-0 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 sm:order-2 sm:w-auto sm:px-5 sm:text-sm"
+                    disabled={savingTx}
+                    aria-busy={savingTx}
+                    className={cn(
+                      "order-1 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-xs font-black text-white shadow-[0_14px_30px_rgba(15,23,42,0.18)] transition active:translate-y-0 dark:bg-white dark:text-slate-950 sm:order-2 sm:w-auto sm:px-5 sm:text-sm",
+                      savingTx
+                        ? "cursor-not-allowed opacity-70"
+                        : "hover:-translate-y-0.5 hover:bg-slate-800 dark:hover:bg-slate-100"
+                    )}
                   >
-                    {isEditing ? "Update" : "Save"}
+                    {savingTx && (
+                      <svg
+                        className="h-4 w-4 animate-spin"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                        />
+                      </svg>
+                    )}
+
+                    {savingTx ? (isEditing ? "Updating..." : "Saving...") : isEditing ? "Update" : "Save"}
                   </button>
 
                   <button
