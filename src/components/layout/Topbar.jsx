@@ -155,6 +155,11 @@ export default function Topbar({ onToggleSidebar, onOpenDrawer }) {
         subtitle: "Member-wise income, expense, and settlement",
         accent: "from-amber-500 to-orange-600",
       },
+      "/individual-summary": {
+        title: "Individual Summary",
+        subtitle: "Member-wise spending, cash, and monthly insight",
+        accent: "from-cyan-500 to-teal-600",
+      },
       "/carry-forward": {
         title: "Carry Forward",
         subtitle: "Previous balance movement across months",

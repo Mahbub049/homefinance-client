@@ -20,6 +20,44 @@ function safeNumber(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
+
+function todayYMD() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function defaultDateForMonth(month) {
+  const today = todayYMD();
+  if (month && today.startsWith(month)) return today;
+  return month ? `${month}-01` : today;
+}
+
+function toLocalYMD(dateLike) {
+  if (!dateLike) return todayYMD();
+  const d = new Date(dateLike);
+  if (Number.isNaN(d.getTime())) return todayYMD();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function formatDate(dateLike) {
+  if (!dateLike) return "-";
+  const d = new Date(dateLike);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function getId(v) {
+  if (!v) return "";
+  if (typeof v === "string") return v;
+  return String(v._id || v.id || "");
+}
+
 function shortMonth(value) {
   if (!value) return "Selected month";
   const [year, month] = String(value).split("-");
@@ -372,41 +410,515 @@ function QuickInsight({ topSurplus, topDeficit }) {
   );
 }
 
-function SettlementCard({ data, nameById }) {
-  if (!data) return null;
 
-  if (!data?.settlement) {
-    return (
-      <section className="rounded-[2rem] border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 shadow-sm dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100 sm:p-5">
-        <div className="font-black">No settlement needed</div>
-        <div className="mt-1">This month already looks balanced based on the available wallet summary.</div>
-      </section>
-    );
+function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus, topDeficit }) {
+  const users = data?.users || [];
+  const suggested = data?.settlement || null;
+  const settlementSummary = data?.settlementSummary || [];
+  const settlementTotals = data?.settlementTotals || {};
+  const settlements = data?.settlements || [];
+
+  const [mode, setMode] = useState("wallet");
+  const [form, setForm] = useState({
+    date: defaultDateForMonth(month),
+    fromUserId: "",
+    toUserId: "",
+    amount: "",
+    fromAccountId: "",
+    toAccountId: "",
+    note: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const userById = useMemo(() => {
+    const m = new Map();
+    users.forEach((u) => m.set(String(u.userId), u));
+    return m;
+  }, [users]);
+
+  const normalAccounts = useMemo(() => {
+    return (accounts || []).filter((a) => {
+      const type = String(a?.type || "").toLowerCase();
+      return a?.isActive !== false && ["cash", "bank", "wallet"].includes(type);
+    });
+  }, [accounts]);
+
+  function memberName(userId) {
+    return nameById.get(String(userId)) || userById.get(String(userId))?.name || "Member";
   }
 
-  return (
-    <section className="relative overflow-hidden rounded-[2rem] border border-amber-200 bg-gradient-to-br from-amber-50 via-orange-50 to-white p-4 shadow-sm dark:border-amber-400/20 dark:from-amber-400/10 dark:via-orange-400/10 dark:to-white/[0.04] sm:p-5">
-      <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-amber-200/40 blur-2xl dark:bg-amber-400/10" />
-      <div className="relative">
-        <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white/80 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-amber-700 dark:border-amber-400/20 dark:bg-white/10 dark:text-amber-100 sm:text-xs">
-          Settlement Suggestion
-        </div>
-        <h4 className="mt-3 text-lg font-black text-amber-950 dark:text-white sm:text-xl">Quick way to balance this month</h4>
-        <p className="mt-1 text-xs leading-5 text-amber-900/80 dark:text-amber-100/80 sm:text-sm">
-          This suggestion uses the calculated net position of each member.
-        </p>
+  function accountLabel(account) {
+    if (!account) return "";
+    const owner = account.owner ? ` (${account.owner})` : "";
+    return `${account.name || "Account"}${owner}`;
+  }
 
-        <div className="mt-4 rounded-3xl border border-amber-200 bg-white p-3 shadow-sm dark:border-amber-400/20 dark:bg-slate-950/50 sm:p-4">
-          <p className="break-words text-sm leading-7 text-slate-700 dark:text-slate-200">
-            <span className="rounded-full bg-rose-50 px-2.5 py-1 font-black text-rose-700 dark:bg-rose-400/10 dark:text-rose-100">
-              {nameById.get(String(data.settlement.fromUserId)) || `User ${data.settlement.fromUserId}`}
-            </span>{" "}
-            should pay{" "}
-            <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-black text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-100">
-              {nameById.get(String(data.settlement.toUserId)) || `User ${data.settlement.toUserId}`}
-            </span>{" "}
-            <span className="font-black text-slate-950 dark:text-white">{formatMoney(data.settlement.amount)}</span>
+  function accountMatchesUser(account, userId) {
+    const owner = String(account?.owner || "").trim().toLowerCase();
+    if (!owner || owner === "joint") return false;
+
+    const name = memberName(userId).trim().toLowerCase();
+    const parts = name.split(/\s+/).filter(Boolean);
+
+    return name.includes(owner) || owner.includes(name) || parts.some((part) => owner.includes(part) || part.includes(owner));
+  }
+
+  function accountOptionsForUser(userId) {
+    const matched = normalAccounts.filter((account) => accountMatchesUser(account, userId));
+    return matched.length ? matched : normalAccounts;
+  }
+
+  const fromAccountOptions = useMemo(
+    () => accountOptionsForUser(form.fromUserId),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [normalAccounts, form.fromUserId, nameById]
+  );
+
+  const toAccountOptions = useMemo(
+    () => accountOptionsForUser(form.toUserId),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [normalAccounts, form.toUserId, nameById]
+  );
+
+  useEffect(() => {
+    if (!users.length) return;
+
+    const suggestedFrom = getId(suggested?.fromUserId);
+    const suggestedTo = getId(suggested?.toUserId);
+
+    const defaultFrom = suggestedFrom || String(users[0]?.userId || "");
+    const defaultTo = suggestedTo || String(users.find((u) => String(u.userId) !== String(defaultFrom))?.userId || "");
+    const suggestedAmount = safeNumber(suggested?.amount);
+
+    setForm((prev) => ({
+      ...prev,
+      date: prev.date?.startsWith(month) ? prev.date : defaultDateForMonth(month),
+      fromUserId: prev.fromUserId || defaultFrom,
+      toUserId: prev.toUserId || defaultTo,
+      amount: suggestedAmount > 0 && (!prev.amount || safeNumber(prev.amount) === 0) ? String(suggestedAmount) : prev.amount,
+    }));
+  }, [users, suggested?.fromUserId, suggested?.toUserId, suggested?.amount, month]);
+
+  useEffect(() => {
+    if (mode !== "wallet") return;
+
+    setForm((prev) => {
+      const fromExists = fromAccountOptions.some((a) => String(a._id) === String(prev.fromAccountId));
+      const toExists = toAccountOptions.some((a) => String(a._id) === String(prev.toAccountId));
+
+      return {
+        ...prev,
+        fromAccountId: fromExists ? prev.fromAccountId : fromAccountOptions[0]?._id || "",
+        toAccountId: toExists ? prev.toAccountId : toAccountOptions[0]?._id || "",
+      };
+    });
+  }, [mode, form.fromUserId, form.toUserId, fromAccountOptions, toAccountOptions]);
+
+  function fillSuggestion() {
+    if (!suggested) return;
+    setForm((prev) => ({
+      ...prev,
+      fromUserId: getId(suggested.fromUserId),
+      toUserId: getId(suggested.toUserId),
+      amount: String(safeNumber(suggested.amount)),
+    }));
+    setMsg("");
+  }
+
+  async function saveSettlement() {
+    if (saving) return;
+
+    setMsg("");
+
+    const amount = safeNumber(form.amount);
+    if (!form.date) return setMsg("Select a settlement date.");
+    if (!form.fromUserId || !form.toUserId) return setMsg("Select both members.");
+    if (String(form.fromUserId) === String(form.toUserId)) return setMsg("From and To member must be different.");
+    if (!amount || amount <= 0) return setMsg("Amount must be greater than 0.");
+
+    if (mode === "wallet") {
+      if (!form.fromAccountId || !form.toAccountId) return setMsg("Select both accounts for wallet settlement.");
+      if (String(form.fromAccountId) === String(form.toAccountId)) return setMsg("From and To accounts must be different.");
+    }
+
+    try {
+      setSaving(true);
+
+      await api.post("/api/wallet/settlements", {
+        settlementType: mode,
+        date: form.date,
+        fromUserId: form.fromUserId,
+        toUserId: form.toUserId,
+        amount,
+        fromAccountId: mode === "wallet" ? form.fromAccountId : null,
+        toAccountId: mode === "wallet" ? form.toAccountId : null,
+        note: form.note,
+      });
+
+      setMsg(mode === "wallet" ? "✅ Settlement saved and wallet transfer added to Ledger." : "✅ Past pending issue marked as settled.");
+      setForm((prev) => ({ ...prev, amount: "", note: "" }));
+      await onSaved?.();
+    } catch (e) {
+      setMsg(e?.response?.data?.message || "Failed to save settlement.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteSettlement(id) {
+    if (!id) return;
+    const ok = window.confirm("Delete this settlement record? If it created a wallet transfer, that transfer will also be removed.");
+    if (!ok) return;
+
+    try {
+      setSaving(true);
+      await api.delete(`/api/wallet/settlements/${id}`);
+      setMsg("Settlement deleted.");
+      await onSaved?.();
+    } catch (e) {
+      setMsg(e?.response?.data?.message || "Failed to delete settlement.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const requiredTotal = safeNumber(settlementTotals.requiredTotal);
+  const monthlySettled = safeNumber(settlementTotals.monthlySettled);
+  const pendingTotal = safeNumber(settlementTotals.pendingTotal);
+  const pastPendingSettled = safeNumber(settlementTotals.pastPendingSettled);
+
+  return (
+    <section className="rounded-[1.25rem] border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:rounded-[2rem] sm:p-5">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start">
+        <div className="min-w-0">
+          <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-violet-700 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-100">
+            Settlement Center
+          </div>
+          <h3 className="mt-3 text-lg font-black text-slate-950 dark:text-white sm:text-xl">Settle balances for {shortMonth(month)}</h3>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm">
+            Wallet settlement creates a real transfer, so wallet balance and Ledger transfer list will change. Past pending settlement only records that an older outside-app issue is settled.
           </p>
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-slate-950/40">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">Quick Insights</div>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Fast settlement signal for this month.</p>
+            </div>
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-violet-600 text-white dark:bg-violet-500">
+              <Icon name="wallet" className="h-4 w-4" />
+            </div>
+          </div>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-2.5 dark:border-emerald-400/20 dark:bg-emerald-400/10">
+              <div className="text-[10px] font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-200">Highest Surplus</div>
+              <div className="mt-1 flex items-center justify-between gap-3 text-xs">
+                <span className="break-words font-bold text-emerald-950 dark:text-emerald-100">{topSurplus?.name || "-"}</span>
+                <span className="shrink-0 font-black text-emerald-950 dark:text-emerald-100">{formatMoney(topSurplus?.net || 0)}</span>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-rose-100 bg-rose-50 p-2.5 dark:border-rose-400/20 dark:bg-rose-400/10">
+              <div className="text-[10px] font-black uppercase tracking-wide text-rose-700 dark:text-rose-200">Highest Deficit</div>
+              <div className="mt-1 flex items-center justify-between gap-3 text-xs">
+                <span className="break-words font-bold text-rose-950 dark:text-rose-100">{topDeficit?.name || "-"}</span>
+                <span className="shrink-0 font-black text-rose-950 dark:text-rose-100">{formatMoney(topDeficit?.net || 0)}</span>
+              </div>
+            </div>
+          </div>
+
+          {suggested ? (
+            <button
+              type="button"
+              onClick={fillSuggestion}
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Use suggestion: {formatMoney(suggested.amount)}
+            </button>
+          ) : (
+            <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-center text-xs font-black text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100">
+              Monthly settlement settled
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <MiniMetric label="Total Required" value={formatMoney(requiredTotal)} tone="violet" />
+        <MiniMetric label="Wallet Settled" value={formatMoney(monthlySettled)} tone="emerald" />
+        <MiniMetric label="Still Pending" value={formatMoney(pendingTotal)} tone={pendingTotal > 0 ? "rose" : "emerald"} />
+        <MiniMetric label="Past Marked" value={formatMoney(pastPendingSettled)} tone="sky" />
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-slate-950/40 sm:p-4">
+          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white p-1 dark:bg-white/5">
+            <button
+              type="button"
+              onClick={() => setMode("wallet")}
+              className={cx(
+                "rounded-xl px-3 py-2 text-xs font-black transition",
+                mode === "wallet"
+                  ? "bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950"
+                  : "text-slate-500 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/10"
+              )}
+            >
+              Wallet Settlement
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("past_pending")}
+              className={cx(
+                "rounded-xl px-3 py-2 text-xs font-black transition",
+                mode === "past_pending"
+                  ? "bg-slate-950 text-white shadow-sm dark:bg-white dark:text-slate-950"
+                  : "text-slate-500 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/10"
+              )}
+            >
+              Past Pending
+            </button>
+          </div>
+
+          <div className={cx(
+            "mt-3 rounded-2xl border p-3 text-xs leading-5",
+            mode === "wallet"
+              ? "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-100"
+              : "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100"
+          )}>
+            {mode === "wallet"
+              ? "Use this when money actually moved from one member/account to another. It will appear as a Transfer in Ledger."
+              : "Use this for older cash issues that were never added to the app. It will not change wallet amount or Ledger."}
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            <label>
+              <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">Date</span>
+              <input
+                type="date"
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:[color-scheme:dark] dark:focus:ring-violet-400/10"
+              />
+            </label>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label>
+                <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">From / Payer</span>
+                <select
+                  value={form.fromUserId}
+                  onChange={(e) => setForm({ ...form, fromUserId: e.target.value })}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:focus:ring-violet-400/10"
+                >
+                  <option value="">Select payer</option>
+                  {users.map((u) => (
+                    <option key={u.userId} value={u.userId}>{u.name}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">To / Receiver</span>
+                <select
+                  value={form.toUserId}
+                  onChange={(e) => setForm({ ...form, toUserId: e.target.value })}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:focus:ring-violet-400/10"
+                >
+                  <option value="">Select receiver</option>
+                  {users.map((u) => (
+                    <option key={u.userId} value={u.userId}>{u.name}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            {mode === "wallet" ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label>
+                  <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">From Account</span>
+                  <select
+                    value={form.fromAccountId}
+                    onChange={(e) => setForm({ ...form, fromAccountId: e.target.value })}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:focus:ring-violet-400/10"
+                  >
+                    <option value="">Select account</option>
+                    {fromAccountOptions.map((a) => (
+                      <option key={a._id} value={a._id}>{accountLabel(a)}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">To Account</span>
+                  <select
+                    value={form.toAccountId}
+                    onChange={(e) => setForm({ ...form, toAccountId: e.target.value })}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:focus:ring-violet-400/10"
+                  >
+                    <option value="">Select account</option>
+                    {toAccountOptions.map((a) => (
+                      <option key={a._id} value={a._id}>{accountLabel(a)}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : null}
+
+            <label>
+              <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">Amount</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                placeholder="Enter settlement amount"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-500 dark:focus:ring-violet-400/10"
+              />
+            </label>
+
+            <label>
+              <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">Optional Note</span>
+              <textarea
+                value={form.note}
+                onChange={(e) => setForm({ ...form, note: e.target.value })}
+                placeholder={mode === "wallet" ? "Example: May shared expense settlement" : "Example: old cash borrowed before using app"}
+                rows={3}
+                className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-500 dark:focus:ring-violet-400/10"
+              />
+            </label>
+
+            {msg ? (
+              <div className={cx(
+                "rounded-2xl border px-3 py-2 text-xs font-bold",
+                msg.startsWith("✅") || msg === "Settlement deleted."
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100"
+                  : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-100"
+              )}>
+                {msg}
+              </div>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={saveSettlement}
+              disabled={saving || !data}
+              className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:from-violet-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? "Saving settlement..." : mode === "wallet" ? "Settle & Add Transfer" : "Mark Past Issue Settled"}
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40">
+            <div className="border-b border-slate-100 px-4 py-3 dark:border-white/10">
+              <h4 className="text-sm font-black text-slate-950 dark:text-white">Per-person settlement status</h4>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Green means settled. Red means still pending.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-xs">
+                <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
+                  <tr>
+                    <th className="px-4 py-3">Member</th>
+                    <th className="px-4 py-3">Pay</th>
+                    <th className="px-4 py-3">Receive</th>
+                    <th className="px-4 py-3">Settled</th>
+                    <th className="px-4 py-3">Pending</th>
+                    <th className="px-4 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-white/10">
+                  {settlementSummary.length ? settlementSummary.map((row) => {
+                    const pending = safeNumber(row.pendingPay) + safeNumber(row.pendingReceive);
+                    const settled = safeNumber(row.settledPaid) + safeNumber(row.settledReceived);
+                    const done = row.status === "settled";
+                    return (
+                      <tr key={row.userId} className="text-slate-700 dark:text-slate-200">
+                        <td className="px-4 py-3 font-black text-slate-950 dark:text-white">{row.name}</td>
+                        <td className="px-4 py-3">{formatMoney(row.shouldPay)}</td>
+                        <td className="px-4 py-3">{formatMoney(row.shouldReceive)}</td>
+                        <td className="px-4 py-3">{formatMoney(settled)}</td>
+                        <td className="px-4 py-3 font-black">{formatMoney(pending)}</td>
+                        <td className="px-4 py-3">
+                          <span className={cx(
+                            "rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide",
+                            done
+                              ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-400/10 dark:text-emerald-100 dark:ring-emerald-400/20"
+                              : "bg-rose-50 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-400/10 dark:text-rose-100 dark:ring-rose-400/20"
+                          )}>
+                            {done ? "Settled" : "Pending"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  }) : (
+                    <tr>
+                      <td colSpan="6" className="px-4 py-5 text-center text-slate-500 dark:text-slate-400">No settlement data yet.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40">
+            <div className="border-b border-slate-100 px-4 py-3 dark:border-white/10">
+              <h4 className="text-sm font-black text-slate-950 dark:text-white">Settlement history</h4>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Wallet settlements are real transfers; past pending records are informational only.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-xs">
+                <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
+                  <tr>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Direction</th>
+                    <th className="px-4 py-3">Amount</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3">Note</th>
+                    <th className="px-4 py-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-white/10">
+                  {settlements.length ? settlements.map((item) => (
+                    <tr key={item._id} className="text-slate-700 dark:text-slate-200">
+                      <td className="px-4 py-3 whitespace-nowrap">{formatDate(item.date)}</td>
+                      <td className="px-4 py-3 font-bold text-slate-950 dark:text-white">
+                        {memberName(getId(item.fromUserId))} → {memberName(getId(item.toUserId))}
+                      </td>
+                      <td className="px-4 py-3 font-black">{formatMoney(item.amount)}</td>
+                      <td className="px-4 py-3">
+                        <span className={cx(
+                          "rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ring-1",
+                          item.settlementType === "wallet"
+                            ? "bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-400/10 dark:text-sky-100 dark:ring-sky-400/20"
+                            : "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-400/10 dark:text-amber-100 dark:ring-amber-400/20"
+                        )}>
+                          {item.settlementType === "wallet" ? "Wallet" : "Past"}
+                        </span>
+                      </td>
+                      <td className="max-w-[220px] px-4 py-3 text-slate-500 dark:text-slate-400">{item.note || "-"}</td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => deleteSettlement(item._id)}
+                          disabled={saving}
+                          className="rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-black text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-100"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan="6" className="px-4 py-5 text-center text-slate-500 dark:text-slate-400">No settlement history for this month.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -419,13 +931,20 @@ export default function Wallet() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [search, setSearch] = useState("");
+  const [accounts, setAccounts] = useState([]);
 
   async function load() {
     try {
       setErr("");
       setLoading(true);
-      const res = await api.get("/api/wallet/summary", { params: { month } });
-      setData(res.data);
+
+      const [summaryRes, accountsRes] = await Promise.all([
+        api.get("/api/wallet/summary", { params: { month } }),
+        api.get("/api/accounts"),
+      ]);
+
+      setData(summaryRes.data);
+      setAccounts(accountsRes.data.items || []);
     } catch (e) {
       setErr(e?.response?.data?.message || e?.message || "Failed to load wallet summary");
       setData(null);
@@ -568,7 +1087,7 @@ export default function Wallet() {
             <SummaryCard title="Total Income" value={formatMoney(totals.income)} sub={shortMonth(month)} icon="arrowUp" accent="from-emerald-500 to-teal-600" />
             <SummaryCard title="Expense Share" value={formatMoney(totals.share)} sub="Split-aware total share" icon="arrowDown" accent="from-rose-500 to-pink-600" />
             <SummaryCard title="Remaining" value={formatMoney(totals.remaining)} sub="Income − share + transfer net" icon="wallet" accent="from-sky-500 to-indigo-600" />
-            <SummaryCard title="Settlement Gap" value={formatMoney(Math.max(totals.surplus, totals.deficit))} sub="Amount needed to balance" icon="swap" accent="from-amber-500 to-orange-600" />
+            <SummaryCard title="Settlement Gap" value={formatMoney(data?.settlementTotals?.pendingTotal ?? Math.max(totals.surplus, totals.deficit))} sub="Pending after recorded settlements" icon="swap" accent="from-amber-500 to-orange-600" />
           </section>
 
           <section className="w-full max-w-none min-w-0 rounded-[1.25rem] border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:rounded-[2rem] sm:p-5">
@@ -611,10 +1130,15 @@ export default function Wallet() {
             </div>
           </section>
 
-          <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-            <SettlementCard data={data} nameById={nameById} />
-            <QuickInsight topSurplus={topSurplus} topDeficit={topDeficit} />
-          </section>
+          <SettlementCenter
+            data={data}
+            nameById={nameById}
+            accounts={accounts}
+            month={month}
+            onSaved={load}
+            topSurplus={topSurplus}
+            topDeficit={topDeficit}
+          />
 
           <section className="hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.06] lg:block">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

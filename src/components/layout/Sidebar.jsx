@@ -73,6 +73,17 @@ function Icon({ name, className = "h-5 w-5" }) {
           <path d="M17 13h4" />
         </svg>
       );
+    case "summary":
+      return (
+        <svg {...common} viewBox="0 0 24 24">
+          <path d="M4 19V5" />
+          <path d="M4 19h16" />
+          <path d="M8 15v-4" />
+          <path d="M12 15V7" />
+          <path d="M16 15v-6" />
+          <circle cx="18" cy="6" r="2" />
+        </svg>
+      );
     case "planned":
       return (
         <svg {...common} viewBox="0 0 24 24">
@@ -179,6 +190,7 @@ export default function Sidebar({
       {
         title: "Reports",
         items: [
+          { to: "/individual-summary", label: "Individual Summary", icon: <Icon name="summary" /> },
           { to: "/carry-forward", label: "Carry Forward", icon: <Icon name="reports" /> },
           { to: "/year-overview", label: "Year Overview", icon: <Icon name="reports" /> },
         ],
