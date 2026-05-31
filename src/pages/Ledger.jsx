@@ -426,6 +426,8 @@ export default function Ledger() {
     toAccountId: "",
     paidByUserId: "",
     receivedByUserId: "",
+    paymentMode: "single",
+    paymentParts: [],
     splitType: "personal",
     personalUserId: "",
     ratioMe: 50,
@@ -544,7 +546,7 @@ export default function Ledger() {
   }, [members, me?.id]);
 
   const showCategory = form.txType !== "transfer";
-  const showFrom = form.txType === "expense" || form.txType === "transfer";
+  const showFrom = (form.txType === "expense" && form.paymentMode !== "split") || form.txType === "transfer";
   const showTo = form.txType === "income" || form.txType === "transfer";
 
   const visibleCategoryList = useMemo(() => {
@@ -615,6 +617,82 @@ export default function Ledger() {
     );
   }
 
+  function getDefaultPaymentParts(existingParts = []) {
+    const existingMap = new Map(
+      (existingParts || []).map((part) => [String(getId(part.userId)), part])
+    );
+
+    return (members || []).map((member) => {
+      const userId = getId(member);
+      const previous = existingMap.get(String(userId));
+      const availableAccounts = getNormalAccountsForMember(userId);
+      const previousAccountId = getId(previous?.accountId);
+      const previousAccountStillValid = availableAccounts.some(
+        (account) => String(account._id) === String(previousAccountId)
+      );
+
+      return {
+        userId,
+        accountId: previousAccountStillValid
+          ? previousAccountId
+          : availableAccounts?.[0]?._id || "",
+        amount: previous?.amount === 0 || previous?.amount ? String(previous.amount) : "",
+      };
+    });
+  }
+
+  function getPaymentPartsTotal(parts = []) {
+    const total = (parts || []).reduce(
+      (sum, part) => sum + Number(part.amount || 0),
+      0
+    );
+
+    return Math.round((total + Number.EPSILON) * 100) / 100;
+  }
+
+  function amountInputValue(value) {
+    const n = Number(value || 0);
+    if (!n || n <= 0) return "";
+    return String(Math.round((n + Number.EPSILON) * 100) / 100);
+  }
+
+  function setPaymentPart(index, key, value) {
+    setForm((prev) => {
+      const nextParts = [...(prev.paymentParts || [])];
+      nextParts[index] = { ...(nextParts[index] || {}), [key]: value };
+
+      if (key === "amount") {
+        const total = getPaymentPartsTotal(nextParts);
+        return {
+          ...prev,
+          paymentParts: nextParts,
+          amount: amountInputValue(total),
+        };
+      }
+
+      return { ...prev, paymentParts: nextParts };
+    });
+  }
+
+  function paymentSummary(item) {
+    if (item?.txType !== "expense") return "";
+
+    const parts = Array.isArray(item.paymentParts) ? item.paymentParts : [];
+    if (item.paymentMode === "split" && parts.length > 0) {
+      return parts
+        .map((part) => {
+          const memberName = part.userId?.name || memberById.get(getId(part.userId))?.name || "Member";
+          const accountName = part.accountId?.name || accountsById.get(getId(part.accountId))?.name || "Account";
+          return `${memberName}: ${money(part.amount)} from ${accountName}`;
+        })
+        .join(" + ");
+    }
+
+    const memberName = item.paidByUserId?.name || memberById.get(getId(item.paidByUserId))?.name || "-";
+    const accountName = item.fromAccountId?.name || accountsById.get(getId(item.fromAccountId))?.name || "-";
+    return `${memberName} from ${accountName}`;
+  }
+
   const fromAccountOptions = useMemo(() => {
     if (form.txType === "expense") {
       return getNormalAccountsForMember(form.paidByUserId);
@@ -637,11 +715,12 @@ export default function Ledger() {
     const defaultUser = getId(members?.[0]) || "";
     const txType = next.txType || "expense";
 
-    const defaultPaidBy = next.paidByUserId || defaultUser;
+    const paymentMode = next.paymentMode === "split" ? "split" : "single";
+    const defaultPaidBy = paymentMode === "split" ? "" : next.paidByUserId || defaultUser;
     const defaultReceivedBy = next.receivedByUserId || defaultUser;
 
     const availableFromAccounts =
-      txType === "expense"
+      txType === "expense" && paymentMode !== "split"
         ? getNormalAccountsForMember(defaultPaidBy)
         : accounts || [];
 
@@ -676,6 +755,8 @@ export default function Ledger() {
       toAccountId: defaultToAccount,
       paidByUserId: defaultPaidBy,
       receivedByUserId: defaultReceivedBy,
+      paymentMode,
+      paymentParts: paymentMode === "split" ? getDefaultPaymentParts(next.paymentParts || []) : [],
       splitType: next.splitType || "personal",
       personalUserId: next.personalUserId || next.paidByUserId || defaultUser,
       ratioMe: next.ratioMe ?? 50,
@@ -738,6 +819,14 @@ export default function Ledger() {
         toAccountId: getId(item.toAccountId),
         paidByUserId: getId(item.paidByUserId),
         receivedByUserId: getId(item.receivedByUserId),
+        paymentMode: item.paymentMode === "split" ? "split" : "single",
+        paymentParts: Array.isArray(item.paymentParts)
+          ? item.paymentParts.map((part) => ({
+            userId: getId(part.userId),
+            accountId: getId(part.accountId),
+            amount: part.amount,
+          }))
+          : [],
         ...transactionSplitToForm(item),
       })
     );
@@ -770,8 +859,34 @@ export default function Ledger() {
 
       let split = null;
 
+      let paymentParts = [];
+
       if (form.txType === "expense") {
-        if (!form.paidByUserId) return setMsg("Select Paid By");
+        if (form.paymentMode === "split") {
+          paymentParts = (form.paymentParts || []).map((part) => ({
+            userId: part.userId,
+            accountId: part.accountId,
+            amount: Number(part.amount || 0),
+          }));
+
+          if (paymentParts.length < 2) return setMsg("Split payment needs both members");
+
+          const invalidPayment = paymentParts.find(
+            (part) => !part.userId || !part.accountId || !part.amount || part.amount <= 0
+          );
+          if (invalidPayment) return setMsg("Select account and amount for every split payment row");
+
+          const paidTotal = Math.round(
+            paymentParts.reduce((sum, part) => sum + Number(part.amount || 0), 0) * 100
+          ) / 100;
+
+          if (paidTotal !== Math.round(amt * 100) / 100) {
+            return setMsg("Split payment amounts must sum to total amount");
+          }
+        } else {
+          if (!form.paidByUserId) return setMsg("Select Paid By");
+          if (!form.fromAccountId) return setMsg("Select From account");
+        }
 
         split = { type: form.splitType || "personal" };
 
@@ -819,8 +934,13 @@ export default function Ledger() {
         categoryId: showCategory ? form.categoryId : null,
         fromAccountId: showFrom ? form.fromAccountId : null,
         toAccountId: showTo ? form.toAccountId : null,
-        paidByUserId: form.txType === "expense" ? form.paidByUserId : null,
+        paidByUserId:
+          form.txType === "expense" && form.paymentMode !== "split"
+            ? form.paidByUserId
+            : null,
         receivedByUserId: form.txType === "income" ? form.receivedByUserId : null,
+        paymentMode: form.txType === "expense" ? form.paymentMode : "single",
+        paymentParts: form.txType === "expense" && form.paymentMode === "split" ? paymentParts : [],
         split,
       };
 
@@ -875,7 +995,11 @@ export default function Ledger() {
       if (memberFilter !== "all") {
         const filterId = String(memberFilter);
         if (it.txType === "income" && getId(it.receivedByUserId) !== filterId) return false;
-        if (it.txType === "expense" && getId(it.paidByUserId) !== filterId) return false;
+        if (it.txType === "expense") {
+          const parts = Array.isArray(it.paymentParts) ? it.paymentParts : [];
+          const memberPaidInSplit = it.paymentMode === "split" && parts.some((part) => getId(part.userId) === filterId);
+          if (!memberPaidInSplit && getId(it.paidByUserId) !== filterId) return false;
+        }
       }
 
       if (!needle) return true;
@@ -885,7 +1009,8 @@ export default function Ledger() {
       const toName = it.toAccountId?.name || "";
       const note = it.note || "";
       const splitName = splitLabel(it.split);
-      const hay = `${catName} ${fromName} ${toName} ${note} ${splitName} ${it.txType}`.toLowerCase();
+      const payText = paymentSummary(it);
+      const hay = `${catName} ${fromName} ${toName} ${note} ${splitName} ${payText} ${it.txType}`.toLowerCase();
       return hay.includes(needle);
     });
 
@@ -1110,54 +1235,285 @@ export default function Ledger() {
 
   async function exportTransactionsPdf() {
     try {
-      const doc = new jsPDF("p", "mm", "a4");
+      const doc = new jsPDF("l", "mm", "a4"); // landscape = better table width
+
       const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
 
-      const exportRows = [...rows].sort((a, b) => new Date(a.date) - new Date(b.date));
+      const marginX = 10;
+      const contentWidth = pageWidth - marginX * 2;
 
-      const title = "HomeFinance Transaction Statement";
-      const subtitle = `Month: ${month}`;
-      const filterLine = `Type: ${activeTab === "all" ? "All" : typeLabel(activeTab)} | Member: ${memberFilter === "all"
-        ? "All members"
-        : members.find((m) => getId(m) === memberFilter)?.name || "All members"
-        }`;
+      const COLORS = {
+        navy: [15, 23, 42],
+        navy2: [30, 41, 59],
+        blue: [37, 99, 235],
+        blueSoft: [239, 246, 255],
+        green: [22, 163, 74],
+        greenSoft: [240, 253, 244],
+        red: [220, 38, 38],
+        redSoft: [254, 242, 242],
+        amber: [245, 158, 11],
+        amberSoft: [255, 251, 235],
+        slate: [71, 85, 105],
+        slateSoft: [248, 250, 252],
+        border: [226, 232, 240],
+        white: [255, 255, 255],
+      };
 
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(16);
-      doc.text(title, 14, 16);
+      const exportRows = [...rows].sort(
+        (a, b) => new Date(a.date) - new Date(b.date)
+      );
 
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      doc.text(subtitle, 14, 23);
-      doc.text(filterLine, 14, 28);
+      const selectedMemberName =
+        memberFilter === "all"
+          ? "All members"
+          : members.find((m) => getId(m) === memberFilter)?.name || "All members";
 
-      doc.setFont("helvetica", "bold");
-      doc.text(`Generated: ${formatPdfDate(new Date())}`, pageWidth - 14, 16, {
-        align: "right",
+      const reportTitle = "HomeFinance Transaction Statement";
+      const reportMonth = formatMonthLabel(month);
+      const filterLine = `${activeTab === "all" ? "All transaction types" : typeLabel(activeTab)} • ${selectedMemberName}`;
+      const generatedLine = `Generated: ${formatPdfDate(new Date())}`;
+
+      doc.setProperties({
+        title: `Transactions_${month}`,
+        subject: "HomeFinance Ledger Statement",
+        author: "HomeFinance",
+        creator: "HomeFinance",
       });
 
+      const safeText = (value) => {
+        if (value === null || value === undefined || value === "") return "-";
+        return String(value).replace(/\s+/g, " ").trim();
+      };
+
+      const pdfOwnerLabel = (ownerValue) => {
+        if (!ownerValue) return "";
+
+        if (typeof ownerValue === "object") {
+          const ownerId = getId(ownerValue);
+          return (
+            ownerValue.name ||
+            ownerValue.fullName ||
+            memberById.get(String(ownerId))?.name ||
+            ""
+          );
+        }
+
+        const ownerText = String(ownerValue).trim();
+        if (!ownerText) return "";
+
+        const byId = memberById.get(ownerText)?.name;
+        if (byId) return byId;
+
+        const lowerOwner = ownerText.toLowerCase();
+
+        if (["joint", "shared", "family"].includes(lowerOwner)) {
+          return "Joint";
+        }
+
+        const matchedMember = (members || []).find((member) => {
+          const memberName = String(member.name || "").toLowerCase();
+          const memberParts = memberName.split(/\s+/).filter(Boolean);
+
+          return (
+            memberName.includes(lowerOwner) ||
+            lowerOwner.includes(memberName) ||
+            memberParts.some(
+              (part) => part === lowerOwner || part.includes(lowerOwner) || lowerOwner.includes(part)
+            )
+          );
+        });
+
+        return matchedMember?.name || ownerText;
+      };
+
+      const pdfAccountLabel = (accountOrId) => {
+        if (!accountOrId) return "-";
+
+        const accountId = getId(accountOrId);
+        const fullAccount = accountId ? accountsById.get(String(accountId)) : null;
+
+        const account =
+          typeof accountOrId === "object"
+            ? { ...(fullAccount || {}), ...(accountOrId || {}) }
+            : fullAccount;
+
+        if (!account) return "-";
+
+        const accountName = account.name || "Account";
+        const ownerName = pdfOwnerLabel(account.owner);
+
+        return ownerName ? `${ownerName} • ${accountName}` : accountName;
+      };
+
+      const drawTopHeader = (compact = false) => {
+        const headerY = 8;
+        const headerH = compact ? 18 : 30;
+
+        doc.setFillColor(...COLORS.navy);
+        doc.roundedRect(marginX, headerY, contentWidth, headerH, 4, 4, "F");
+
+        doc.setFillColor(...COLORS.blue);
+        doc.roundedRect(marginX, headerY, 5, headerH, 4, 4, "F");
+
+        doc.setTextColor(...COLORS.white);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(compact ? 11 : 17);
+        doc.text(reportTitle, marginX + 10, compact ? 20 : 20);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(compact ? 8 : 9);
+        doc.setTextColor(203, 213, 225);
+        doc.text(
+          compact ? `${reportMonth} • ${filterLine}` : `Month: ${reportMonth}`,
+          marginX + 10,
+          compact ? 26 : 26
+        );
+
+        if (!compact) {
+          doc.text(filterLine, marginX + 10, 31);
+        }
+
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(71, 85, 105);
+        doc.roundedRect(pageWidth - marginX - 56, compact ? 13 : 15, 48, 9, 4, 4, "FD");
+
+        doc.setTextColor(...COLORS.navy);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.5);
+        doc.text(generatedLine, pageWidth - marginX - 32, compact ? 19 : 21, {
+          align: "center",
+        });
+      };
+
+      const drawFooter = (pageNo, pageCount) => {
+        const y = pageHeight - 8;
+
+        doc.setDrawColor(...COLORS.border);
+        doc.setLineWidth(0.2);
+        doc.line(marginX, y - 5, pageWidth - marginX, y - 5);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(...COLORS.slate);
+        doc.text("HomeFinance Ledger Report", marginX, y);
+
+        doc.setFont("helvetica", "bold");
+        doc.text(`Page ${pageNo} of ${pageCount}`, pageWidth - marginX, y, {
+          align: "right",
+        });
+      };
+
+      const drawKpiCard = (x, y, w, h, label, value, color, softColor) => {
+        doc.setFillColor(...softColor);
+        doc.setDrawColor(...COLORS.border);
+        doc.roundedRect(x, y, w, h, 3, 3, "FD");
+
+        doc.setTextColor(...COLORS.slate);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7);
+        doc.text(label.toUpperCase(), x + 3, y + 5);
+
+        doc.setTextColor(...color);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+
+        const valueText = doc.splitTextToSize(value, w - 6);
+        doc.text(valueText, x + 3, y + 12);
+      };
+
+      drawTopHeader(false);
+
+      const cardGap = 3;
+      const cardCount = 6;
+      const cardW = (contentWidth - cardGap * (cardCount - 1)) / cardCount;
+      const cardY = 43;
+      const cardH = 20;
+
+      drawKpiCard(
+        marginX,
+        cardY,
+        cardW,
+        cardH,
+        "Income",
+        moneyPdf(totals.income),
+        COLORS.green,
+        COLORS.greenSoft
+      );
+
+      drawKpiCard(
+        marginX + (cardW + cardGap) * 1,
+        cardY,
+        cardW,
+        cardH,
+        "Expense",
+        moneyPdf(totals.expense),
+        COLORS.red,
+        COLORS.redSoft
+      );
+
+      drawKpiCard(
+        marginX + (cardW + cardGap) * 2,
+        cardY,
+        cardW,
+        cardH,
+        "Transfer",
+        moneyPdf(totals.transfer),
+        COLORS.blue,
+        COLORS.blueSoft
+      );
+
+      drawKpiCard(
+        marginX + (cardW + cardGap) * 3,
+        cardY,
+        cardW,
+        cardH,
+        "Net Cashflow",
+        moneyPdf(totals.netCashflow),
+        totals.netCashflow >= 0 ? COLORS.green : COLORS.red,
+        totals.netCashflow >= 0 ? COLORS.greenSoft : COLORS.redSoft
+      );
+
+      drawKpiCard(
+        marginX + (cardW + cardGap) * 4,
+        cardY,
+        cardW,
+        cardH,
+        "Remaining Expense",
+        moneyPdf(remainingExpense),
+        COLORS.amber,
+        COLORS.amberSoft
+      );
+
+      drawKpiCard(
+        marginX + (cardW + cardGap) * 5,
+        cardY,
+        cardW,
+        cardH,
+        "Transactions",
+        String(exportRows.length),
+        COLORS.navy,
+        COLORS.slateSoft
+      );
+
       autoTable(doc, {
-        startY: 34,
-        theme: "grid",
-        head: [["Summary", "Amount"]],
-        body: [
-          ["Income", moneyPdf(totals.income)],
-          ["Expense", moneyPdf(totals.expense)],
-          ["Transfer", moneyPdf(totals.transfer)],
-          ["Net Cashflow", moneyPdf(totals.netCashflow)],
-          ["Remaining Expense", moneyPdf(remainingExpense)],
-          ["Transactions Count", String(exportRows.length)],
+        startY: 70,
+        margin: { left: marginX, right: marginX },
+        theme: "plain",
+        tableWidth: contentWidth,
+        head: [
+          [
+            "Member",
+            "Income",
+            "Expense",
+            "Transfer In",
+            "Transfer Out",
+            "Transfer Net",
+            "Remaining",
+          ],
         ],
-        styles: { fontSize: 9, cellPadding: 2.5 },
-        headStyles: { fillColor: [240, 240, 240], textColor: 20 },
-      });
-
-      autoTable(doc, {
-        startY: doc.lastAutoTable.finalY + 6,
-        theme: "grid",
-        head: [["Member", "Income", "Expense", "Transfer In", "Transfer Out", "Transfer Net", "Remaining"]],
         body: memberStats.map((m) => [
-          m.name || "-",
+          safeText(m.name),
           moneyPdf(m.income),
           moneyPdf(m.expense),
           moneyPdf(m.transferIn),
@@ -1165,66 +1521,180 @@ export default function Ledger() {
           moneyPdf(m.transferNet),
           moneyPdf(m.remaining),
         ]),
-        styles: { fontSize: 8.5, cellPadding: 2.2 },
-        headStyles: { fillColor: [240, 240, 240], textColor: 20 },
+        styles: {
+          font: "helvetica",
+          fontSize: 8,
+          cellPadding: { top: 2.2, right: 2.4, bottom: 2.2, left: 2.4 },
+          lineWidth: 0.15,
+          lineColor: COLORS.border,
+          textColor: COLORS.navy,
+          overflow: "linebreak",
+        },
+        headStyles: {
+          fillColor: COLORS.navy2,
+          textColor: COLORS.white,
+          fontStyle: "bold",
+          fontSize: 7.8,
+          halign: "center",
+        },
+        bodyStyles: {
+          fillColor: COLORS.white,
+        },
+        alternateRowStyles: {
+          fillColor: COLORS.slateSoft,
+        },
+        columnStyles: {
+          0: { cellWidth: 52, fontStyle: "bold" },
+          1: { halign: "right" },
+          2: { halign: "right" },
+          3: { halign: "right" },
+          4: { halign: "right" },
+          5: { halign: "right" },
+          6: { halign: "right", fontStyle: "bold" },
+        },
+        didParseCell: (data) => {
+          if (data.section === "body" && data.column.index === 6) {
+            const raw = String(data.cell.raw || "");
+            if (raw.includes("-")) {
+              data.cell.styles.textColor = COLORS.red;
+            } else {
+              data.cell.styles.textColor = COLORS.green;
+            }
+          }
+        },
+      });
+
+      const transactionStartY = doc.lastAutoTable.finalY + 8;
+
+      const transactionBody = exportRows.map((it) => {
+        const who =
+          it.txType === "income"
+            ? memberById.get(getId(it.receivedByUserId))?.name || "-"
+            : it.txType === "expense"
+              ? it.paymentMode === "split"
+                ? "Split Payment"
+                : memberById.get(getId(it.paidByUserId))?.name || "-"
+              : "-";
+
+        return {
+          rawType: it.txType,
+          date: formatPdfDate(it.date),
+          type: typeLabel(it.txType),
+          member: safeText(who),
+          category: safeText(
+            it.categoryId?.name || (it.txType === "transfer" ? "Transfer" : "-")
+          ),
+          from:
+            it.txType === "expense" && it.paymentMode === "split"
+              ? safeText(paymentSummary(it))
+              : it.txType === "transfer"
+                ? safeText(pdfAccountLabel(it.fromAccountId))
+                : safeText(it.fromAccountId?.name),
+
+          to:
+            it.txType === "transfer"
+              ? safeText(pdfAccountLabel(it.toAccountId))
+              : safeText(it.toAccountId?.name),
+          amount: `${it.txType === "expense" ? "-" : it.txType === "income" ? "+" : ""}${moneyPdf(
+            it.amount
+          )}`,
+          split: it.txType === "expense" ? safeText(splitLabel(it.split)) : "-",
+          note: safeText(it.note),
+        };
       });
 
       autoTable(doc, {
-        startY: doc.lastAutoTable.finalY + 6,
+        startY: transactionStartY,
+        margin: { left: marginX, right: marginX, top: 12, bottom: 18 },
         theme: "grid",
-        head: [["Date", "Type", "Member", "Category / Details", "From", "To", "Amount", "Split", "Note"]],
-        body: exportRows.map((it) => {
-          const who =
-            it.txType === "income"
-              ? memberById.get(getId(it.receivedByUserId))?.name || "-"
-              : it.txType === "expense"
-                ? memberById.get(getId(it.paidByUserId))?.name || "-"
-                : "-";
-
-          return [
-            formatPdfDate(it.date),
-            typeLabel(it.txType),
-            who,
-            it.categoryId?.name || (it.txType === "transfer" ? "Transfer" : "-"),
-            it.fromAccountId?.name || "-",
-            it.toAccountId?.name || "-",
-            `${it.txType === "expense" ? "-" : it.txType === "income" ? "+" : ""}${moneyPdf(it.amount)}`,
-            it.txType === "expense" ? splitLabel(it.split) || "-" : "-",
-            it.note || "-",
-          ];
-        }),
+        tableWidth: contentWidth,
+        showHead: "everyPage",
+        columns: [
+          { header: "Date", dataKey: "date" },
+          { header: "Type", dataKey: "type" },
+          { header: "Member", dataKey: "member" },
+          { header: "Category", dataKey: "category" },
+          { header: "From", dataKey: "from" },
+          { header: "To", dataKey: "to" },
+          { header: "Amount", dataKey: "amount" },
+          { header: "Split", dataKey: "split" },
+          { header: "Note", dataKey: "note" },
+        ],
+        body: transactionBody,
         styles: {
-          fontSize: 7.5,
-          cellPadding: 1.7,
-          overflow: "linebreak",
+          font: "helvetica",
+          fontSize: 7.15,
+          cellPadding: { top: 1.6, right: 1.8, bottom: 1.6, left: 1.8 },
+          lineWidth: 0.12,
+          lineColor: COLORS.border,
+          textColor: COLORS.navy,
           valign: "middle",
+          overflow: "linebreak",
         },
-        headStyles: { fillColor: [240, 240, 240], textColor: 20, fontSize: 7.5 },
+        headStyles: {
+          fillColor: COLORS.navy,
+          textColor: COLORS.white,
+          fontStyle: "bold",
+          fontSize: 7.2,
+          halign: "center",
+          lineColor: COLORS.navy,
+        },
+        alternateRowStyles: {
+          fillColor: [249, 250, 251],
+        },
         columnStyles: {
-          0: { cellWidth: 17 },
-          1: { cellWidth: 15 },
-          2: { cellWidth: 23 },
-          3: { cellWidth: 30 },
-          4: { cellWidth: 22 },
-          5: { cellWidth: 22 },
-          6: { cellWidth: 22 },
-          7: { cellWidth: 18 },
-          8: { cellWidth: 28 },
+          date: { cellWidth: 20, halign: "center" },
+          type: { cellWidth: 17, halign: "center", fontStyle: "bold" },
+          member: { cellWidth: 35 },
+          category: { cellWidth: 30 },
+          from: { cellWidth: 34 },
+          to: { cellWidth: 34 },
+          amount: { cellWidth: 25, halign: "right", fontStyle: "bold" },
+          split: { cellWidth: 18, halign: "center" },
+          note: { cellWidth: 64 },
         },
-        didDrawPage: () => {
-          const pageCount = doc.getNumberOfPages();
-          const pageSize = doc.internal.pageSize;
-          const pageHeight = pageSize.height || pageSize.getHeight();
+        didParseCell: (data) => {
+          if (data.section !== "body") return;
 
-          doc.setFontSize(9);
-          doc.text(
-            `Page ${doc.internal.getCurrentPageInfo().pageNumber} of ${pageCount}`,
-            pageWidth - 14,
-            pageHeight - 8,
-            { align: "right" }
-          );
+          const rawType = data.row.raw?.rawType;
+
+          if (data.column.dataKey === "type") {
+            data.cell.styles.fontStyle = "bold";
+
+            if (rawType === "income") {
+              data.cell.styles.textColor = COLORS.green;
+              data.cell.styles.fillColor = COLORS.greenSoft;
+            } else if (rawType === "expense") {
+              data.cell.styles.textColor = COLORS.red;
+              data.cell.styles.fillColor = COLORS.redSoft;
+            } else {
+              data.cell.styles.textColor = COLORS.blue;
+              data.cell.styles.fillColor = COLORS.blueSoft;
+            }
+          }
+
+          if (data.column.dataKey === "amount") {
+            if (rawType === "income") {
+              data.cell.styles.textColor = COLORS.green;
+            } else if (rawType === "expense") {
+              data.cell.styles.textColor = COLORS.red;
+            } else {
+              data.cell.styles.textColor = COLORS.blue;
+            }
+          }
+
+          if (data.column.dataKey === "member") {
+            data.cell.styles.fontStyle = "bold";
+          }
         },
       });
+
+      const pageCount = doc.getNumberOfPages();
+
+      for (let i = 1; i <= pageCount; i += 1) {
+        doc.setPage(i);
+        drawFooter(i, pageCount);
+      }
 
       const fileName = `Transactions_${month}.pdf`;
 
@@ -1613,7 +2083,10 @@ export default function Ledger() {
                   let details = "";
                   if (it.txType === "transfer") details = `${fromName || "-"} → ${toName || "-"}`;
                   else if (it.txType === "income") details = `${catName || "-"} • To: ${toName || "-"}`;
-                  else details = `${catName || "-"} • From: ${fromName || "-"}`;
+                  else {
+                    const payText = paymentSummary(it);
+                    details = `${catName || "-"}${payText ? ` • ${payText}` : ""}`;
+                  }
 
                   const splitText = it.txType === "expense" ? splitLabel(it.split) : "";
 
@@ -1621,7 +2094,9 @@ export default function Ledger() {
                     it.txType === "income"
                       ? memberById.get(getId(it.receivedByUserId))?.name
                       : it.txType === "expense"
-                        ? memberById.get(getId(it.paidByUserId))?.name
+                        ? it.paymentMode === "split"
+                          ? "Split Payment"
+                          : memberById.get(getId(it.paidByUserId))?.name
                         : null;
 
                   return (
@@ -1788,8 +2263,10 @@ export default function Ledger() {
                             ...form,
                             txType: nextType,
                             categoryId: "",
+                            paymentMode: nextType === "expense" ? form.paymentMode || "single" : "single",
+                            paymentParts: nextType === "expense" && form.paymentMode === "split" ? getDefaultPaymentParts(form.paymentParts) : [],
                             splitType: nextType === "expense" ? form.splitType : "personal",
-                            paidByUserId: nextPaidBy,
+                            paidByUserId: nextType === "expense" && form.paymentMode === "split" ? "" : nextPaidBy,
                             receivedByUserId: nextReceivedBy,
                             fromAccountId: fromStillValid
                               ? form.fromAccountId
@@ -1851,10 +2328,25 @@ export default function Ledger() {
                       <div className="md:col-span-2">
                         <FieldLabel>Paid By</FieldLabel>
                         <FieldSelect
-                          value={form.paidByUserId}
+                          value={form.paymentMode === "split" ? "__split__" : form.paidByUserId}
                           onChange={(e) => {
-                            const nextPaidBy = e.target.value;
+                            const value = e.target.value;
 
+                            if (value === "__split__") {
+                              setForm({
+                                ...form,
+                                paymentMode: "split",
+                                paidByUserId: "",
+                                fromAccountId: "",
+                                paymentParts: getDefaultPaymentParts(form.paymentParts),
+                                amount: amountInputValue(
+                                  getPaymentPartsTotal(getDefaultPaymentParts(form.paymentParts))
+                                ),
+                              });
+                              return;
+                            }
+
+                            const nextPaidBy = value;
                             const availableAccounts = getNormalAccountsForMember(nextPaidBy);
 
                             const currentAccountStillValid = availableAccounts.some(
@@ -1863,6 +2355,8 @@ export default function Ledger() {
 
                             setForm({
                               ...form,
+                              paymentMode: "single",
+                              paymentParts: [],
                               paidByUserId: nextPaidBy,
                               personalUserId:
                                 !form.personalUserId || form.personalUserId === form.paidByUserId
@@ -1880,6 +2374,7 @@ export default function Ledger() {
                               {m.name}
                             </option>
                           ))}
+                          <option value="__split__">Split Payment</option>
                         </FieldSelect>
                       </div>
                     )}
@@ -1899,6 +2394,71 @@ export default function Ledger() {
                             </option>
                           ))}
                         </FieldSelect>
+                      </div>
+                    )}
+
+                    {form.txType === "expense" && form.paymentMode === "split" && (
+                      <div className="md:col-span-2 rounded-[1.25rem] border border-emerald-100 bg-emerald-50/70 p-3 dark:border-emerald-500/20 dark:bg-emerald-500/10 sm:rounded-[1.5rem] sm:p-4">
+                        <div className="mb-3">
+                          <div className="font-black text-slate-950 dark:text-white">
+                            Split Payment Sources
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400">
+                            Select which account each member paid from and how much they paid.
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3">
+                          {(form.paymentParts || []).map((part, index) => {
+                            const member = memberById.get(String(part.userId));
+                            const accountOptions = getNormalAccountsForMember(part.userId);
+
+                            return (
+                              <div
+                                key={part.userId || index}
+                                className="grid grid-cols-1 gap-3 rounded-2xl border border-white/70 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.04] sm:grid-cols-[1fr_1.3fr_1fr]"
+                              >
+                                <div>
+                                  <FieldLabel>Member</FieldLabel>
+                                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700 dark:border-white/10 dark:bg-slate-950/60 dark:text-slate-200 sm:rounded-2xl sm:px-4 sm:py-2.5 sm:text-sm">
+                                    {member?.name || "Member"}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <FieldLabel>Paid From Account</FieldLabel>
+                                  <FieldSelect
+                                    value={part.accountId || ""}
+                                    onChange={(e) => setPaymentPart(index, "accountId", e.target.value)}
+                                  >
+                                    <option value="">Select account</option>
+                                    {accountOptions.map((a) => (
+                                      <option key={a._id} value={a._id}>
+                                        {a.name}
+                                      </option>
+                                    ))}
+                                  </FieldSelect>
+                                </div>
+
+                                <div>
+                                  <FieldLabel>Paid Amount</FieldLabel>
+                                  <FieldInput
+                                    type="number"
+                                    value={part.amount || ""}
+                                    onChange={(e) => setPaymentPart(index, "amount", e.target.value)}
+                                    placeholder="e.g., 500"
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="mt-3 rounded-2xl bg-white/70 p-3 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">
+                          Total paid: <b>{money(getPaymentPartsTotal(form.paymentParts))}</b>
+                          <span className="mx-2">•</span>
+                          Transaction amount: <b>{money(form.amount)}</b>
+                        </div>
                       </div>
                     )}
 
@@ -1957,9 +2517,27 @@ export default function Ledger() {
                       <FieldInput
                         type="number"
                         value={form.amount}
-                        onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                        placeholder="e.g., 5000"
+                        onChange={(e) => {
+                          if (form.txType === "expense" && form.paymentMode === "split") return;
+                          setForm({ ...form, amount: e.target.value });
+                        }}
+                        readOnly={form.txType === "expense" && form.paymentMode === "split"}
+                        placeholder={
+                          form.txType === "expense" && form.paymentMode === "split"
+                            ? "Auto calculated from split payments"
+                            : "e.g., 5000"
+                        }
+                        className={
+                          form.txType === "expense" && form.paymentMode === "split"
+                            ? "cursor-not-allowed bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-300"
+                            : ""
+                        }
                       />
+                      {form.txType === "expense" && form.paymentMode === "split" ? (
+                        <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                          This amount is automatically calculated from the member-wise paid amounts above.
+                        </p>
+                      ) : null}
                     </div>
 
                     {form.txType === "expense" && (

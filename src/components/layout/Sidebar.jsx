@@ -91,6 +91,15 @@ function Icon({ name, className = "h-5 w-5" }) {
           <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
         </svg>
       );
+    case "tax":
+      return (
+        <svg {...common} viewBox="0 0 24 24">
+          <path d="M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+          <path d="M9 8h6" />
+          <path d="M9 12h6" />
+          <path d="M9 16h3" />
+        </svg>
+      );
     case "reports":
       return (
         <svg {...common} viewBox="0 0 24 24">
@@ -191,6 +200,7 @@ export default function Sidebar({
         title: "Reports",
         items: [
           { to: "/individual-summary", label: "Individual Summary", icon: <Icon name="summary" /> },
+          { to: "/tax-center", label: "Tax Center", icon: <Icon name="tax" /> },
           { to: "/carry-forward", label: "Carry Forward", icon: <Icon name="reports" /> },
           { to: "/year-overview", label: "Year Overview", icon: <Icon name="reports" /> },
         ],

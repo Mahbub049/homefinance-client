@@ -160,6 +160,11 @@ export default function Topbar({ onToggleSidebar, onOpenDrawer }) {
         subtitle: "Member-wise spending, cash, and monthly insight",
         accent: "from-cyan-500 to-teal-600",
       },
+      "/tax-center": {
+        title: "Tax Center",
+        subtitle: "Income, rebate, expenditure, assets, and tax records",
+        accent: "from-indigo-500 to-cyan-600",
+      },
       "/carry-forward": {
         title: "Carry Forward",
         subtitle: "Previous balance movement across months",

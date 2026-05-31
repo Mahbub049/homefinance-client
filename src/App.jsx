@@ -16,6 +16,7 @@ import CarryForward from "./pages/CarryForward";
 import IndividualSummary from "./pages/IndividualSummary";
 import YearOverview from "./pages/YearOverview";
 import PlannedPurchases from "./pages/PlannedPurchases";
+import TaxCenter from "./pages/TaxCenter";
 
 export default function App() {
   return (
@@ -161,6 +162,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <PlannedPurchases />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/tax-center"
+          element={
+            <ProtectedRoute>
+              <TaxCenter />
             </ProtectedRoute>
           }
         />
