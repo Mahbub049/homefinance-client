@@ -283,7 +283,8 @@ function WalletPersonCard({ user, maxAbsNet }) {
   const transferOut = safeNumber(user.transferOut);
   const transferNet = safeNumber(user.transferNet);
   const net = safeNumber(user.net);
-  const remaining = safeNumber(user.remaining ?? income - share + transferNet);
+  const remaining = safeNumber(user.cashAfterPaid ?? user.remaining ?? income - paid + transferNet);
+  const shareBasedRemaining = safeNumber(user.shareBasedRemaining ?? income - share + transferNet);
 
   const netPositive = net >= 0;
   const pct = Math.round((Math.abs(net) / Math.max(1, maxAbsNet)) * 100);
@@ -330,7 +331,7 @@ function WalletPersonCard({ user, maxAbsNet }) {
             <div className="hidden h-10 w-10 place-items-center rounded-2xl bg-slate-900 text-xs font-black text-white dark:bg-white dark:text-slate-950 sm:grid">VS</div>
             <div className="rounded-2xl border border-rose-100 bg-white p-2.5 dark:border-rose-400/20 dark:bg-rose-400/10 sm:p-3">
               <div className="text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:text-rose-200 sm:text-[11px]">Outflow</div>
-              <div className="mt-1 break-words text-sm font-black text-rose-900 dark:text-rose-100 sm:text-base">{formatMoney(share + transferOut)}</div>
+              <div className="mt-1 break-words text-sm font-black text-rose-900 dark:text-rose-100 sm:text-base">{formatMoney(paid + transferOut)}</div>
             </div>
           </div>
         </div>
@@ -348,6 +349,7 @@ function WalletPersonCard({ user, maxAbsNet }) {
           <MiniMetric label="Income" value={formatMoney(income)} tone="emerald" />
           <MiniMetric label="Paid Expense" value={formatMoney(paid)} tone="violet" />
           <MiniMetric label="Expense Share" value={formatMoney(share)} tone="rose" />
+          <MiniMetric label="Share-Based Balance" value={formatMoney(shareBasedRemaining)} tone="sky" />
           <MiniMetric label="Transfer In" value={formatMoney(transferIn)} tone="sky" />
           <MiniMetric label="Transfer Out" value={formatMoney(transferOut)} tone="rose" />
           <MiniMetric label="Transfer Net" value={formatMoney(transferNet)} tone={transferNet >= 0 ? "emerald" : "rose"} />
@@ -993,7 +995,7 @@ export default function Wallet() {
       const transferOut = safeNumber(u.transferOut);
       const transferNet = safeNumber(u.transferNet);
       const net = safeNumber(u.net);
-      const remaining = safeNumber(u.remaining ?? income - share + transferNet);
+      const remaining = safeNumber(u.cashAfterPaid ?? u.remaining ?? income - paid + transferNet);
 
       initial.income += income;
       initial.paid += paid;
@@ -1086,7 +1088,7 @@ export default function Wallet() {
           <section className="hidden grid-cols-1 gap-3 sm:grid sm:grid-cols-2 xl:grid-cols-4">
             <SummaryCard title="Total Income" value={formatMoney(totals.income)} sub={shortMonth(month)} icon="arrowUp" accent="from-emerald-500 to-teal-600" />
             <SummaryCard title="Expense Share" value={formatMoney(totals.share)} sub="Split-aware total share" icon="arrowDown" accent="from-rose-500 to-pink-600" />
-            <SummaryCard title="Remaining" value={formatMoney(totals.remaining)} sub="Income − share + transfer net" icon="wallet" accent="from-sky-500 to-indigo-600" />
+            <SummaryCard title="Remaining" value={formatMoney(totals.remaining)} sub="Income − paid expense + transfer net" icon="wallet" accent="from-sky-500 to-indigo-600" />
             <SummaryCard title="Settlement Gap" value={formatMoney(data?.settlementTotals?.pendingTotal ?? Math.max(totals.surplus, totals.deficit))} sub="Pending after recorded settlements" icon="swap" accent="from-amber-500 to-orange-600" />
           </section>
 
