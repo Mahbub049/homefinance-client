@@ -91,6 +91,16 @@ function Icon({ name, className = "h-5 w-5" }) {
           <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
         </svg>
       );
+    case "shared":
+      return (
+        <svg {...common} viewBox="0 0 24 24">
+          <rect x="3" y="5" width="18" height="14" rx="3" />
+          <path d="M3 10h18" />
+          <path d="M8 15h3" />
+          <path d="M15 13v4" />
+          <path d="M13 15h4" />
+        </svg>
+      );
     case "tax":
       return (
         <svg {...common} viewBox="0 0 24 24">
@@ -191,6 +201,7 @@ export default function Sidebar({
           { to: "/fixed", label: "Fixed Expenses", icon: <Icon name="fixed" /> },
           { to: "/grocery", label: "Grocery", icon: <Icon name="grocery" /> },
           { to: "/emi", label: "EMI", icon: <Icon name="emi" /> },
+          { to: "/shared-purchases", label: "Shared Purchases", icon: <Icon name="shared" /> },
           { to: "/savings", label: "Savings", icon: <Icon name="savings" /> },
           { to: "/wallet", label: "Wallet", icon: <Icon name="wallet" /> },
           { to: "/planned-purchases", label: "Planned Purchases", icon: <Icon name="planned" /> },
