@@ -115,6 +115,18 @@ function splitLabel(split) {
   return "";
 }
 
+function isSettlementTransfer(item) {
+  const sourceType = String(item?.sourceType || "").toLowerCase();
+  const note = String(item?.note || "").trim().toLowerCase();
+
+  return (
+    sourceType === "wallet_settlement" ||
+    sourceType === "shared_purchase_reimbursement" ||
+    note.startsWith("[settlement]") ||
+    note.startsWith("[purchase reimbursement]")
+  );
+}
+
 function Icon({ name, className = "h-5 w-5" }) {
   const common = {
     className,
@@ -1112,6 +1124,11 @@ export default function Ledger() {
     for (const t of allItems || []) {
       if (t.txType !== "transfer") continue;
 
+      // Expense splits have already assigned each member's responsibility.
+      // A later settlement/reimbursement only moves cash between accounts and
+      // must not deduct the same responsibility again in Ledger member totals.
+      if (isSettlementTransfer(t)) continue;
+
       const amt = Number(t.amount || 0);
       const fromAcc = accountsById.get(getId(t.fromAccountId));
       const toAcc = accountsById.get(getId(t.toAccountId));
@@ -2009,7 +2026,7 @@ export default function Ledger() {
               </div>
 
               <div className="mt-4 hidden rounded-2xl border border-violet-100 bg-violet-50 p-4 text-xs leading-5 text-violet-800 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-200 sm:block">
-                Transfers use account ownership: Mahbub, Mirza, or Joint. Same-owner transfers are not counted as personal spending.
+                Transfers use account ownership: Mahbub, Mirza, or Joint. Same-owner transfers and expense settlements are excluded from member spending because the original split already assigned the cost.
               </div>
             </div>
           </section>

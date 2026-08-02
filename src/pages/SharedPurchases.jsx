@@ -685,7 +685,7 @@ export default function SharedPurchases() {
                         <div>
                           <h3 className="font-black">{monthLabel(month)} schedule</h3>
                           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            Allocations reduce the monthly budget. Only reimbursements move money between accounts.
+                            The upfront payer’s own allocation affects the monthly budget. Another member’s portion is added to debt/spend only after Record Payment is completed.
                           </p>
                         </div>
                       </div>
@@ -767,7 +767,7 @@ export default function SharedPurchases() {
       <Modal open={createOpen} title="Add Shared or Large Purchase" onClose={() => setCreateOpen(false)} wide>
         <form onSubmit={createPurchase} className="space-y-5 p-4 sm:p-6">
           <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 text-sm leading-6 text-indigo-800 dark:border-indigo-400/20 dark:bg-indigo-400/10 dark:text-indigo-200">
-            The full amount will be deducted once from the selected payer account. It will not become one large monthly expense; the app will create monthly budget allocations instead.
+            The full amount will be deducted once from the selected payer account. The payer’s own share is allocated monthly; other members’ portions affect monthly debt/spend only when their payments are recorded.
           </div>
 
           {message ? (

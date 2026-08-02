@@ -1190,7 +1190,7 @@ function openPayModalForInstallment(item) {
               <div>
                 <div className="text-base font-black text-slate-950 dark:text-white sm:text-lg">Monthly EMI Bills</div>
                 <p className="mt-1 hidden text-sm text-slate-600 dark:text-slate-400 sm:block">
-                  Generate pending installment rows for all active plans in {monthLabel(month)}.
+                  Generate pending installment rows for all active plans in {monthLabel(month)}. Pending rows do not affect Dashboard debt or spend until marked paid.
                 </p>
                 <p className="mt-1 hidden text-xs text-slate-500 dark:text-slate-400 sm:block">
                   Expense category used: <b>{emiExpenseCategoryId ? "EMI" : "Not selected"}</b>
@@ -1291,7 +1291,7 @@ function openPayModalForInstallment(item) {
               <div>
                 <div className="text-base font-black text-slate-950 dark:text-white sm:text-lg">Installments ({monthLabel(month)})</div>
                 <p className="mt-1 hidden text-sm text-slate-600 dark:text-slate-400 sm:block">
-                  Mark monthly installments paid or pending. Paid installments deduct from selected account.
+                  Mark monthly installments paid or pending. Only paid installments deduct from the selected account and appear in Dashboard debt/spend.
                 </p>
               </div>
               <div className="w-fit rounded-full border border-amber-100 bg-white px-3 py-1 text-xs font-bold text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200">
