@@ -56,6 +56,22 @@ function nameOf(value, fallback = "Member") {
   return typeof value === "object" ? value.name || fallback : fallback;
 }
 
+function accountMatchesMember(account, userId, members = []) {
+  const owner = String(account?.owner || "").trim().toLowerCase();
+  if (!owner || ["joint", "shared", "family"].includes(owner)) return true;
+
+  const member = members.find((row) => idOf(row?.id) === idOf(userId));
+  const memberName = String(member?.name || "").trim().toLowerCase();
+  if (!memberName) return false;
+
+  const memberParts = memberName.split(/\s+/).filter(Boolean);
+  return (
+    memberName.includes(owner) ||
+    owner.includes(memberName) ||
+    memberParts.some((part) => owner.includes(part) || part.includes(owner))
+  );
+}
+
 const inputClass =
   "w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:focus:border-indigo-400";
 const labelClass =
@@ -250,10 +266,14 @@ export default function SharedPurchases() {
     setCategories(categoryItems);
 
     const payerId = myId || memberItems[0]?.id || "";
+    const defaultPayerAccount = activeAccounts.find((account) =>
+      accountMatchesMember(account, payerId, memberItems)
+    );
     setForm((previous) => ({
       ...previous,
       payerUserId: previous.payerUserId || payerId,
-      payerAccountId: previous.payerAccountId || activeAccounts[0]?._id || "",
+      payerAccountId:
+        previous.payerAccountId || defaultPayerAccount?._id || "",
       categoryId:
         previous.categoryId ||
         categoryItems.find((item) => /large purchase/i.test(item.name || ""))?._id ||
@@ -299,6 +319,21 @@ export default function SharedPurchases() {
   const total = Number(form.totalAmount || 0);
   const payerId = idOf(form.payerUserId);
 
+  const payerAccounts = useMemo(
+    () => accounts.filter((account) => accountMatchesMember(account, payerId, members)),
+    [accounts, members, payerId]
+  );
+
+  const reimbursementFromAccounts = useMemo(() => {
+    const userId = idOf(selectedInstallment?.userId);
+    return accounts.filter((account) => accountMatchesMember(account, userId, members));
+  }, [accounts, members, selectedInstallment]);
+
+  const reimbursementToAccounts = useMemo(() => {
+    const userId = idOf(selectedPlan?.payerUserId);
+    return accounts.filter((account) => accountMatchesMember(account, userId, members));
+  }, [accounts, members, selectedPlan]);
+
   const calculatedShares = useMemo(() => {
     if (form.purchaseType === "personal") {
       return [{ userId: payerId, shareAmount: round2(total) }];
@@ -329,6 +364,9 @@ export default function SharedPurchases() {
 
   function resetForm() {
     const payerUserId = myId || members[0]?.id || "";
+    const defaultPayerAccount = accounts.find((account) =>
+      accountMatchesMember(account, payerUserId, members)
+    );
     setForm({
       title: "",
       totalAmount: "",
@@ -338,7 +376,7 @@ export default function SharedPurchases() {
         categories[0]?._id ||
         "",
       payerUserId,
-      payerAccountId: accounts[0]?._id || "",
+      payerAccountId: defaultPayerAccount?._id || "",
       purchaseType: "shared",
       startMonth: month,
       months: 8,
@@ -406,11 +444,33 @@ export default function SharedPurchases() {
   }
 
   function openPayment(plan, installment) {
+    const installmentUserId = idOf(installment?.userId);
+    const payerUserId = idOf(plan?.payerUserId);
+    const allowedFromAccounts = accounts.filter((account) =>
+      accountMatchesMember(account, installmentUserId, members)
+    );
+    const allowedToAccounts = accounts.filter((account) =>
+      accountMatchesMember(account, payerUserId, members)
+    );
+
+    const previousFromId = idOf(installment?.fromAccountId);
+    const planPayerAccountId = idOf(plan?.payerAccountId);
+    const defaultFromId = allowedFromAccounts.some(
+      (account) => idOf(account._id) === previousFromId
+    )
+      ? previousFromId
+      : idOf(allowedFromAccounts[0]?._id);
+    const defaultToId = allowedToAccounts.some(
+      (account) => idOf(account._id) === planPayerAccountId
+    )
+      ? planPayerAccountId
+      : idOf(allowedToAccounts[0]?._id);
+
     setSelectedPlan(plan);
     setSelectedInstallment(installment);
     setPayForm({
-      fromAccountId: installment?.fromAccountId?._id || "",
-      toAccountId: idOf(plan?.payerAccountId) || "",
+      fromAccountId: defaultFromId,
+      toAccountId: defaultToId,
       paidDate: localDate(),
       note: "",
     });
@@ -843,7 +903,21 @@ export default function SharedPurchases() {
               <select
                 className={inputClass}
                 value={form.payerUserId}
-                onChange={(event) => setForm((previous) => ({ ...previous, payerUserId: event.target.value }))}
+                onChange={(event) => {
+                  const nextPayerId = event.target.value;
+                  const nextAccounts = accounts.filter((account) =>
+                    accountMatchesMember(account, nextPayerId, members)
+                  );
+                  setForm((previous) => ({
+                    ...previous,
+                    payerUserId: nextPayerId,
+                    payerAccountId: nextAccounts.some(
+                      (account) => idOf(account._id) === idOf(previous.payerAccountId)
+                    )
+                      ? previous.payerAccountId
+                      : idOf(nextAccounts[0]?._id),
+                  }));
+                }}
               >
                 {members.map((member) => (
                   <option key={member.id} value={member.id}>
@@ -859,7 +933,7 @@ export default function SharedPurchases() {
                 onChange={(event) => setForm((previous) => ({ ...previous, payerAccountId: event.target.value }))}
               >
                 <option value="">Select account</option>
-                {accounts.map((account) => (
+                {payerAccounts.map((account) => (
                   <option key={account._id} value={account._id}>
                     {account.name} · {account.owner}
                   </option>
@@ -1034,7 +1108,7 @@ export default function SharedPurchases() {
               onChange={(event) => setPayForm((previous) => ({ ...previous, fromAccountId: event.target.value }))}
             >
               <option value="">Select member account</option>
-              {accounts.map((account) => (
+              {reimbursementFromAccounts.map((account) => (
                 <option key={account._id} value={account._id}>
                   {account.name} · {account.owner}
                 </option>
@@ -1049,7 +1123,7 @@ export default function SharedPurchases() {
               onChange={(event) => setPayForm((previous) => ({ ...previous, toAccountId: event.target.value }))}
             >
               <option value="">Select receiving account</option>
-              {accounts.map((account) => (
+              {reimbursementToAccounts.map((account) => (
                 <option key={account._id} value={account._id}>
                   {account.name} · {account.owner}
                 </option>
