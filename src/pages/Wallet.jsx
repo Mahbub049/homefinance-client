@@ -364,12 +364,12 @@ function WalletPersonCard({ user, maxAbsNet }) {
           <MiniMetric label="Paid Expense" value={formatMoney(paid)} tone="violet" />
           <MiniMetric label="Expense Share" value={formatMoney(share)} tone="rose" />
           <MiniMetric label="Regular Expense Net" value={formatMoney(expenseNet)} tone={expenseNet >= 0 ? "emerald" : "rose"} />
-          <MiniMetric label="Shared Purchase Due" value={formatMoney(sharedPurchaseDue)} tone={sharedPurchaseDue > 0 ? "rose" : "slate"} />
-          <MiniMetric label="Shared Purchase Receivable" value={formatMoney(sharedPurchaseReceivable)} tone={sharedPurchaseReceivable > 0 ? "emerald" : "slate"} />
+          <MiniMetric label="Outstanding Shared Due" value={formatMoney(sharedPurchaseDue)} tone={sharedPurchaseDue > 0 ? "rose" : "slate"} />
+          <MiniMetric label="Outstanding Shared Receivable" value={formatMoney(sharedPurchaseReceivable)} tone={sharedPurchaseReceivable > 0 ? "emerald" : "slate"} />
           <MiniMetric label="Shared Reimbursement Paid" value={formatMoney(sharedPurchasePaid)} tone={sharedPurchasePaid > 0 ? "emerald" : "slate"} />
           <MiniMetric label="Shared Reimbursement Received" value={formatMoney(sharedPurchaseReceived)} tone={sharedPurchaseReceived > 0 ? "sky" : "slate"} />
-          <MiniMetric label="Shared Purchase Net" value={formatMoney(sharedPurchaseNet)} tone={sharedPurchaseNet >= 0 ? "emerald" : "rose"} />
-          <MiniMetric label="Before Recorded Payments" value={formatMoney(preSettlementNet)} tone={preSettlementNet >= 0 ? "emerald" : "rose"} />
+          <MiniMetric label="Outstanding Shared Net" value={formatMoney(sharedPurchaseNet)} tone={sharedPurchaseNet >= 0 ? "emerald" : "rose"} />
+          <MiniMetric label="Before Wallet Settlement" value={formatMoney(preSettlementNet)} tone={preSettlementNet >= 0 ? "emerald" : "rose"} />
           <MiniMetric label="Wallet Settlement Paid" value={formatMoney(walletSettlementPaid)} tone={walletSettlementPaid > 0 ? "emerald" : "slate"} />
           <MiniMetric label="Wallet Settlement Received" value={formatMoney(walletSettlementReceived)} tone={walletSettlementReceived > 0 ? "sky" : "slate"} />
           <MiniMetric label="Wallet Settlement Net" value={formatMoney(walletSettlementNet)} tone={walletSettlementNet >= 0 ? "emerald" : "rose"} />
@@ -394,7 +394,7 @@ function WalletPersonCard({ user, maxAbsNet }) {
         </div>
 
         <div className="mt-4 hidden rounded-2xl border border-slate-100 bg-white px-3 py-2 text-xs leading-5 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 lg:block">
-          Final settlement = regular expense net + Shared/Large Purchase obligations + recorded purchase reimbursements + recorded Wallet settlements. Account transfers still affect the cash balance separately.
+          Final settlement = regular expense net + outstanding Shared/Large Purchase obligations + verified Wallet settlement transfers. A verified Shared Purchase repayment clears its due and is shown for history only; it is never added a second time.
         </div>
       </div>
     </article>
@@ -612,6 +612,8 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
 
   const requiredTotal = safeNumber(settlementTotals.requiredTotal);
   const monthlySettled = safeNumber(settlementTotals.monthlySettled);
+  const sharedPurchaseSettled = safeNumber(settlementTotals.sharedPurchaseSettled);
+  const walletSettled = safeNumber(settlementTotals.walletSettled);
   const pendingTotal = safeNumber(settlementTotals.pendingTotal);
   const pastPendingSettled = safeNumber(settlementTotals.pastPendingSettled);
 
@@ -624,7 +626,7 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
           </div>
           <h3 className="mt-3 text-lg font-black text-slate-950 dark:text-white sm:text-xl">Settle balances for {shortMonth(month)}</h3>
           <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm">
-            Final settlement now combines normal expense sharing, Shared & Large Purchase obligations, recorded purchase reimbursements, and Wallet settlement payments. Past pending only records an older outside-app issue.
+            Final settlement combines normal expense sharing with only outstanding Shared & Large Purchase obligations. A verified Shared Purchase repayment clears that due; it is not added again as a second adjustment. Only verified Wallet settlement transfers reduce the remaining combined balance.
           </p>
         </div>
 
@@ -672,9 +674,10 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-5">
         <MiniMetric label="Total Required" value={formatMoney(requiredTotal)} tone="violet" />
-        <MiniMetric label="Recorded Payments" value={formatMoney(monthlySettled)} tone="emerald" />
+        <MiniMetric label="Shared Repaid" value={formatMoney(sharedPurchaseSettled)} tone="sky" />
+        <MiniMetric label="Wallet Settled" value={formatMoney(walletSettled || monthlySettled)} tone="emerald" />
         <MiniMetric label="Still Pending" value={formatMoney(pendingTotal)} tone={pendingTotal > 0 ? "rose" : "emerald"} />
         <MiniMetric label="Past Marked" value={formatMoney(pastPendingSettled)} tone="sky" />
       </div>
@@ -842,7 +845,7 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
           <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40">
             <div className="border-b border-slate-100 px-4 py-3 dark:border-white/10">
               <h4 className="text-sm font-black text-slate-950 dark:text-white">Per-person settlement status</h4>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">This includes regular expenses plus Shared & Large Purchase payment effects.</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Current position includes regular expenses, unpaid Shared & Large Purchase dues, and verified Wallet settlements.</p>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-xs">
