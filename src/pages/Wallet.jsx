@@ -282,6 +282,16 @@ function WalletPersonCard({ user, maxAbsNet }) {
   const transferIn = safeNumber(user.transferIn);
   const transferOut = safeNumber(user.transferOut);
   const transferNet = safeNumber(user.transferNet);
+  const expenseNet = safeNumber(user.expenseNet ?? paid - share);
+  const sharedPurchaseDue = safeNumber(user.sharedPurchaseDue);
+  const sharedPurchaseReceivable = safeNumber(user.sharedPurchaseReceivable);
+  const sharedPurchasePaid = safeNumber(user.sharedPurchasePaid);
+  const sharedPurchaseReceived = safeNumber(user.sharedPurchaseReceived);
+  const sharedPurchaseNet = safeNumber(user.sharedPurchaseNet);
+  const walletSettlementPaid = safeNumber(user.walletSettlementPaid);
+  const walletSettlementReceived = safeNumber(user.walletSettlementReceived);
+  const walletSettlementNet = safeNumber(user.walletSettlementNet);
+  const preSettlementNet = safeNumber(user.preSettlementNet ?? expenseNet);
   const net = safeNumber(user.net);
   const remaining = safeNumber(user.cashAfterPaid ?? user.remaining ?? income - paid + transferNet);
   const shareBasedRemaining = safeNumber(user.shareBasedRemaining ?? income - share + transferNet);
@@ -302,13 +312,17 @@ function WalletPersonCard({ user, maxAbsNet }) {
             <div className="min-w-0">
               <h3 className="break-words text-base font-black text-slate-950 dark:text-white sm:text-lg">{user.name}</h3>
               <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400 sm:mt-1">
-                {netPositive ? "Paid more than personal share" : "Needs to balance the month"}
+                {Math.abs(net) <= 0.009
+                  ? "Fully balanced after all settlement items"
+                  : netPositive
+                    ? "Should receive after all settlement items"
+                    : "Needs to pay after all settlement items"}
               </p>
             </div>
           </div>
 
           <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-black sm:px-3 sm:py-1.5 sm:text-xs ${statusClasses(net)}`}>
-            Net {netPositive ? "+" : ""}{formatMoney(net)}
+            Final {netPositive ? "+" : ""}{formatMoney(net)}
           </span>
         </div>
 
@@ -349,6 +363,17 @@ function WalletPersonCard({ user, maxAbsNet }) {
           <MiniMetric label="Income" value={formatMoney(income)} tone="emerald" />
           <MiniMetric label="Paid Expense" value={formatMoney(paid)} tone="violet" />
           <MiniMetric label="Expense Share" value={formatMoney(share)} tone="rose" />
+          <MiniMetric label="Regular Expense Net" value={formatMoney(expenseNet)} tone={expenseNet >= 0 ? "emerald" : "rose"} />
+          <MiniMetric label="Shared Purchase Due" value={formatMoney(sharedPurchaseDue)} tone={sharedPurchaseDue > 0 ? "rose" : "slate"} />
+          <MiniMetric label="Shared Purchase Receivable" value={formatMoney(sharedPurchaseReceivable)} tone={sharedPurchaseReceivable > 0 ? "emerald" : "slate"} />
+          <MiniMetric label="Shared Reimbursement Paid" value={formatMoney(sharedPurchasePaid)} tone={sharedPurchasePaid > 0 ? "emerald" : "slate"} />
+          <MiniMetric label="Shared Reimbursement Received" value={formatMoney(sharedPurchaseReceived)} tone={sharedPurchaseReceived > 0 ? "sky" : "slate"} />
+          <MiniMetric label="Shared Purchase Net" value={formatMoney(sharedPurchaseNet)} tone={sharedPurchaseNet >= 0 ? "emerald" : "rose"} />
+          <MiniMetric label="Before Recorded Payments" value={formatMoney(preSettlementNet)} tone={preSettlementNet >= 0 ? "emerald" : "rose"} />
+          <MiniMetric label="Wallet Settlement Paid" value={formatMoney(walletSettlementPaid)} tone={walletSettlementPaid > 0 ? "emerald" : "slate"} />
+          <MiniMetric label="Wallet Settlement Received" value={formatMoney(walletSettlementReceived)} tone={walletSettlementReceived > 0 ? "sky" : "slate"} />
+          <MiniMetric label="Wallet Settlement Net" value={formatMoney(walletSettlementNet)} tone={walletSettlementNet >= 0 ? "emerald" : "rose"} />
+          <MiniMetric label="Final Settlement Net" value={formatMoney(net)} tone={net >= 0 ? "emerald" : "rose"} />
           <MiniMetric label="Share-Based Balance" value={formatMoney(shareBasedRemaining)} tone="sky" />
           <MiniMetric label="Transfer In" value={formatMoney(transferIn)} tone="sky" />
           <MiniMetric label="Transfer Out" value={formatMoney(transferOut)} tone="rose" />
@@ -369,7 +394,7 @@ function WalletPersonCard({ user, maxAbsNet }) {
         </div>
 
         <div className="mt-4 hidden rounded-2xl border border-slate-100 bg-white px-3 py-2 text-xs leading-5 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 lg:block">
-          Same-owner transfers are ignored for personal settlement. Cross-owner transfers reduce one person and increase the other.
+          Final settlement = regular expense net + Shared/Large Purchase obligations + recorded purchase reimbursements + recorded Wallet settlements. Account transfers still affect the cash balance separately.
         </div>
       </div>
     </article>
@@ -599,7 +624,7 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
           </div>
           <h3 className="mt-3 text-lg font-black text-slate-950 dark:text-white sm:text-xl">Settle balances for {shortMonth(month)}</h3>
           <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm">
-            Wallet settlement creates a real transfer, so wallet balance and Ledger transfer list will change. Past pending settlement only records that an older outside-app issue is settled.
+            Final settlement now combines normal expense sharing, Shared & Large Purchase obligations, recorded purchase reimbursements, and Wallet settlement payments. Past pending only records an older outside-app issue.
           </p>
         </div>
 
@@ -649,7 +674,7 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
 
       <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
         <MiniMetric label="Total Required" value={formatMoney(requiredTotal)} tone="violet" />
-        <MiniMetric label="Wallet Settled" value={formatMoney(monthlySettled)} tone="emerald" />
+        <MiniMetric label="Recorded Payments" value={formatMoney(monthlySettled)} tone="emerald" />
         <MiniMetric label="Still Pending" value={formatMoney(pendingTotal)} tone={pendingTotal > 0 ? "rose" : "emerald"} />
         <MiniMetric label="Past Marked" value={formatMoney(pastPendingSettled)} tone="sky" />
       </div>
@@ -690,7 +715,7 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
               : "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100"
           )}>
             {mode === "wallet"
-              ? "Use this when money actually moved from one member/account to another. It will appear as a Transfer in Ledger."
+              ? "Use this only for the remaining final settlement shown here. Shared & Large Purchase Record Payments are included automatically, so do not pay the same obligation twice."
               : "Use this for older cash issues that were never added to the app. It will not change wallet amount or Ledger."}
           </div>
 
@@ -817,32 +842,39 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
           <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40">
             <div className="border-b border-slate-100 px-4 py-3 dark:border-white/10">
               <h4 className="text-sm font-black text-slate-950 dark:text-white">Per-person settlement status</h4>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Green means settled. Red means still pending.</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">This includes regular expenses plus Shared & Large Purchase payment effects.</p>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-xs">
                 <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
                   <tr>
                     <th className="px-4 py-3">Member</th>
-                    <th className="px-4 py-3">Pay</th>
-                    <th className="px-4 py-3">Receive</th>
-                    <th className="px-4 py-3">Settled</th>
-                    <th className="px-4 py-3">Pending</th>
+                    <th className="px-4 py-3">Gross Pay</th>
+                    <th className="px-4 py-3">Gross Receive</th>
+                    <th className="px-4 py-3">Recorded Paid</th>
+                    <th className="px-4 py-3">Recorded Received</th>
+                    <th className="px-4 py-3">Final Position</th>
                     <th className="px-4 py-3">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-white/10">
                   {settlementSummary.length ? settlementSummary.map((row) => {
-                    const pending = safeNumber(row.pendingPay) + safeNumber(row.pendingReceive);
-                    const settled = safeNumber(row.settledPaid) + safeNumber(row.settledReceived);
+                    const pendingPay = safeNumber(row.pendingPay);
+                    const pendingReceive = safeNumber(row.pendingReceive);
                     const done = row.status === "settled";
+                    const finalPosition = pendingPay > 0.009
+                      ? `Pay ${formatMoney(pendingPay)}`
+                      : pendingReceive > 0.009
+                        ? `Receive ${formatMoney(pendingReceive)}`
+                        : "Balanced";
                     return (
                       <tr key={row.userId} className="text-slate-700 dark:text-slate-200">
                         <td className="px-4 py-3 font-black text-slate-950 dark:text-white">{row.name}</td>
                         <td className="px-4 py-3">{formatMoney(row.shouldPay)}</td>
                         <td className="px-4 py-3">{formatMoney(row.shouldReceive)}</td>
-                        <td className="px-4 py-3">{formatMoney(settled)}</td>
-                        <td className="px-4 py-3 font-black">{formatMoney(pending)}</td>
+                        <td className="px-4 py-3">{formatMoney(row.settledPaid)}</td>
+                        <td className="px-4 py-3">{formatMoney(row.settledReceived)}</td>
+                        <td className="px-4 py-3 font-black">{finalPosition}</td>
                         <td className="px-4 py-3">
                           <span className={cx(
                             "rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide",
@@ -857,7 +889,7 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
                     );
                   }) : (
                     <tr>
-                      <td colSpan="6" className="px-4 py-5 text-center text-slate-500 dark:text-slate-400">No settlement data yet.</td>
+                      <td colSpan="7" className="px-4 py-5 text-center text-slate-500 dark:text-slate-400">No settlement data yet.</td>
                     </tr>
                   )}
                 </tbody>
