@@ -67,6 +67,13 @@ function Icon({ name, className = "h-5 w-5" }) {
         <path d="M8 11V8a4 4 0 0 1 8 0v3" />
       </svg>
     ),
+    save: (
+      <svg {...common}>
+        <path d="M5 3h12l2 2v16H5V3Z" />
+        <path d="M8 3v6h8V3" />
+        <path d="M8 21v-7h8v7" />
+      </svg>
+    ),
     edit: (
       <svg {...common}>
         <path d="M12 20h9" />
@@ -235,6 +242,58 @@ export default function CarryForward() {
       setDraftClosing(nextDraft);
     } catch (e) {
       setErr(e?.response?.data?.message || "Failed to load carry forward data.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveDraft() {
+    setMsg("");
+    setErr("");
+    setBusy(true);
+
+    try {
+      const accountBalances = rows.map((row) => ({
+        accountId: row.accountId,
+        balance: Number(row.editedClosing || 0),
+      }));
+
+      const res = await api.post("/api/month-balance/save", {
+        month,
+        accountBalances,
+      });
+
+      setItem(res.data.item);
+
+      // This is only a draft save, not a month closing.
+      setCalc(null);
+
+      setComputed((prev) => ({
+        ...(prev || {}),
+        month,
+        openingTotal: res.data.calc?.openingTotal,
+        closingTotal: res.data.calc?.closingTotal,
+        systemClosingTotal: res.data.calc?.systemClosingTotal,
+        accountsOpening: res.data.accounts?.opening || [],
+        accountsClosing: res.data.accounts?.closing || [],
+        systemAccountsClosing: res.data.accounts?.systemClosing || [],
+        summary: {
+          income: res.data.calc?.income,
+          expense: res.data.calc?.expense,
+          transfer: res.data.calc?.transfer,
+          netCashflow: res.data.calc?.netCashflow,
+        },
+      }));
+
+      const nextDraft = {};
+      for (const row of res.data.accounts?.closing || []) {
+        nextDraft[String(row.accountId)] = row.balance;
+      }
+      setDraftClosing(nextDraft);
+
+      setMsg("Balances saved temporarily. The month is still open.");
+    } catch (e) {
+      setErr(e?.response?.data?.message || "Save balances failed.");
     } finally {
       setBusy(false);
     }
@@ -485,7 +544,7 @@ export default function CarryForward() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 xl:min-w-[620px]">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:min-w-[760px] xl:grid-cols-4">
                 <input
                   type="month"
                   className={fieldClass}
@@ -501,6 +560,16 @@ export default function CarryForward() {
                 >
                   <Icon name="refresh" className="h-4 w-4" />
                   Refresh
+                </button>
+
+                <button
+                  type="button"
+                  onClick={saveDraft}
+                  disabled={busy || !rows.length || isClosed}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200 dark:hover:bg-emerald-400/15"
+                >
+                  <Icon name="save" className="h-4 w-4" />
+                  Save
                 </button>
 
                 <button
