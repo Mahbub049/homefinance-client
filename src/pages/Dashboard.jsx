@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import HFPageLead from "../components/design/HFPageLead";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AppLayout from "../components/layout/AppLayout";
 import api from "../services/api";
 import {
@@ -26,7 +27,7 @@ function monthNow() {
 
 function formatMoney(v) {
   const n = Number(v || 0);
-  const abs = Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
+  const abs = Math.abs(n).toLocaleString("bn-BD", { maximumFractionDigits: 2 });
   return n < 0 ? `-৳ ${abs}` : `৳ ${abs}`;
 }
 
@@ -112,9 +113,192 @@ function SimpleTooltip({ active, payload, label }) {
   );
 }
 
+function CreditCardStatementEditor({ account, month, onSaved }) {
+  const [amount, setAmount] = useState(account.outstanding == null ? "" : String(account.outstanding));
+  const [note, setNote] = useState(account.note || "");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  useEffect(() => {
+    setAmount(account.outstanding == null ? "" : String(account.outstanding));
+    setNote(account.note || "");
+    setMessage("");
+  }, [account.accountId, account.outstanding, account.note, month]);
+
+  async function save(e) {
+    e.preventDefault();
+    if (amount.trim() === "" || !Number.isFinite(Number(amount)) || Number(amount) < 0 || !/^\d+(?:\.\d{1,2})?$/.test(amount.trim())) {
+      setMessage("Enter a valid, non-negative bank statement amount (up to 2 decimals).");
+      return;
+    }
+    setSaving(true);
+    setMessage("");
+    try {
+      await api.put(`/api/credit-card-statements/${encodeURIComponent(account.accountId)}/${encodeURIComponent(month)}`, {
+        outstanding: Number(amount), note,
+      });
+      setMessage("Statement saved. No cash or Ledger entry was created.");
+      await onSaved();
+    } catch (e2) {
+      setMessage(e2?.response?.data?.message || "Unable to save statement. Confirm backend Phase 4C is installed.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={save} className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-slate-950/50">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-black text-slate-800 dark:text-slate-100">{account.name}</span>
+        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">{account.status === "recorded" ? `Recorded: ${formatMoney(account.outstanding)}` : "No statement recorded"}</span>
+      </div>
+      <label className="mt-3 block text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+        ব্যাংকে বর্তমান বকেয়া (৳)
+        <input type="number" min="0" step="0.01" required value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Enter exact amount from bank" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-white/20 dark:bg-slate-900 dark:text-white" />
+      </label>
+      <label className="mt-2 block text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+        রেফারেন্স / মন্তব্য (ঐচ্ছিক)
+        <input type="text" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Bank statement date or reference" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-white/20 dark:bg-slate-900 dark:text-white" />
+      </label>
+      <button disabled={saving} type="submit" className="mt-3 w-full rounded-lg bg-indigo-600 px-3 py-2 text-xs font-black text-white hover:bg-indigo-500 disabled:opacity-50">{saving ? "Saving…" : `Save ${month} card statement`}</button>
+      {message && <p role="status" className="mt-2 text-xs text-amber-700 dark:text-amber-300">{message}</p>}
+    </form>
+  );
+}
+
+
+function CreditCardRepaymentEditor({ account, month, onSaved }) {
+  const [expanded, setExpanded] = useState(false);
+  const [accountOptions, setAccountOptions] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [source, setSource] = useState("");
+  const [date, setDate] = useState("");
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const requestKey = useRef(null);
+
+  const availableAccounts = useMemo(() => accountOptions.filter(a =>
+    a.owner === "Joint" || account.owner === "Joint" || a.owner === account.owner
+  ), [accountOptions, account.owner]);
+
+  const refresh = async () => {
+    setLoadingPayments(true);
+    try {
+      const response = await api.get("/api/credit-card-payments", { params: { month, cardAccountId: account.accountId } });
+      setAccountOptions(response.data?.data?.fundingAccounts || []);
+      setPayments(response.data?.data?.payments || []);
+    } catch (error) {
+      setMessage(error?.response?.data?.message || "Payment history unavailable. Install the Phase 4C-B backend.");
+    } finally {
+      setLoadingPayments(false);
+    }
+  };
+
+  useEffect(() => {
+    if (expanded) refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded, month, account.accountId]);
+
+  const edited = (setter) => (value) => {
+    setter(value);
+    requestKey.current = null;
+    setMessage("");
+  };
+
+  const post = async (event) => {
+    event.preventDefault();
+    if (busy) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date.slice(0, 7) !== month) {
+      setMessage("Choose an actual payment date within the selected month."); return;
+    }
+    if (!source || !/^(?:\d+)(?:\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) {
+      setMessage("Select your funding account and enter an amount greater than zero."); return;
+    }
+    if (!window.confirm(`Record a real ${formatMoney(amount)} bank debit to pay ${account.name}? Do not duplicate an existing EMI or card payment.`)) return;
+    setBusy(true); setMessage("");
+    if (!requestKey.current) requestKey.current = crypto.randomUUID();
+    try {
+      const response = await api.post("/api/credit-card-payments", {
+        cardAccountId: account.accountId, fromAccountId: source, date, month,
+        amount: Number(amount), note,
+      }, { headers: { "Idempotency-Key": requestKey.current } });
+      setMessage(response.data?.replayed ? "Already recorded — original payment reused." : "Card repayment recorded; one real funding-account debit created.");
+      requestKey.current = null;
+      setAmount(""); setNote("");
+      await Promise.all([refresh(), onSaved()]);
+    } catch (error) {
+      setMessage(error?.response?.data?.message || "Unable to save. If the network timed out, retry without changing the form to avoid duplication.");
+    } finally { setBusy(false); }
+  };
+
+  const voidPayment = async (payment) => {
+    if (busy || payment.status !== "posted") return;
+    if (!window.confirm(`Void the ${formatMoney(payment.amount)} card repayment? Its linked bank debit will be reversed, but statement snapshots will NOT change.`)) return;
+    setBusy(true); setMessage("");
+    try {
+      await api.post(`/api/credit-card-payments/${encodeURIComponent(payment.id)}/void`);
+      setMessage("Payment voided and linked bank debit reversed.");
+      await Promise.all([refresh(), onSaved()]);
+    } catch (error) { setMessage(error?.response?.data?.message || "Void failed; review your payment history."); }
+    finally { setBusy(false); }
+  };
+
+  const paidTotal = payments.filter(p => p.status === "posted").reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  return (
+    <div className="mt-2 rounded-xl border border-sky-200 bg-sky-50/70 p-3 dark:border-sky-400/20 dark:bg-sky-500/5">
+      <button type="button" className="flex w-full items-center justify-between gap-2 text-left text-xs font-bold text-sky-950 dark:text-sky-200" onClick={() => setExpanded(v => !v)}>
+        <span>কার্ডে টাকা দেওয়া · শুধু নগদ টাকা কমবে</span>
+        <span>{expanded ? "Hide" : "View / record"}</span>
+      </button>
+      {expanded && <>
+        <p className="mt-2 text-[11px] leading-5 text-slate-700 dark:text-slate-300">
+          Record only a payment you actually made from your bank, cash or mobile wallet. It reduces available cash, but does NOT create a new household expense, EMI payment or settlement.
+          The bank statement you entered above is a separate snapshot; it will not be reduced a second time.
+        </p>
+        {month < "2026-10" ? (
+          <p className="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-200">আগের মাসগুলো পরিবর্তন করা যাবে না।</p>
+        ) : (
+          <form onSubmit={post} className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+            <label className="font-semibold text-slate-700 dark:text-slate-200">যে অ্যাকাউন্ট থেকে দিয়েছেন
+              <select required value={source} onChange={e => edited(setSource)(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-slate-900 dark:border-white/20 dark:bg-slate-900 dark:text-white">
+                <option value="">যে অ্যাকাউন্ট থেকে টাকা গেছে সেটি বাছুন</option>
+                {availableAccounts.map(a => <option key={a.id} value={a.id}>{a.name} · {a.owner}</option>)}
+              </select>
+            </label>
+            <label className="font-semibold text-slate-700 dark:text-slate-200">টাকা দেওয়ার তারিখ
+              <input required type="date" value={date} onChange={e => edited(setDate)(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-slate-900 dark:border-white/20 dark:bg-slate-900 dark:text-white" />
+            </label>
+            <label className="font-semibold text-slate-700 dark:text-slate-200">পরিশোধিত টাকা (৳)
+              <input required min="0.01" type="number" step="0.01" value={amount} onChange={e => edited(setAmount)(e.target.value)} placeholder="Amount actually paid" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-slate-900 dark:border-white/20 dark:bg-slate-900 dark:text-white" />
+            </label>
+            <label className="font-semibold text-slate-700 dark:text-slate-200">রেফারেন্স / মন্তব্য
+              <input maxLength={240} value={note} onChange={e => edited(setNote)(e.target.value)} placeholder="Bank transfer reference (optional)" className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-slate-900 dark:border-white/20 dark:bg-slate-900 dark:text-white" />
+            </label>
+            <button type="submit" disabled={busy || !availableAccounts.length} className="rounded-lg bg-sky-700 px-3 py-2 font-black text-white disabled:opacity-50 sm:col-span-2">{busy ? "Processing…" : "Record actual card repayment"}</button>
+          </form>
+        )}
+        <div className="mt-3 flex justify-between text-xs font-bold text-slate-800 dark:text-slate-100"><span>যেসব পরিশোধ লেখা আছে {month}</span><span>{formatMoney(paidTotal)}</span></div>
+        {loadingPayments ? <p className="mt-1 text-xs text-slate-500">পরিশোধের তথ্য আসছে…</p> : payments.length === 0 ? <p className="mt-1 text-xs text-slate-500">এই মাসে কার্ডে টাকা দেওয়ার তথ্য নেই।</p> : (
+          <div className="mt-2 space-y-2">
+            {payments.map(payment => <div key={payment.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white p-2 text-xs dark:border-white/10 dark:bg-slate-950">
+              <span className={payment.status === "voided" ? "text-slate-500 line-through" : "text-slate-800 dark:text-slate-200"}>{payment.date} · {payment.fromName} · {formatMoney(payment.amount)}</span>
+              {payment.status === "posted" ? <button type="button" disabled={busy} onClick={() => voidPayment(payment)} className="font-bold text-rose-700 disabled:opacity-50 dark:text-rose-300">বাতিল করুন</button> : <span className="font-semibold text-slate-500">বাতিল হয়েছে</span>}
+            </div>)}
+          </div>
+        )}
+        {message && <p role="status" className="mt-2 text-xs font-semibold text-amber-800 dark:text-amber-200">{message}</p>}
+      </>}
+    </div>
+  );
+}
+
 export default function Dashboard() {
+  const [hfMore, setHfMore] = useState(false);
   const [month, setMonth] = useState(monthNow());
   const [resp, setResp] = useState(null);
+  const [walletOverview, setWalletOverview] = useState(null);
   const [trend, setTrend] = useState([]);
   const [networth, setNetworth] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -134,7 +318,7 @@ export default function Dashboard() {
   useEffect(() => {
     loadTrend();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [month]);
 
   async function loadSummary() {
     try {
@@ -142,6 +326,11 @@ export default function Dashboard() {
       setLoading(true);
       const res = await api.get("/api/dashboard/summary", { params: { month } });
       setResp(res.data);
+      // Wallet is the authoritative source for total member-to-member settlement.
+      try {
+        const walletResponse = await api.get('/api/wallet/summary', {params:{month}});
+        setWalletOverview(walletResponse.data?.data || null);
+      } catch { setWalletOverview(null); }
     } catch (e) {
       setResp(null);
       setErr(e?.response?.data?.message || e?.message || "Failed to load dashboard");
@@ -152,7 +341,7 @@ export default function Dashboard() {
 
   async function loadTrend() {
     try {
-      const res = await api.get("/api/dashboard/trend");
+      const res = await api.get("/api/dashboard/trend", { params: { month } });
       setTrend(res.data?.data || []);
     } catch {
       setTrend([]);
@@ -170,27 +359,49 @@ export default function Dashboard() {
 
   const data = resp?.data;
   const summary = data?.summary;
+  const budgetAllocation = data?.budgetAllocation;
+  const cash = data?.cash;
+  const cashAvailable = cash && Number.isFinite(Number(cash.monthRemaining));
+  const cashRemaining = cashAvailable ? Number(cash.monthRemaining) : null;
+  const recordedLiquidBalance = Number.isFinite(Number(cash?.recordedLiquidBalance)) ? Number(cash.recordedLiquidBalance) : null;
 
   const settlement = data?.settlement || [];
-  const totalSavingsAsset = safeNum(data?.totalSavingsAsset || 0);
-
-  const remainingEMI = safeNum(networth?.liabilities?.remainingEMI ?? 0);
-  const netWorthValue = safeNum(networth?.netWorth ?? 0);
-  const manualSavings = safeNum(networth?.assets?.manualSavings ?? 0);
+  const trackedAssets = networth?.assets;
+  const trackedLiquid = trackedAssets ? safeNum(trackedAssets.liquidCash) : null;
+  const trackedSavings = trackedAssets ? safeNum(trackedAssets.savingsAndInvestments) : null;
+  const trackedAccountTotal = trackedAssets ? safeNum(trackedAssets.trackedAccountTotal) : null;
+  const remainingEMI = networth?.liabilities ? safeNum(networth.liabilities.remainingEMI) : null;
+  const cardReviewCount = safeNum(trackedAssets?.cardReviewCount);
+  const netPositionWarnings = networth?.reconciliation?.issues || [];
+  const cardStatements = networth?.liabilities?.creditCards;
 
   const income = safeNum(summary?.income);
   const living = safeNum(summary?.living);
-  const debt = safeNum(summary?.debt);
+  const debt = safeNum(summary?.debt); // legacy combined total: regular debt + managed purchase schedule
+  const regularDebt = safeNum(summary?.components?.regularDebt ?? debt);
+  const scheduledPurchases = safeNum(summary?.components?.scheduledLargePurchaseAllocation ?? budgetAllocation?.scheduledLargePurchaseAllocation);
   const investment = safeNum(summary?.investment);
   const available = safeNum(summary?.available);
   const finalBalance = safeNum(summary?.finalBalance);
   const savingsRate = safeNum(summary?.savingsRate ?? 0);
   const thisMonthSavingsTx = safeNum(summary?.components?.savingsContribution ?? 0);
+  // Prefer real transaction evidence to the Ledger-only EMI indicator.
+  const paidEmi = cashAvailable ? safeNum(cash?.emiPaid) : safeNum(summary?.components?.paidEmi);
+  const otherPaidDebt = Math.max(0, regularDebt - paidEmi);
+  const actualPaidExpense = cashAvailable ? safeNum(cash?.paidExpenses) : living + regularDebt;
+  const paidPurchaseUpfront = cashAvailable ? safeNum(cash?.sharedPurchasePaidUpfront) : 0;
+  const paidOtherExpense = cashAvailable ? safeNum(cash?.otherExpenses) : 0;
+  const paidCardRepayments = cashAvailable ? safeNum(cash?.cardRepayments) : 0;
+  const combinedPending = walletOverview?.settlementTotals?.pendingTotal;
+  const combinedSuggestion = walletOverview?.settlement;
 
-  const spendTotal = living + debt + investment;
+
+  const spendTotal = living + regularDebt + scheduledPurchases + investment;
+  const expenseBudgetTotal = living + regularDebt + scheduledPurchases;
+  // A budget can exceed income: display 115%, not an incorrectly capped 100%.
+  // Individual gauge components may cap only the progress-bar width.
   const spendPct = useMemo(() => {
-    const denom = Math.max(income, 1);
-    return clamp(Math.round((spendTotal / denom) * 100));
+    return income > 0 ? Math.round((spendTotal / income) * 100) : 0;
   }, [income, spendTotal]);
 
   const availablePct = useMemo(() => {
@@ -243,6 +454,10 @@ export default function Dashboard() {
       const rowSpend = rowLiving + rowDebt + rowInvestment;
       return {
         ...row,
+        monthKey: row.month,
+        month: /^\d{4}-\d{2}$/.test(String(row.month))
+          ? new Intl.DateTimeFormat('bn-BD', { month: 'short', timeZone: 'UTC' }).format(new Date(`${row.month}-01T00:00:00.000Z`))
+          : row.month,
         income: rowIncome,
         living: rowLiving,
         debt: rowDebt,
@@ -255,563 +470,136 @@ export default function Dashboard() {
 
   const expensePieData = useMemo(() => {
     const parts = [
-      { name: "Living", value: living, color: COLORS.living },
-      { name: "EMI / Debt", value: debt, color: COLORS.debt },
-      { name: "Investment", value: investment, color: COLORS.investment },
+      { name: "নিয়মিত খরচ", value: living, color: COLORS.living },
+      { name: "অন্যান্য কিস্তি/দেনা", value: regularDebt, color: COLORS.debt },
+      { name: "বড় কেনাকাটার ভাগ", value: scheduledPurchases, color: COLORS.final },
+      { name: "সঞ্চয়", value: Math.max(0, investment), color: COLORS.investment },
     ].filter((item) => item.value > 0);
 
-    if (available > 0) {
-      parts.push({ name: "Available", value: available, color: COLORS.available });
+    if (finalBalance > 0) {
+      parts.push({ name: "অবশিষ্ট", value: finalBalance, color: COLORS.available });
     }
 
     return parts;
-  }, [living, debt, investment, available]);
+  }, [living, regularDebt, scheduledPurchases, investment, finalBalance]);
 
   const cashFlowData = useMemo(
     () => [
       { name: "Income", value: income, color: COLORS.income },
       { name: "Living", value: -living, color: COLORS.living },
-      { name: "Debt", value: -debt, color: COLORS.debt },
-      { name: "Investment", value: -investment, color: COLORS.investment },
+      { name: "Regular debt", value: -regularDebt, color: COLORS.debt },
+      { name: "Large purchases", value: -scheduledPurchases, color: COLORS.final },
+      { name: "Savings/investments", value: -investment, color: COLORS.investment },
       {
-        name: "Final",
+        name: "Budget remaining",
         value: finalBalance,
         color: finalBalance >= 0 ? COLORS.final : COLORS.living,
       },
     ],
-    [income, living, debt, investment, finalBalance]
+    [income, living, regularDebt, scheduledPurchases, investment, finalBalance]
   );
 
   const quickNote = useMemo(() => {
     if (!income) return "Add income and expense records to activate insights.";
-    if (finalBalance < 0) return "Your month is ending negative. Reduce flexible spending or delay optional purchases.";
+    if (finalBalance < 0) return "Planned allocations exceed this month's income. This is a budget warning, not a statement of your actual bank cash.";
     if (savingsRate >= 20) return "Savings rate is healthy. Keep this pace consistent for long-term stability.";
-    if (spendPct > 90) return "Spending is very close to income. Check living and debt categories first.";
-    return "Month looks stable. A little more savings can improve the final balance.";
+    if (spendPct > 90) return "Your planned allocations are close to income. Check the budget separately from recorded cash.";
+    return "Budget allocation is within monthly income; compare with the actual cash result above.";
   }, [income, finalBalance, savingsRate, spendPct]);
 
   const chartTick = { fontSize: 11, fill: chartText };
 
   return (
     <AppLayout>
-      <div className="dashboard-page mx-auto w-full px-0 pb-8 sm:px-1 lg:px-2">
-        {/* Hero */}
-        <div className="relative mb-4 overflow-hidden rounded-[1.5rem] border border-slate-800 bg-slate-950 p-4 text-white shadow-xl dark:border-slate-700 sm:mb-6 sm:rounded-[2rem] sm:p-6 lg:p-8">
-          <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-cyan-400/25 blur-3xl sm:h-64 sm:w-64" />
-          <div className="absolute -bottom-24 left-1/3 h-60 w-60 rounded-full bg-violet-500/20 blur-3xl sm:h-72 sm:w-72" />
-          <div className="absolute bottom-0 right-0 h-40 w-40 rounded-full bg-emerald-400/10 blur-2xl" />
-
-          <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="min-w-0">
-              <div className="mb-3 inline-flex items-center hidden lg:inline-block gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-medium text-cyan-100 backdrop-blur sm:text-xs">
-                Personal Finance Control Center
-              </div>
-              <h1 className="text-2xl font-black tracking-tight sm:text-4xl lg:text-5xl">
-                Dashboard
-              </h1>
-              <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-200 sm:mt-3 sm:text-base sm:leading-6">
-                Overview of income, spending, savings, settlement, and net worth for the selected month.
-              </p>
+      <div className="hf-v2-dashboard hf-v2-page">
+        <HFPageLead title="হোম" description="মাসের আয়-খরচ এক নজরে" month={month} onMonthChange={setMonth} onRefresh={() => { loadSummary(); loadNetWorth(); loadTrend(); }} />
+        {err && <div className="hf-v2-alert" role="alert">{err}</div>}
+        <section className="hf-v2-feature hf-hishab-overview" aria-label="এই মাসের আয়-খরচ">
+          <div>
+            <span className="hf-v2-eyebrow">এই মাসের আয় থেকে</span>
+            <h2 className="hf-hishab-overview-title">এখন বাকি</h2>
+            <div className={`hf-v2-feature-number ${cashRemaining < 0 ? 'hf-v2-negative' : ''}`}>
+              {loading ? '…' : cashAvailable ? formatMoney(cashRemaining) : 'হিসাব পাওয়া যায়নি'}
             </div>
-
-            <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-auto">
-              <div className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur">
-                <div className="text-[11px] text-slate-300 sm:text-xs">Selected Month</div>
-                <input
-                  type="month"
-                  value={month}
-                  onChange={(e) => setMonth(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-xs font-semibold text-slate-900 outline-none [color-scheme:light] dark:bg-slate-950 dark:text-slate-100 dark:[color-scheme:dark] sm:text-sm"
-                />
-              </div>
-
-              <button
-                onClick={() => {
-                  loadSummary();
-                  loadNetWorth();
-                  loadTrend();
-                }}
-                disabled={loading}
-                className="min-h-11 rounded-2xl bg-white px-5 py-3 text-xs font-bold text-slate-950 shadow-lg transition hover:-translate-y-0.5 hover:bg-cyan-50 disabled:translate-y-0 disabled:opacity-70 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white sm:text-sm"
-              >
-                {loading ? "Refreshing..." : "Refresh Data"}
-              </button>
-            </div>
+            <p>এই মাসের আয় − বাস্তবে পরিশোধিত খরচ − সঞ্চয়ে জমা টাকা। আগের মাসের টাকা যোগ করা হয়নি।</p>
           </div>
-        </div>
-
-        {/* Error */}
-        {err && (
-          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 shadow-sm dark:border-red-500/30 dark:bg-red-950/30 dark:text-red-200 sm:mb-6 sm:rounded-3xl">
-            <div className="font-semibold">Couldn’t load data</div>
-            <div className="mt-1 text-sm break-words">{err}</div>
+          <div className="hf-v2-feature-math">
+            <div><span>এই মাসের আয়</span><strong>{formatMoney(cashAvailable ? cash.incomeReceived : income)}</strong></div>
+            <div><span>টাকা খরচ হয়েছে</span><strong>{formatMoney(actualPaidExpense)}</strong></div>
+            <div><span>সঞ্চয়ে জমা</span><strong>{formatMoney(cashAvailable ? cash.savingsDeposited : investment)}</strong></div>
           </div>
-        )}
-
-        {/* KPI Row */}
-        {loading && !summary ? (
-          <>
-            {/* Mobile skeleton */}
-            <div className="mb-4 grid gap-3 sm:hidden">
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-            </div>
-
-            {/* Desktop skeleton */}
-            <div className="mb-4 hidden gap-3 sm:mb-6 sm:grid sm:grid-cols-2 xl:grid-cols-4">
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Mobile KPI order: Income → Spend → Living */}
-            <div className="mb-4 grid grid-cols-2 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2 sm:hidden">
-              <StatCard
-                title="Income"
-                value={income}
-                hint="Total monthly income"
-                tone="positive"
-              />
-
-              <StatCard
-                title="Spend"
-                value={spendTotal}
-                hint={`${spendPct}% of income`}
-                tone={spendPct > 90 ? "danger" : "warning"}
-              />
-
-              <StatCard
-                title="Living"
-                value={living}
-                hint="Daily and household spending"
-                tone="danger"
-              />
-
-              <StatCard
-                title="EMI / Debt"
-                value={debt}
-                hint="Debt payments this month"
-                tone="warning"
-              />
-
-              <StatCard
-                title="Investment"
-                value={investment}
-                hint="Savings and investments"
-                tone="info"
-              />
-
-              <StatCard
-                title="Finance Score"
-                value={`${personalFinanceScore}/100`}
-                hint={
-                  personalFinanceScore >= 75
-                    ? "Healthy position"
-                    : personalFinanceScore >= 50
-                      ? "Needs monitoring"
-                      : "Needs attention"
-                }
-                tone={personalFinanceScoreTone}
-                isText
-              />
-            </div>
-
-            {/* Desktop KPI row */}
-            <div className="mb-4 hidden gap-3 sm:mb-6 sm:grid sm:grid-cols-2 xl:grid-cols-4">
-              <StatCard
-                title="Income"
-                value={income}
-                hint="Total monthly income"
-                tone="positive"
-              />
-
-              <StatCard
-                title="Spend"
-                value={spendTotal}
-                hint={`${spendPct}% of income`}
-                tone={spendPct > 90 ? "danger" : "warning"}
-              />
-
-              <StatCard
-                title="Final Balance"
-                value={finalBalance}
-                hint="End-of-month financial position"
-                tone={finalBalance >= 0 ? "positive" : "danger"}
-              />
-
-              <StatCard
-                title="Available"
-                value={available}
-                hint="Income minus total monthly outflow"
-                tone={available >= 0 ? "positive" : "danger"}
-              />
-            </div>
-          </>
-        )}
-
-        {loading && !summary ? (
-          <>
-            {/* Mobile second KPI row */}
-            <div className="mb-4 grid grid-cols-2 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2 sm:hidden">
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-            </div>
-
-            {/* Desktop third KPI row */}
-            <div className="mb-4 hidden gap-3 sm:mb-6 sm:grid sm:grid-cols-2 xl:grid-cols-4">
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Mobile second KPI row unchanged */}
-            <div className="mb-4 grid grid-cols-2 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2 sm:hidden">
-              <StatCard
-                title="Available"
-                value={available}
-                hint="Income minus total monthly outflow"
-                tone={available >= 0 ? "positive" : "danger"}
-              />
-
-              <StatCard
-                title="Final Balance"
-                value={finalBalance}
-                hint="End-of-month financial position"
-                tone={finalBalance >= 0 ? "positive" : "danger"}
-              />
-
-              <StatCard
-                title="Savings Rate"
-                value={`${savingsRate}%`}
-                hint="Savings as percentage of income"
-                tone={savingsRate >= 20 ? "positive" : "warning"}
-                isText
-              />
-            </div>
-
-            {/* Desktop third KPI row */}
-            <div className="mb-4 hidden gap-3 sm:mb-6 sm:grid sm:grid-cols-2 xl:grid-cols-4">
-              <StatCard
-                title="Living"
-                value={living}
-                hint="Daily and household spending"
-                tone="danger"
-              />
-
-              <StatCard
-                title="EMI / Debt"
-                value={debt}
-                hint="Debt payments this month"
-                tone="warning"
-              />
-
-              <StatCard
-                title="Investment"
-                value={investment}
-                hint="Savings and investments"
-                tone="info"
-              />
-
-              <StatCard
-                title="Savings Rate"
-                value={`${savingsRate}%`}
-                hint="Savings as percentage of income"
-                tone={savingsRate >= 20 ? "positive" : "warning"}
-                isText
-              />
-            </div>
-          </>
-        )}
-
-        {/* Charts */}
-        <div className="mb-4 grid gap-3 sm:mb-6 xl:grid-cols-3">
-          <Panel title="Income Allocation" subtitle="Where this month’s money is going">
-            {expensePieData.length === 0 ? (
-              <EmptyState text="No allocation data yet." />
-            ) : (
-              <div className="grid gap-3 md:grid-cols-[1fr_0.9fr] xl:grid-cols-1 2xl:grid-cols-[1fr_0.9fr]">
-                <div className="h-[220px] min-w-0 sm:h-[260px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={expensePieData}
-                        dataKey="value"
-                        nameKey="name"
-                        innerRadius="58%"
-                        outerRadius="82%"
-                        paddingAngle={4}
-                      >
-                        {expensePieData.map((entry) => (
-                          <Cell key={entry.name} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<SimpleTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-
-                <div className="space-y-2 self-center sm:space-y-3">
-                  {expensePieData.map((item) => {
-                    const pct = income ? Math.round((item.value / income) * 100) : 0;
-                    return (
-                      <LegendRow
-                        key={item.name}
-                        color={item.color}
-                        label={item.name}
-                        value={formatMoney(item.value)}
-                        sub={`${pct}% of income`}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </Panel>
-
-          <Panel title="Cash Flow Movement" subtitle="Income vs outflows vs final balance">
-            <div className="h-[250px] w-full sm:h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={cashFlowData} margin={{ top: 10, right: 8, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} vertical={false} />
-                  <XAxis dataKey="name" tick={chartTick} axisLine={false} tickLine={false} />
-                  <YAxis tick={chartTick} axisLine={false} tickLine={false} width={44} />
-                  <Tooltip content={<SimpleTooltip />} />
-                  <Bar dataKey="value" radius={[10, 10, 10, 10]}>
-                    {cashFlowData.map((entry) => (
-                      <Cell key={entry.name} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Panel>
-
-          <Panel title="Financial Health" subtitle="Quick visual indicators">
-            <div className="space-y-4 sm:space-y-5">
-              <GaugeRow
-                label="Spend vs Income"
-                value={spendPct}
-                caption={`${formatMoney(spendTotal)} spent from ${formatMoney(income)}`}
-                tone={spendPct <= 70 ? "positive" : spendPct <= 90 ? "warning" : "danger"}
-              />
-              <GaugeRow
-                label="Available Ratio"
-                value={availablePct}
-                caption={`${formatMoney(available)} available after spending`}
-                tone={available >= 0 ? "positive" : "danger"}
-              />
-              <GaugeRow
-                label="Savings Rate"
-                value={savingsRatePct}
-                caption="Target suggestion: 20% or more"
-                tone={savingsRate >= 20 ? "positive" : "warning"}
-              />
-
-              <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 dark:border-slate-700 dark:from-slate-800 dark:to-slate-900 sm:rounded-3xl">
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Insight</div>
-                <div className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-300">{quickNote}</div>
-              </div>
-            </div>
-          </Panel>
+        </section>
+        <section className="hf-hishab-kpi-grid" aria-label="মাসের প্রধান তথ্য">
+          <div className="hf-hishab-kpi hf-hishab-kpi-income">
+            <span>মোট আয়</span><strong>{formatMoney(income)}</strong>
+            <small>এই মাসে পাওয়া সব আয়ের এন্ট্রি (বেতন ও অন্যান্য আয়)। দুজনের আয় যোগ করা হয়েছে।</small>
+          </div>
+          <div className="hf-hishab-kpi hf-hishab-kpi-spend">
+            <span>মোট টাকা বের হয়েছে</span><strong>{formatMoney(actualPaidExpense)}</strong>
+            <small>ব্যাংক/নগদ থেকে পরিশোধিত খরচ (সাধারণ খরচ, পরিশোধিত EMI, এককালীন কেনাকাটা ও প্রযোজ্য কার্ড পরিশোধ)। সঞ্চয় আলাদা।</small>
+          </div>
+          <div className="hf-hishab-kpi">
+            <span>সাধারণ খরচ</span><strong>{formatMoney(living)}</strong>
+            <small>খাবার, যাতায়াত, বাজার ও নিয়মিত বিল। EMI, সঞ্চয় ও বড় কেনাকাটার নির্ধারিত ভাগ এখানে নেই।</small>
+          </div>
+          <div className="hf-hishab-kpi">
+            <span>পরিশোধিত EMI</span><strong>{formatMoney(paidEmi)}</strong>
+            <small>যে EMI-তে টাকা সত্যিই দেওয়া হয়েছে। শুধু বিল তৈরি বা কিস্তি বাকি থাকলে এখানে যোগ হবে না।</small>
+          </div>
+        </section>
+        <section className="hf-hishab-extra-grid" aria-label="জমা ও বড় কেনাকাটার মাসিক ভাগ">
+          <div className="hf-hishab-kpi hf-hishab-extra-card">
+            <span>এই মাসে সঞ্চয়</span><strong>{formatMoney(investment)}</strong>
+            <small>সঞ্চয়/DPS-এ জমা টাকা; খরচ নয়, কিন্তু এই মাসে ব্যবহারযোগ্য টাকা থেকে বাদ।</small>
+          </div>
+          <div className="hf-hishab-kpi hf-hishab-extra-card">
+            <span>বড় কেনাকাটার এই মাসের ভাগ</span><strong>{formatMoney(scheduledPurchases)}</strong>
+            <small>সব সদস্যের নির্ধারিত মাসিক ভাগ—পরিশোধ হোক বা বাকি থাকুক। ব্যাংক থেকে দ্বিতীয়বার টাকা কাটে না।</small>
+          </div>
+          <div className="hf-hishab-kpi hf-hishab-extra-card hf-hishab-budget-balance">
+            <span>বড় কেনাকাটার ভাগসহ মাসে বাকি</span>
+            <strong className={finalBalance < 0 ? 'hf-v2-negative' : 'hf-v2-positive'}>{formatMoney(finalBalance)}</strong>
+            <small>মোট আয় − সাধারণ খরচ − অন্যান্য Ledger দেনা − সঞ্চয় − বড় কেনাকাটার এই মাসের ভাগ। এটি Wallet-এর নগদ চলাচলের হিসাব নয়।</small>
+          </div>
+        </section>
+        <details className="hf-v2-disclosure hf-hishab-explain">
+          <summary>সব টাকার হিসাব কীভাবে হয়েছে?</summary>
+          <div className="hf-hishab-explain-content">
+            <p><b>মোট আয়:</b> {formatMoney(income)} — Ledger-এ এই মাসের আয়ের এন্ট্রিগুলোর যোগফল।</p>
+            <p><b>টাকা বের হয়েছে:</b> {formatMoney(actualPaidExpense)} — রেকর্ড করা অ্যাকাউন্টের বাস্তব খরচ। এর মধ্যে সাধারণ অন্যান্য খরচ {formatMoney(paidOtherExpense)}, EMI {formatMoney(paidEmi)}, বড় কেনাকাটায় একবার দেওয়া টাকা {formatMoney(paidPurchaseUpfront)}{paidCardRepayments > 0 ? `, কার্ডের বিল পরিশোধ ${formatMoney(paidCardRepayments)}` : ''}। সঞ্চয়ে পাঠানো টাকা এখানে নেই।</p>
+            <p><b>সাধারণ খরচ:</b> {formatMoney(living)} — Ledger-এর সাধারণ খরচ; EMI, DPS ও বড় কেনাকাটার মাসিক বরাদ্দ নয়। এটি অ্যাকাউন্ট থেকে বের হওয়া টাকার breakdown-এর সঙ্গে একেবারে একই নাও হতে পারে।</p>
+            <p><b>মাসে বাস্তবে বাকি:</b> {formatMoney(cashRemaining)} — এই মাসের আয় − প্রকৃত টাকা বের হওয়া − সঞ্চয়ে জমা + সঞ্চয় থেকে তোলা টাকা। আগের মাসের ব্যালেন্স যোগ হয়নি।</p>
+            <p><b>বড় কেনাকাটার ভাগ ধরে মাসে বাকি:</b> {formatMoney(finalBalance)} — আলাদা মাসিক পরিকল্পনার হিসাব; আগেই পরিশোধ করা কেনাকাটাকে আবার ব্যাংক থেকে কাটে না।</p>
+          </div>
+        </details>
+        {(cash?.issues?.length > 0 || (cash?.negativeAccountCount || 0)>0) && <details className="hf-v2-disclosure"><summary>অ্যাকাউন্টের কিছু অঙ্ক যাচাই করা প্রয়োজন</summary><p>ব্যাংকের প্রকৃত ব্যালেন্সের সঙ্গে মাস শেষে হিসাব মিলিয়ে নিন।</p></details>}
+        <div className="hf-v2-dashboard-panels">
+          <section className="hf-v2-panel"><div className="hf-v2-panel-head"><div><h2>খরচের ভাগ</h2><p>মাসের আয় কোন খাতে গেছে</p></div></div>
+            {expensePieData.length ? <div className="hf-v2-pie-layout"><div className="hf-v2-pie"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={expensePieData} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="85%" paddingAngle={3}>{expensePieData.map(x=><Cell key={x.name} fill={x.color}/>)}</Pie><Tooltip content={<SimpleTooltip/>}/></PieChart></ResponsiveContainer></div>
+            <div className="hf-v2-legend">{expensePieData.map(x=><div key={x.name}><i style={{background:x.color}}/><span>{x.name}</span><strong>{formatMoney(x.value)}</strong></div>)}</div></div> : <p className="hf-v2-empty">এখনও কোনো খরচের তথ্য নেই।</p>}
+          </section>
+          <section className="hf-v2-panel"><div className="hf-v2-panel-head"><div><h2>দেনা-পাওনা</h2><p>সাধারণ খরচের ভাগ; চূড়ান্ত হিসাব টাকার হিসাব পেজে</p></div></div>
+            {walletOverview && combinedSuggestion && safeNum(combinedPending) > 0 ? (
+              <div className="hf-hishab-settlement-total"><span>{walletOverview.users?.find(u=>String(u.userId)===String(combinedSuggestion.fromUserId))?.name || 'যিনি দেবেন'} → {walletOverview.users?.find(u=>String(u.userId)===String(combinedSuggestion.toUserId))?.name || 'যিনি পাবেন'}</span><strong>{formatMoney(combinedPending)}</strong><small>সাধারণ খরচ ও অপরিশোধিত বড় কেনাকাটার টাকা মিলিয়ে</small></div>
+            ) : settlement.length ? <div className="hf-v2-settlement-list">{settlement.map(x=><div key={x.userId}><div><strong>{x.name}</strong><span>{safeNum(x.net)>=0?'পাবেন':'দেবেন'}</span></div><strong className={safeNum(x.net)<0?'hf-v2-negative':'hf-v2-positive'}>{formatMoney(Math.abs(safeNum(x.net)))}</strong></div>)}</div> : <p className="hf-v2-empty">এখন কোনো দেনা-পাওনা নেই।</p>}
+            <a className="hf-v2-text-link" href="/wallet">সম্পূর্ণ দেনা-পাওনা দেখুন →</a>
+          </section>
         </div>
-
-        {/* Net worth + notes */}
-        <div className="mb-4 grid gap-3 sm:mb-6 lg:grid-cols-3">
-          <Panel title="Net Worth" subtitle="Assets minus liabilities" className="lg:col-span-1">
-            <div className="rounded-[1.35rem] bg-gradient-to-br from-indigo-600 via-blue-600 to-cyan-500 p-4 text-white shadow-lg sm:rounded-[1.5rem] sm:p-5">
-              <div className="text-[11px] uppercase tracking-wide text-cyan-100 sm:text-xs">Current Net Worth</div>
-              <div className="mt-2 text-2xl font-black sm:text-4xl">{formatMoney(netWorthValue)}</div>
-              <div className="mt-1 text-xs text-blue-100">Calculated as of {month}</div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3">
-              <MiniStat label="Savings Asset" value={totalSavingsAsset} tone="positive" />
-              <MiniStat label="Manual Savings" value={manualSavings} tone="info" />
-              <MiniStat label="Remaining EMI" value={remainingEMI} tone="warning" />
-              <MiniStat label="This Month Savings" value={thisMonthSavingsTx} tone="positive" />
-            </div>
-          </Panel>
-
-          <Panel title="Quick Notes" subtitle="Important monthly signals" className="lg:col-span-2">
-            <div className="grid gap-3 md:grid-cols-3">
-              <SignalCard
-                title="Balance Health"
-                value={finalBalance >= 0 ? "Stable" : "Negative"}
-                desc={finalBalance >= 0 ? "Final balance is positive." : "Spending is higher than income."}
-                tone={finalBalance >= 0 ? "positive" : "danger"}
-              />
-              <SignalCard
-                title="Savings Target"
-                value={savingsRate >= 20 ? "On Track" : "Below Target"}
-                desc={savingsRate >= 20 ? "Savings rate is healthy." : "Try reaching at least 20%."}
-                tone={savingsRate >= 20 ? "positive" : "warning"}
-              />
-              <SignalCard
-                title="Debt Pressure"
-                value={debt > living ? "High" : "Normal"}
-                desc={debt > living ? "EMI is larger than living cost." : "Debt is under control."}
-                tone={debt > living ? "warning" : "neutral"}
-              />
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/60 sm:rounded-3xl">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Monthly Spending Structure</div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Living + debt + investment compared with income</div>
-                </div>
-                <div className="text-right text-sm font-bold text-slate-900 dark:text-slate-100">{spendPct}%</div>
-              </div>
-              <div className="flex h-3 overflow-hidden rounded-full bg-white shadow-inner dark:bg-slate-800 sm:h-4">
-                <div className="bg-rose-500" style={{ width: `${income ? clamp((living / income) * 100) : 0}%` }} />
-                <div className="bg-orange-500" style={{ width: `${income ? clamp((debt / income) * 100) : 0}%` }} />
-                <div className="bg-blue-500" style={{ width: `${income ? clamp((investment / income) * 100) : 0}%` }} />
-                <div className="bg-teal-500" style={{ width: `${income && available > 0 ? clamp((available / income) * 100) : 0}%` }} />
-              </div>
-              <div className="mt-3 grid gap-2 text-xs text-slate-600 dark:text-slate-300 sm:grid-cols-4">
-                <LegendDot color="bg-rose-500" label="Living" />
-                <LegendDot color="bg-orange-500" label="Debt" />
-                <LegendDot color="bg-blue-500" label="Investment" />
-                <LegendDot color="bg-teal-500" label="Available" />
-              </div>
-            </div>
-          </Panel>
-        </div>
-
-        {/* Settlement */}
-        <Panel
-          title="Settlement"
-          subtitle="Who owes or gets back for this month"
-          className="mb-4 sm:mb-6"
-          right={<span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{settlement.length ? `${settlement.length} members` : "No members"}</span>}
-        >
-          {settlement.length === 0 ? (
-            <EmptyState text="No settlement data yet." />
-          ) : (
-            <div className="grid gap-3 lg:grid-cols-[1fr_0.8fr] sm:gap-4">
-              <div className="space-y-3">
-                {settlement.map((s) => {
-                  const net = safeNum(s.net);
-                  const pct = Math.round((Math.abs(net) / maxAbsSettlement) * 100);
-                  const positive = net >= 0;
-
-                  return (
-                    <div key={s.userId} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-950/60 sm:rounded-3xl">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                        <div className="min-w-0">
-                          <div className="font-semibold text-slate-950 break-words dark:text-slate-100">{s.name}</div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400">{positive ? "Gets back" : "Owes"}</div>
-                        </div>
-                        <div className={positive ? "text-base font-black text-emerald-600 dark:text-emerald-400 sm:text-lg" : "text-base font-black text-rose-600 dark:text-rose-400 sm:text-lg"}>
-                          {positive ? "+" : "-"}{formatMoney(Math.abs(net))}
-                        </div>
-                      </div>
-                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                        <div
-                          className={positive ? "h-full rounded-full bg-emerald-500" : "h-full rounded-full bg-rose-500"}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="rounded-[1.35rem] border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4 dark:border-amber-500/30 dark:from-amber-950/30 dark:to-slate-900 sm:rounded-[1.5rem] sm:p-5">
-                <div className="text-sm font-bold text-amber-950 dark:text-amber-200">Settlement Summary</div>
-                <div className="mt-2 text-sm leading-6 text-amber-900/80 dark:text-amber-100/80">
-                  Positive balance means that member paid more than their share. Negative balance means that member needs to pay back.
-                </div>
-                <div className="mt-4 space-y-2 sm:mt-5 sm:space-y-3">
-                  {settlement.map((s) => {
-                    const net = safeNum(s.net);
-                    return (
-                      <div key={`summary-${s.userId}`} className="flex items-center justify-between gap-3 rounded-2xl bg-white/80 px-3 py-2 text-sm dark:bg-slate-950/60">
-                        <span className="truncate text-slate-700 dark:text-slate-300">{s.name}</span>
-                        <span className={net >= 0 ? "font-bold text-emerald-600 dark:text-emerald-400" : "font-bold text-rose-600 dark:text-rose-400"}>
-                          {net >= 0 ? "+" : "-"}{formatMoney(Math.abs(net))}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-        </Panel>
-
-        {/* Trend graphs */}
-        <div className="grid gap-3 xl:grid-cols-2 sm:gap-4">
-          <Panel title="6 Month Trend" subtitle="Income and category movement over time">
-            {trendView.length === 0 ? (
-              <EmptyState text="No trend data yet." />
-            ) : (
-              <div className="h-[260px] w-full sm:h-[340px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trendView} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} vertical={false} />
-                    <XAxis dataKey="month" tick={chartTick} axisLine={false} tickLine={false} />
-                    <YAxis tick={chartTick} axisLine={false} tickLine={false} width={46} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={legendStyle} />
-                    <Line type="monotone" dataKey="income" name="Income" stroke={COLORS.income} strokeWidth={3} dot={false} />
-                    <Line type="monotone" dataKey="living" name="Living" stroke={COLORS.living} strokeWidth={3} dot={false} />
-                    <Line type="monotone" dataKey="debt" name="Debt" stroke={COLORS.debt} strokeWidth={3} dot={false} />
-                    <Line type="monotone" dataKey="investment" name="Investment" stroke={COLORS.investment} strokeWidth={3} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </Panel>
-
-          <Panel title="Income vs Spending Area" subtitle="Trend of total spending and leftover balance">
-            {trendView.length === 0 ? (
-              <EmptyState text="No trend data yet." />
-            ) : (
-              <div className="h-[260px] w-full sm:h-[340px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={trendView} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={COLORS.income} stopOpacity={0.32} />
-                        <stop offset="95%" stopColor={COLORS.income} stopOpacity={0.03} />
-                      </linearGradient>
-                      <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={COLORS.living} stopOpacity={0.28} />
-                        <stop offset="95%" stopColor={COLORS.living} stopOpacity={0.02} />
-                      </linearGradient>
-                      <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={COLORS.final} stopOpacity={0.28} />
-                        <stop offset="95%" stopColor={COLORS.final} stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} vertical={false} />
-                    <XAxis dataKey="month" tick={chartTick} axisLine={false} tickLine={false} />
-                    <YAxis tick={chartTick} axisLine={false} tickLine={false} width={46} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={legendStyle} />
-                    <Area type="monotone" dataKey="income" name="Income" stroke={COLORS.income} strokeWidth={3} fill="url(#incomeGradient)" />
-                    <Area type="monotone" dataKey="spend" name="Spend" stroke={COLORS.living} strokeWidth={3} fill="url(#spendGradient)" />
-                    <Area type="monotone" dataKey="balance" name="Balance" stroke={COLORS.final} strokeWidth={3} fill="url(#balanceGradient)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </Panel>
-        </div>
+        <section className="hf-v2-panel hf-v2-trend"><div className="hf-v2-panel-head"><div><h2>গত ১২ মাসের হিসাব</h2><p>আয়, খরচ ও সঞ্চয়ের পরিবর্তন</p></div></div>
+          {trendView.length ? <div className="hf-v2-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={trendView} margin={{top:12,right:12,left:0,bottom:2}}><CartesianGrid strokeDasharray="3 5" stroke={chartGrid} vertical={false}/><XAxis dataKey="month" tick={chartTick} axisLine={false} tickLine={false}/><YAxis tick={chartTick} axisLine={false} tickLine={false} width={50}/><Tooltip content={<CustomTooltip/>}/><Legend wrapperStyle={legendStyle}/><Line type="monotone" dataKey="income" name="আয়" stroke={COLORS.income} strokeWidth={2.6} dot={false}/><Line type="monotone" dataKey="spend" name="খরচ ও জমা" stroke={COLORS.living} strokeWidth={2.6} dot={false}/><Line type="monotone" dataKey="balance" name="বাকি" stroke={COLORS.final} strokeWidth={2.6} dot={false}/></LineChart></ResponsiveContainer></div> : <p className="hf-v2-empty">১২ মাসের তথ্য এখনও পাওয়া যায়নি।</p>}
+        </section>
+        {cardReviewCount > 0 && cardStatements && <details className="hf-v2-disclosure"><summary>সংরক্ষিত ক্রেডিট কার্ডের বিবরণ</summary><div className="hf-v2-muted">আগের credit-card সুবিধাগুলো এখানে অক্ষত আছে।</div>{(cardStatements.cards||[]).map(a=><div key={String(a.accountId)}><CreditCardStatementEditor account={a} month={month} onSaved={loadNetWorth}/><CreditCardRepaymentEditor account={a} month={month} onSaved={async()=>{await Promise.all([loadSummary(),loadNetWorth()]);}}/></div>)}</details>}
       </div>
     </AppLayout>
+  );
+}
+
+function CashLine({ label, value }) {
+  return (
+    <div className="min-w-0 rounded-xl border border-slate-200 bg-white/70 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/70">
+      <div className="text-[11px] leading-4 text-slate-500 dark:text-slate-400">{label}</div>
+      <div className="mt-1 text-sm font-black text-slate-900 dark:text-white">{formatMoney(value ?? 0)}</div>
+    </div>
   );
 }
 

@@ -1,3 +1,4 @@
+import HFPageLead from "../components/design/HFPageLead";
 import { useEffect, useMemo, useRef, useState } from "react";
 import AppLayout from "../components/layout/AppLayout";
 import api from "../services/api";
@@ -409,6 +410,7 @@ function EmptyState({ title, desc, action, dark = false }) {
 }
 
 export default function Fixed() {
+  const [hfMore, setHfMore] = useState(false);
   const me = getUser();
   const dark = useGlobalDarkMode();
   const monthInputRef = useRef(null);
@@ -963,6 +965,18 @@ export default function Fixed() {
 
   return (
     <AppLayout>
+      <div className={`hf-step3-page hf-step3-fixed hf-v2-page hf-v2-fixed ${hfMore ? "hf-step3-expanded" : ""}`}>
+        <HFPageLead title="নিয়মিত বিল" description="বাসাভাড়া, বিদ্যুৎ বিল ও অন্যান্য মাসিক খরচ" month={month} onMonthChange={setMonth}
+          metrics={[
+ {label:'পরিশোধ করেছেন',value:stats.paidTotal,primary:true},
+ {label:'এখনও বাকি (আনুমানিক)',value:stats.pendingEstimate}
+]}
+          onAdd={openTemplateModal} addLabel="নতুন নিয়ম"
+          addDisabled={false}
+          onExtra={undefined} extraLabel=""
+          onRefresh={undefined}
+          more={undefined} onToggleMore={undefined} />
+
       <div
         className={classNames(
           "fixed-page -m-3 min-h-[calc(100vh-64px)] overflow-x-hidden p-3 transition-colors sm:-m-4 sm:p-4 md:-m-6 md:p-6",
@@ -972,78 +986,9 @@ export default function Fixed() {
         )}
       >
         <div className="mx-auto space-y-3 sm:space-y-5">
-          <section
-            className={classNames(
-              "relative overflow-hidden rounded-[1.5rem] border p-4 shadow-xl sm:rounded-[2rem] sm:p-5 md:p-7",
-              dark ? "border-white/10 bg-slate-950/70 shadow-black/30" : "border-white/80 bg-white/80 shadow-slate-200/80 backdrop-blur"
-            )}
-          >
-            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-cyan-400/25 blur-3xl" />
-            <div className="absolute -bottom-24 left-1/3 h-64 w-64 rounded-full bg-violet-400/20 blur-3xl" />
+          <></>
 
-            <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-              <div className="max-w-3xl">
-                <div className="hidden flex-wrap items-center gap-2 sm:flex">
-                  <Pill dark={dark} tone="blue">Recurring Budget</Pill>
-                  <Pill dark={dark} tone="purple">{monthLabel(month)}</Pill>
-                  <Pill dark={dark} tone={tab === "templates" ? "green" : "yellow"}>
-                    {tab === "templates" ? "Template View" : "Monthly View"}
-                  </Pill>
-                </div>
-                <h1 className="mt-2 text-2xl font-black tracking-tight sm:mt-4 sm:text-3xl md:text-4xl">
-                  Fixed Expenses
-                </h1>
-                <p className={classNames("mt-2 max-w-2xl text-[13px] leading-5 sm:text-sm sm:leading-6 md:text-base", dark ? "text-slate-300" : "text-slate-600")}>
-                  Manage recurring bills like rent, internet, subscriptions and utility costs. Templates keep the rules; monthly items store payment account, payer, date and amount.
-                </p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-[1fr_auto] xl:min-w-[520px]">
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={openBudgetMonthPicker}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") openBudgetMonthPicker();
-                  }}
-                  className={classNames(
-                    "rounded-2xl border p-2.5 sm:rounded-3xl sm:p-3",
-                    dark ? "border-white/10 bg-white/[0.06]" : "border-slate-200 bg-white/75"
-                  )}
-                >
-                  <label className={classNames("mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] sm:text-xs", dark ? "text-slate-400" : "text-slate-500")}>Budget Month</label>
-                  <div className="relative">
-                    <Icon name="calendar" className={classNames("pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2", dark ? "text-slate-400" : "text-slate-500")} />
-                    <input
-                      ref={monthInputRef}
-                      value={month}
-                      onChange={(e) => setMonth(e.target.value)}
-                      type="month"
-                      className={classNames(inputClass, "cursor-pointer pl-10")}
-                    />
-                  </div>
-                </div>
-
-                <SoftButton
-                  dark={dark}
-                  primary
-                  onClick={tab === "templates" ? openTemplateModal : generateMonth}
-                  className="min-h-11 rounded-2xl px-4 sm:min-h-[74px] sm:rounded-3xl sm:px-5"
-                >
-                  <Icon name={tab === "templates" ? "plus" : "refresh"} className="h-4 w-4" />
-                  <span>{tab === "templates" ? "Add Template" : "Generate Month"}</span>
-                </SoftButton>
-              </div>
-            </div>
-          </section>
-
-          <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            <StatCard className="hidden sm:block" title="Templates" value={stats.templateCount} sub="Saved recurring rules" iconName="pin" accent="from-indigo-500 to-blue-400" dark={dark} />
-            <StatCard title="Fixed Base" value={money(stats.fixedTemplateTotal)} sub="Non-variable template total" iconName="home" accent="from-emerald-500 to-teal-400" dark={dark} />
-            <StatCard className="hidden sm:block" title="Variable" value={stats.variableCount} sub="Amount changes monthly" iconName="bolt" accent="from-amber-500 to-orange-400" dark={dark} />
-            <StatCard title="Paid This Month" value={money(stats.paidTotal)} sub={`${stats.postedCount} posted item(s)`} iconName="check" accent="from-cyan-500 to-sky-400" dark={dark} />
-            <StatCard title="Pending" value={stats.pendingCount} sub={`Estimate: ${money(stats.pendingEstimate)}`} iconName="hourglass" accent="from-fuchsia-500 to-violet-400" dark={dark} />
-          </section>
+          <></>
 
           <section
             className={classNames(
@@ -1054,10 +999,10 @@ export default function Fixed() {
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className={classNames("fixed-no-scrollbar flex w-full overflow-x-auto rounded-2xl p-1 xl:w-auto", dark ? "bg-white/5" : "bg-slate-100")}>
                 <Tab active={tab === "templates"} onClick={() => setTab("templates")} dark={dark}>
-                  Templates <span className="opacity-70">({templates.length})</span>
+                  সংরক্ষিত নিয়ম <span className="opacity-70">({templates.length})</span>
                 </Tab>
                 <Tab active={tab === "instances"} onClick={() => setTab("instances")} dark={dark}>
-                  This Month <span className="opacity-70">({instances.length})</span>
+                  এই মাসের বিল <span className="opacity-70">({instances.length})</span>
                 </Tab>
               </div>
 
@@ -1065,21 +1010,21 @@ export default function Fixed() {
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder={tab === "templates" ? "Search by template or category..." : "Search by item, note, payer or account..."}
+                  placeholder={tab === "templates" ? "বিল বা খাত খুঁজুন…" : "বিল, মন্তব্য বা অ্যাকাউন্ট খুঁজুন…"}
                   className={inputClass}
                 />
 
                 {tab === "templates" ? (
                   <select className={classNames(selectClass, "md:max-w-[190px]")} value={filterVar} onChange={(e) => setFilterVar(e.target.value)}>
-                    <option value="all">All Templates</option>
-                    <option value="fixed">Fixed Amount</option>
-                    <option value="variable">Variable Amount</option>
+                    <option value="all">সব নিয়ম</option>
+                    <option value="fixed">নির্দিষ্ট টাকা</option>
+                    <option value="variable">পরিমাণ বদলায়</option>
                   </select>
                 ) : (
                   <select className={classNames(selectClass, "md:max-w-[180px]")} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                    <option value="all">All Status</option>
-                    <option value="pending">Pending</option>
-                    <option value="posted">Posted</option>
+                    <option value="all">সব অবস্থা</option>
+                    <option value="pending">বাকি</option>
+                    <option value="posted">পরিশোধিত</option>
                   </select>
                 )}
               </div>
@@ -1105,84 +1050,33 @@ export default function Fixed() {
 
           {loading ? (
             <div className={classNames("rounded-3xl border p-8", dark ? "border-white/10 bg-white/[0.05]" : "border-white/80 bg-white/85")}>
-              <Loader text="Loading fixed expenses" subtext="Fetching templates and current month data" />
+              <Loader text="তথ্য আসছে" subtext="নিয়ম ও এই মাসের বিল দেখা হচ্ছে" />
             </div>
           ) : tab === "templates" ? (
             <section>
               {filteredTemplates.length === 0 ? (
                 <EmptyState
                   dark={dark}
-                  title="No templates found"
+                  title="কোনো নিয়ম পাওয়া যায়নি"
                   desc="Create your first recurring template, such as House Rent, Internet Bill, Electricity Bill or ChatGPT Premium."
-                  action={<SoftButton dark={dark} primary onClick={openTemplateModal}>+ Add Template</SoftButton>}
+                  action={<SoftButton dark={dark} primary onClick={openTemplateModal}>+ নতুন নিয়ম</SoftButton>}
                 />
               ) : (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {filteredTemplates.map((t, index) => {
-                    const accent = [
-                      "from-indigo-500 to-cyan-400",
-                      "from-emerald-500 to-teal-400",
-                      "from-fuchsia-500 to-pink-400",
-                      "from-amber-500 to-orange-400",
-                      "from-blue-500 to-violet-400",
-                    ][index % 5];
-
-                    return (
-                      <article
-                        key={t._id}
-                        className={classNames(
-                          "group relative overflow-hidden rounded-[1.5rem] border p-3 shadow-sm transition sm:rounded-[1.75rem] sm:p-4 sm:hover:-translate-y-0.5 sm:hover:shadow-xl",
-                          dark ? "border-white/10 bg-white/[0.06] hover:bg-white/[0.09]" : "border-white/90 bg-white/90 hover:bg-white"
-                        )}
-                      >
-                        <div className={classNames("absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r", accent)} />
-                        <div className={classNames("absolute -right-12 -top-12 h-28 w-28 rounded-full bg-gradient-to-br opacity-10 transition sm:h-36 sm:w-36 sm:group-hover:opacity-20", accent)} />
-
-                        <div className="relative flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <div className={classNames("grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br text-white shadow-md sm:h-10 sm:w-10 sm:rounded-2xl", accent)}>
-                                <Icon name={t.isVariable ? "bolt" : "receipt"} className="h-4 w-4 sm:h-5 sm:w-5" />
-                              </div>
-                              <div className="min-w-0">
-                                <h3 className={classNames("truncate text-base font-black", dark ? "text-white" : "text-slate-950")}>{t.name}</h3>
-                                <p className={classNames("truncate text-xs", dark ? "text-slate-400" : "text-slate-500")}>{t.categoryId?.name || "No category"}</p>
-                              </div>
-                            </div>
-                          </div>
-                          <Pill dark={dark} tone={t.isVariable ? "yellow" : "green"}>{t.isVariable ? "Variable" : "Fixed"}</Pill>
-                        </div>
-
-                        <div className="relative mt-3 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3">
-                          <div className={classNames("rounded-xl border p-2.5 sm:rounded-2xl sm:p-3", dark ? "border-white/10 bg-slate-950/40" : "border-slate-100 bg-slate-50")}>
-                            <p className={classNames("text-xs font-semibold uppercase tracking-[0.14em]", dark ? "text-slate-500" : "text-slate-400")}>Default</p>
-                            <p className={classNames("mt-1 text-lg font-black", dark ? "text-white" : "text-slate-950")}>
-                              {t.isVariable ? "—" : money(t.defaultAmount)}
-                            </p>
-                          </div>
-
-                          <div className={classNames("rounded-xl border p-2.5 sm:rounded-2xl sm:p-3", dark ? "border-white/10 bg-slate-950/40" : "border-slate-100 bg-slate-50")}>
-                            <p className={classNames("text-xs font-semibold uppercase tracking-[0.14em]", dark ? "text-slate-500" : "text-slate-400")}>Split</p>
-                            <div className="mt-1">
-                              <Pill dark={dark} tone={splitTone(t.defaultSplitType)}>{splitLabel(t.defaultSplitType)}</Pill>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="relative mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:flex sm:flex-wrap sm:justify-end">
-                          <SoftButton dark={dark} className="col-span-2 sm:col-span-1" onClick={() => openPaymentModalForTemplate(t)}>
-                            Add to month
-                          </SoftButton>
-                          <SoftButton dark={dark} onClick={() => openEditTemplateModal(t)}>
-                            Edit
-                          </SoftButton>
-                          <SoftButton dark={dark} danger onClick={() => deleteTemplate(t._id)}>
-                            Delete
-                          </SoftButton>
-                        </div>
-                      </article>
-                    );
-                  })}
+                <div className="hf-hishab-fixed-list">
+                  {filteredTemplates.map((t) => (
+                    <article key={t._id} className="hf-hishab-fixed-row">
+                      <div className="hf-hishab-fixed-main">
+                        <h3>{t.name}</h3>
+                        <p>{t.categoryId?.name || 'অন্যান্য'} · {t.isVariable ? 'মাসভেদে টাকার পরিমাণ বদলায়' : 'নির্দিষ্ট টাকা'} · {splitLabel(t.defaultSplitType)}</p>
+                      </div>
+                      <div className="hf-hishab-fixed-money"><small>সাধারণ পরিমাণ</small><b>{t.isVariable ? 'মাসে লিখবেন' : money(t.defaultAmount)}</b></div>
+                      <div className="hf-hishab-fixed-actions">
+                        <SoftButton dark={dark} primary onClick={() => openPaymentModalForTemplate(t)}>এই মাসে যোগ করুন</SoftButton>
+                        <SoftButton dark={dark} onClick={() => openEditTemplateModal(t)}>সম্পাদনা</SoftButton>
+                        <SoftButton dark={dark} danger onClick={() => deleteTemplate(t._id)}>মুছুন</SoftButton>
+                      </div>
+                    </article>
+                  ))}
                 </div>
               )}
             </section>
@@ -1193,89 +1087,25 @@ export default function Fixed() {
                   dark={dark}
                   title={`No month items for ${monthLabel(month)}`}
                   desc="Generate the month to create pending items from all templates, or add any template directly to this month."
-                  action={<SoftButton dark={dark} primary onClick={generateMonth}>Generate Month</SoftButton>}
+                  action={<SoftButton dark={dark} primary onClick={generateMonth}>মাসের বিল তৈরি</SoftButton>}
                 />
               ) : (
-                <div className="space-y-3">
-                  {filteredInstances.map((i, index) => {
-                    const posted = i.status === "posted" || i.status === "active";
-                    const accent = posted ? "from-emerald-500 to-teal-400" : "from-amber-500 to-orange-400";
+                <div className="hf-hishab-fixed-list">
+                  {filteredInstances.map(i => {
+                    const posted = i.status === 'posted' || i.status === 'active';
                     const amount = posted ? i.amount : i.templateId?.isVariable ? 0 : i.templateId?.defaultAmount || 0;
-
-                    return (
-                      <article
-                        key={i._id}
-                        className={classNames(
-                          "relative overflow-hidden rounded-[1.5rem] border p-3 shadow-sm transition sm:rounded-[1.75rem] sm:p-4 sm:hover:shadow-xl",
-                          dark ? "border-white/10 bg-white/[0.06]" : "border-white/90 bg-white/90"
-                        )}
-                      >
-                        <div className={classNames("absolute left-0 top-0 h-full w-1.5 bg-gradient-to-b", accent)} />
-                        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)_auto] lg:items-center xl:gap-4">
-                          <div className="min-w-0 pl-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className={classNames("grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-gradient-to-br text-xs font-black text-white shadow-md sm:h-9 sm:w-9 sm:rounded-2xl sm:text-sm", accent)}>
-                                {index + 1}
-                              </span>
-                              <h3 className={classNames("text-base font-black", dark ? "text-white" : "text-slate-950")}>{i.templateId?.name || "Fixed Expense"}</h3>
-                              <Pill dark={dark} tone={posted ? "green" : "yellow"}>{posted ? "Posted" : "Pending"}</Pill>
-                              <Pill dark={dark} className="hidden sm:inline-flex" tone={i.templateId?.isVariable ? "yellow" : "green"}>{i.templateId?.isVariable ? "Variable" : "Fixed"}</Pill>
-                              <Pill dark={dark} className="hidden sm:inline-flex" tone={splitTone(i.templateId?.defaultSplitType)}>{splitLabel(i.templateId?.defaultSplitType)}</Pill>
-                            </div>
-
-                            <p className={classNames("mt-2 text-sm", dark ? "text-slate-400" : "text-slate-500")}>
-                              {i.templateId?.categoryId?.name || "Category"}
-                              {i.note ? <span> · {i.note}</span> : null}
-                            </p>
-
-                            <div className={classNames("mt-2 space-y-1 text-xs sm:hidden", dark ? "text-slate-300" : "text-slate-600")}>
-                              <div><span className="font-semibold uppercase tracking-wide opacity-60">Paid:</span> <b>{i.paidByUserId?.name || "—"}</b></div>
-                              <div><span className="font-semibold uppercase tracking-wide opacity-60">Account:</span> <b>{i.fromAccountId?.name || "—"}</b></div>
-                              <div><span className="font-semibold uppercase tracking-wide opacity-60">Date:</span> <b>{prettyDate(i.date)}</b></div>
-                            </div>
-                          </div>
-
-                          <div className="hidden gap-2 sm:grid sm:grid-cols-3 xl:grid-cols-3">
-                            <div className={classNames("rounded-2xl border px-3 py-2", dark ? "border-white/10 bg-slate-950/40" : "border-slate-100 bg-slate-50")}>
-                              <p className={classNames("text-[11px] font-bold uppercase tracking-[0.14em]", dark ? "text-slate-500" : "text-slate-400")}>Paid By</p>
-                              <p className={classNames("mt-1 text-sm font-bold leading-5 break-words", dark ? "text-slate-200" : "text-slate-700")}>{i.paidByUserId?.name || "—"}</p>
-                            </div>
-                            <div className={classNames("rounded-2xl border px-3 py-2", dark ? "border-white/10 bg-slate-950/40" : "border-slate-100 bg-slate-50")}>
-                              <p className={classNames("text-[11px] font-bold uppercase tracking-[0.14em]", dark ? "text-slate-500" : "text-slate-400")}>Account</p>
-                              <p className={classNames("mt-1 text-sm font-bold leading-5 break-words", dark ? "text-slate-200" : "text-slate-700")}>{i.fromAccountId?.name || "—"}</p>
-                            </div>
-                            <div className={classNames("rounded-2xl border px-3 py-2", dark ? "border-white/10 bg-slate-950/40" : "border-slate-100 bg-slate-50")}>
-                              <p className={classNames("text-[11px] font-bold uppercase tracking-[0.14em]", dark ? "text-slate-500" : "text-slate-400")}>Date</p>
-                              <p className={classNames("mt-1 text-sm font-bold leading-5 break-words", dark ? "text-slate-200" : "text-slate-700")}>{prettyDate(i.date)}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col gap-2 sm:gap-3 lg:items-end">
-                            <div className="text-left lg:text-right">
-                              <p className={classNames("text-xs font-bold uppercase tracking-[0.16em]", dark ? "text-slate-500" : "text-slate-400")}>{posted ? "Paid Amount" : "Expected"}</p>
-                              <p className={classNames("mt-1 text-xl font-black sm:text-2xl", posted ? "text-emerald-500" : "text-amber-500")}>
-                                {i.templateId?.isVariable && !posted ? "Variable" : money(amount)}
-                              </p>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
-                              {!posted ? (
-                                <SoftButton dark={dark} primary onClick={() => openPaymentModalForInstance(i)}>
-                                  Post Now
-                                </SoftButton>
-                              ) : (
-                                <SoftButton dark={dark} onClick={() => openEditPaymentModal(i)}>
-                                  <Icon name="edit" className="h-3.5 w-3.5" /> Edit Payment
-                                </SoftButton>
-                              )}
-                              <SoftButton dark={dark} danger onClick={() => deleteInstance(i._id)}>
-                                <Icon name="trash" className="h-3.5 w-3.5" /> Delete
-                              </SoftButton>
-                            </div>
-                          </div>
-                        </div>
-                      </article>
-                    );
+                    return <article key={i._id} className="hf-hishab-fixed-row">
+                      <div className="hf-hishab-fixed-main">
+                        <h3>{i.templateId?.name || 'নিয়মিত বিল'}</h3>
+                        <p>{i.templateId?.categoryId?.name || 'অন্যান্য'} · {i.paidByUserId?.name || 'দেওয়া বাকি'} {i.note ? ` · ${i.note}` : ''}</p>
+                      </div>
+                      <div className="hf-hishab-fixed-money"><small>{posted ? 'পরিশোধ হয়েছে' : 'দিতে হবে'}</small><b>{i.templateId?.isVariable && !posted ? 'টাকা লিখবেন' : money(amount)}</b></div>
+                      <div className="hf-hishab-fixed-actions">
+                        {!posted ? <SoftButton dark={dark} primary onClick={()=>openPaymentModalForInstance(i)}>এখন পরিশোধ করুন</SoftButton>
+                        : <SoftButton dark={dark} onClick={()=>openEditPaymentModal(i)}>পরিশোধ সংশোধন</SoftButton>}
+                        <SoftButton dark={dark} danger onClick={()=>deleteInstance(i._id)}>মুছুন</SoftButton>
+                      </div>
+                    </article>;
                   })}
                 </div>
               )}
@@ -1300,50 +1130,50 @@ export default function Fixed() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <Pill dark={dark} tone={templateMode === "edit" ? "blue" : "green"}>{templateMode === "edit" ? "Update Rule" : "New Rule"}</Pill>
-                    <h3 className="mt-3 text-2xl font-black">{templateMode === "edit" ? "Edit Template" : "Add Template"}</h3>
+                    <Pill dark={dark} tone={templateMode === "edit" ? "blue" : "green"}>{templateMode === "edit" ? "নিয়ম সংশোধন" : "নতুন নিয়ম"}</Pill>
+                    <h3 className="mt-3 text-2xl font-black">{templateMode === "edit" ? "নিয়ম সংশোধন করুন" : "নতুন নিয়ম যোগ করুন"}</h3>
                     <p className={classNames("mt-1 text-sm", dark ? "text-slate-400" : "text-slate-500")}>
-                      Template stores the recurring rule. Payment details are selected when you add it to a month.
+                      নিয়মটি সংরক্ষিত থাকবে; মাসে দেওয়ার সময় অ্যাকাউন্ট বাছবেন।
                     </p>
                   </div>
-                  <SoftButton dark={dark} onClick={closeTemplateModal}>Close</SoftButton>
+                  <SoftButton dark={dark} onClick={closeTemplateModal}>বন্ধ করুন</SoftButton>
                 </div>
 
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
                   <div className="md:col-span-2">
-                    <Field dark={dark} label="Template Name" hint="Example: House Rent / Electricity Bill">
+                    <Field dark={dark} label="নিয়মের নাম" hint="Example: House Rent / Electricity Bill">
                       <input
                         className={inputClass}
                         value={templateForm.name}
                         onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
-                        placeholder="e.g., Electricity Bill"
+                        placeholder="যেমন: বিদ্যুৎ বিল"
                       />
                     </Field>
                   </div>
 
-                  <Field dark={dark} label="Category">
+                  <Field dark={dark} label="খরচের ধরন">
                     <select
                       className={selectClass}
                       value={templateForm.categoryId}
                       onChange={(e) => setTemplateForm({ ...templateForm, categoryId: e.target.value })}
                     >
-                      <option value="">Select category</option>
+                      <option value="">ধরন বাছুন</option>
                       {expenseCats.map((c) => (
                         <option key={c._id} value={c._id}>{c.name}</option>
                       ))}
                     </select>
                   </Field>
 
-                  <Field dark={dark} label="Split Type" hint="How this cost is shared">
+                  <Field dark={dark} label="খরচ ভাগ হবে" hint="How this cost is shared">
                     <select
                       className={selectClass}
                       value={templateForm.defaultSplitType}
                       onChange={(e) => setTemplateForm({ ...templateForm, defaultSplitType: e.target.value })}
                     >
-                      <option value="equal">Equal</option>
-                      <option value="personal">Personal</option>
-                      <option value="ratio">Ratio</option>
-                      <option value="fixed">Fixed Amounts</option>
+                      <option value="equal">সমান</option>
+                      <option value="personal">ব্যক্তিগত</option>
+                      <option value="ratio">অনুপাত অনুযায়ী</option>
+                      <option value="fixed">নির্দিষ্ট ভাগ</option>
                     </select>
                   </Field>
 
@@ -1352,12 +1182,12 @@ export default function Fixed() {
                       dark={dark}
                       checked={templateForm.isVariable}
                       onChange={(v) => setTemplateForm({ ...templateForm, isVariable: v, defaultAmount: "" })}
-                      label="Variable amount"
+                      label="মাসে মাসে অঙ্ক বদলায়"
                       desc="Turn this on for bills like electricity, gas or water where amount changes every month."
                     />
                   </div>
 
-                  <Field dark={dark} label="Default Amount" hint={templateForm.isVariable ? "Disabled for variable templates" : "Required for fixed amount"}>
+                  <Field dark={dark} label="সাধারণত কত টাকা" hint={templateForm.isVariable ? "Disabled for variable templates" : "Required for fixed amount"}>
                     <input
                       className={classNames(inputClass, templateForm.isVariable && "cursor-not-allowed opacity-60")}
                       value={templateForm.defaultAmount}
@@ -1370,13 +1200,13 @@ export default function Fixed() {
                   </Field>
 
                   {templateForm.defaultSplitType === "personal" && (
-                    <Field dark={dark} label="Personal For">
+                    <Field dark={dark} label="কার জন্য">
                       <select
                         className={selectClass}
                         value={templateForm.personalUserId}
                         onChange={(e) => setTemplateForm({ ...templateForm, personalUserId: e.target.value })}
                       >
-                        <option value="">Select member</option>
+                        <option value="">সদস্য বাছুন</option>
                         {members.map((m) => (
                           <option key={m.id} value={m.id}>{m.name}</option>
                         ))}
@@ -1432,7 +1262,7 @@ export default function Fixed() {
                 {msg && <div className={classNames("mt-4 rounded-2xl border px-4 py-3 text-sm font-semibold", dark ? "border-rose-300/20 bg-rose-400/10 text-rose-200" : "border-rose-200 bg-rose-50 text-rose-700")}>{msg}</div>}
 
                 <div className="mt-6 flex justify-end gap-2">
-                  <SoftButton dark={dark} onClick={closeTemplateModal}>Cancel</SoftButton>
+                  <SoftButton dark={dark} onClick={closeTemplateModal}>বাতিল</SoftButton>
                   <SoftButton dark={dark} primary onClick={saveTemplate}>
                     {templateMode === "edit" ? "Update Template" : "Save Template"}
                   </SoftButton>
@@ -1459,11 +1289,11 @@ export default function Fixed() {
                     </h3>
                     <p className={classNames("mt-1 text-sm", dark ? "text-slate-400" : "text-slate-500")}>{selectedTemplate?.name || "Fixed Expense"}</p>
                   </div>
-                  <SoftButton dark={dark} onClick={closePaymentModal}>Close</SoftButton>
+                  <SoftButton dark={dark} onClick={closePaymentModal}>বন্ধ করুন</SoftButton>
                 </div>
 
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
-                  <Field dark={dark} label="Who is paying">
+                  <Field dark={dark} label="টাকা দেবেন">
                     <select
                       className={selectClass}
                       value={paymentForm.paidByUserId}
@@ -1478,23 +1308,23 @@ export default function Fixed() {
                         });
                       }}
                     >
-                      <option value="">Select member</option>
+                      <option value="">সদস্য বাছুন</option>
                       {members.map((m) => (
                         <option key={m.id} value={m.id}>{m.name}</option>
                       ))}
                     </select>
                   </Field>
 
-                  <Field dark={dark} label="From which account">
+                  <Field dark={dark} label="কোন অ্যাকাউন্ট থেকে">
                     <select
                       className={selectClass}
                       value={paymentForm.fromAccountId}
                       onChange={(e) => setPaymentForm({ ...paymentForm, fromAccountId: e.target.value })}
                     >
-                      <option value="">Select account</option>
+                      <option value="">অ্যাকাউন্ট বাছুন</option>
                       {paymentAccountOptions.length === 0 ? (
                         <option value="" disabled>
-                          No payable account found
+                          পরিশোধের উপযুক্ত অ্যাকাউন্ট নেই
                         </option>
                       ) : (
                         paymentAccountOptions.map((a) => (
@@ -1506,7 +1336,7 @@ export default function Fixed() {
                     </select>
                   </Field>
 
-                  <Field dark={dark} label="Payment Date">
+                  <Field dark={dark} label="পরিশোধের তারিখ">
                     <input
                       type="date"
                       className={inputClass}
@@ -1516,30 +1346,30 @@ export default function Fixed() {
                   </Field>
 
                   {(selectedTemplate?.isVariable || paymentMode === "edit") ? (
-                    <Field dark={dark} label="Amount">
+                    <Field dark={dark} label="টাকা">
                       <input
                         type="number"
                         min="0"
                         className={inputClass}
                         value={paymentForm.amount}
                         onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                        placeholder="Enter amount"
+                        placeholder="টাকার অঙ্ক লিখুন"
                       />
                     </Field>
                   ) : (
                     <div className={classNames("rounded-2xl border p-4", dark ? "border-white/10 bg-white/[0.05]" : "border-slate-200 bg-slate-50")}>
-                      <p className={classNames("text-xs font-bold uppercase tracking-[0.16em]", dark ? "text-slate-400" : "text-slate-500")}>Fixed Amount</p>
+                      <p className={classNames("text-xs font-bold uppercase tracking-[0.16em]", dark ? "text-slate-400" : "text-slate-500")}>নির্দিষ্ট টাকা</p>
                       <p className="mt-1 text-2xl font-black text-emerald-500">{money(selectedTemplate?.defaultAmount || 0)}</p>
                     </div>
                   )}
 
                   <div className="md:col-span-2">
-                    <Field dark={dark} label="Note (optional)">
+                    <Field dark={dark} label="নোট (ইচ্ছা হলে)">
                       <input
                         className={inputClass}
                         value={paymentForm.note}
                         onChange={(e) => setPaymentForm({ ...paymentForm, note: e.target.value })}
-                        placeholder="Example: Paid through card / May month bill"
+                        placeholder="যেমন: মে মাসের বিল"
                       />
                     </Field>
                   </div>
@@ -1548,7 +1378,7 @@ export default function Fixed() {
                 {msg && <div className={classNames("mt-4 rounded-2xl border px-4 py-3 text-sm font-semibold", dark ? "border-rose-300/20 bg-rose-400/10 text-rose-200" : "border-rose-200 bg-rose-50 text-rose-700")}>{msg}</div>}
 
                 <div className="mt-6 flex justify-end gap-2">
-                  <SoftButton dark={dark} onClick={closePaymentModal}>Cancel</SoftButton>
+                  <SoftButton dark={dark} onClick={closePaymentModal}>বাতিল</SoftButton>
                   <SoftButton dark={dark} primary onClick={submitPaymentModal}>
                     {paymentMode === "edit" ? "Update Payment" : "Confirm Payment"}
                   </SoftButton>
@@ -1560,6 +1390,7 @@ export default function Fixed() {
           <div className="h-10" />
         </div>
       </div>
+          </div>
     </AppLayout>
   );
 }

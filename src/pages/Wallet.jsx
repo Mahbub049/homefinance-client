@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import HFPageLead from "../components/design/HFPageLead";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AppLayout from "../components/layout/AppLayout";
 import api from "../services/api";
 
@@ -9,10 +10,8 @@ function monthNow() {
 
 function formatMoney(v) {
   const n = Number(v || 0);
-  return `৳ ${n.toLocaleString("en-BD", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })}`;
+  const formatted = Math.abs(n).toLocaleString("bn-BD", { maximumFractionDigits: 2 });
+  return n < 0 ? `-৳ ${formatted}` : `৳ ${formatted}`;
 }
 
 function safeNumber(v) {
@@ -62,7 +61,7 @@ function shortMonth(value) {
   if (!value) return "Selected month";
   const [year, month] = String(value).split("-");
   const date = new Date(Number(year), Number(month) - 1, 1);
-  return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  return date.toLocaleDateString("bn-BD", { month: "long", year: "numeric" });
 }
 
 function initials(name = "") {
@@ -273,173 +272,48 @@ function MiniMetric({ label, value, tone = "slate" }) {
   );
 }
 
-function WalletPersonCard({ user, maxAbsNet }) {
-  const [detailsOpen, setDetailsOpen] = useState(false);
+function MonthlyRemainingPanel({ month, monthlyCashFlow, accountStatus }) {
+  const summary = monthlyCashFlow?.household;
+  const issueCount = monthlyCashFlow?.issues?.length || 0;
+  const ready = !!summary && accountStatus === 'ok' && issueCount === 0;
+  return <section className="hf-v2-wallet-month">
+    <div><span className="hf-v2-eyebrow">{shortMonth(month)} · মাসের আয় থেকে</span><h2>এই মাসে বাকি</h2><strong className={safeNumber(summary?.remainingFromMonth)<0?'hf-v2-negative':''}>{ready ? formatMoney(summary.remainingFromMonth) : 'হিসাব যাচাই করুন'}</strong><p>আগের মাসের জমা টাকা এখানে যোগ করা হয়নি।</p></div>
+    {summary && <div className="hf-v2-wallet-month-parts">
+      <div><span>আয়</span><b>{formatMoney(summary.income)}</b></div>
+      <div><span>পরিশোধিত খরচ</span><b>{formatMoney(summary.expenses)}</b></div>
+      <div><span>সঞ্চয়ে জমা</span><b>{formatMoney(summary.savedOrInvested)}</b></div>
+      {safeNumber(summary.savingsWithdrawn)>0 && <div><span>সঞ্চয় থেকে তোলা</span><b>{formatMoney(summary.savingsWithdrawn)}</b></div>}
+    </div>}
+    {!!issueCount && <p className="hf-v2-inline-warning">{issueCount.toLocaleString('bn-BD')}টি রেকর্ডের হিসাব মিলিয়ে দেখা দরকার।</p>}
+  </section>;
+}
 
-  const income = safeNumber(user.income);
-  const paid = safeNumber(user.paidExpense);
-  const share = safeNumber(user.shareExpense);
-  const transferIn = safeNumber(user.transferIn);
-  const transferOut = safeNumber(user.transferOut);
-  const transferNet = safeNumber(user.transferNet);
-  const expenseNet = safeNumber(user.expenseNet ?? paid - share);
-  const sharedPurchaseDue = safeNumber(user.sharedPurchaseDue);
-  const sharedPurchaseReceivable = safeNumber(user.sharedPurchaseReceivable);
-  const sharedPurchasePaid = safeNumber(user.sharedPurchasePaid);
-  const sharedPurchaseReceived = safeNumber(user.sharedPurchaseReceived);
-  const sharedPurchaseNet = safeNumber(user.sharedPurchaseNet);
-  const walletSettlementPaid = safeNumber(user.walletSettlementPaid);
-  const walletSettlementReceived = safeNumber(user.walletSettlementReceived);
-  const walletSettlementNet = safeNumber(user.walletSettlementNet);
-  const preSettlementNet = safeNumber(user.preSettlementNet ?? expenseNet);
+function WalletPersonCard({ user, maxAbsNet, accountStatus }) {
+  const [detailsOpen,setDetailsOpen] = useState(false);
   const net = safeNumber(user.net);
-  const remaining = safeNumber(user.cashAfterPaid ?? user.remaining ?? income - paid + transferNet);
-  const shareBasedRemaining = safeNumber(user.shareBasedRemaining ?? income - share + transferNet);
-
-  const netPositive = net >= 0;
-  const pct = Math.round((Math.abs(net) / Math.max(1, maxAbsNet)) * 100);
-  const shareCoverage = share > 0 ? Math.min(100, Math.round((paid / share) * 100)) : paid > 0 ? 100 : 0;
-
-  return (
-    <article className="wallet-card group relative w-full max-w-full min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-sky-200 hover:shadow-md dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.08] sm:p-5 lg:hover:-translate-y-0.5">
-      <div className={`absolute -right-14 -top-14 h-36 w-36 rounded-full ${netPositive ? "bg-emerald-100 dark:bg-emerald-400/10" : "bg-rose-100 dark:bg-rose-400/10"} opacity-80 transition lg:group-hover:scale-110`} />
-      <div className="relative min-w-0 overflow-hidden">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className={`hidden h-12 w-12 shrink-0 place-items-center rounded-2xl text-sm font-black text-white shadow-sm sm:grid ${netPositive ? "bg-gradient-to-br from-emerald-500 to-teal-600" : "bg-gradient-to-br from-rose-500 to-pink-600"}`}>
-              {initials(user.name)}
-            </div>
-            <div className="min-w-0">
-              <h3 className="break-words text-base font-black text-slate-950 dark:text-white sm:text-lg">{user.name}</h3>
-              <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400 sm:mt-1">
-                {Math.abs(net) <= 0.009
-                  ? "Fully balanced after all settlement items"
-                  : netPositive
-                    ? "Should receive after all settlement items"
-                    : "Needs to pay after all settlement items"}
-              </p>
-            </div>
-          </div>
-
-          <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-black sm:px-3 sm:py-1.5 sm:text-xs ${statusClasses(net)}`}>
-            Final {netPositive ? "+" : ""}{formatMoney(net)}
-          </span>
-        </div>
-
-        <div className="mt-3 rounded-3xl border border-slate-100 bg-slate-50 p-3 dark:border-white/10 dark:bg-slate-950/40 sm:mt-5 sm:p-4">
-          <div className="flex items-end justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400 sm:text-xs">Remaining Balance</div>
-              <div className="mt-1 break-words text-2xl font-black text-slate-950 dark:text-white sm:text-3xl">{formatMoney(remaining)}</div>
-            </div>
-            <div className="hidden text-xs font-semibold text-slate-500 dark:text-slate-400 sm:block">
-              Share coverage: <b className="text-slate-900 dark:text-white">{shareCoverage}%</b>
-            </div>
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-3">
-            <div className="rounded-2xl border border-emerald-100 bg-white p-2.5 dark:border-emerald-400/20 dark:bg-emerald-400/10 sm:p-3">
-              <div className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-200 sm:text-[11px]">Inflow</div>
-              <div className="mt-1 break-words text-sm font-black text-emerald-900 dark:text-emerald-100 sm:text-base">{formatMoney(income + transferIn)}</div>
-            </div>
-            <div className="hidden h-10 w-10 place-items-center rounded-2xl bg-slate-900 text-xs font-black text-white dark:bg-white dark:text-slate-950 sm:grid">VS</div>
-            <div className="rounded-2xl border border-rose-100 bg-white p-2.5 dark:border-rose-400/20 dark:bg-rose-400/10 sm:p-3">
-              <div className="text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:text-rose-200 sm:text-[11px]">Outflow</div>
-              <div className="mt-1 break-words text-sm font-black text-rose-900 dark:text-rose-100 sm:text-base">{formatMoney(paid + transferOut)}</div>
-            </div>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setDetailsOpen((v) => !v)}
-          className="mt-3 flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 sm:hidden"
-        >
-          {detailsOpen ? "Hide detailed values" : "Show detailed values"}
-          <Icon name="chevron" className={cx("h-4 w-4 transition", detailsOpen && "rotate-180")} />
-        </button>
-
-        <div className={cx("wallet-details-grid mt-3 w-full max-w-full min-w-0 grid-cols-1 gap-2 overflow-hidden sm:mt-4 sm:grid sm:grid-cols-2 sm:gap-3 lg:grid-cols-3", detailsOpen ? "grid" : "hidden")}>
-          <MiniMetric label="Income" value={formatMoney(income)} tone="emerald" />
-          <MiniMetric label="Paid Expense" value={formatMoney(paid)} tone="violet" />
-          <MiniMetric label="Expense Share" value={formatMoney(share)} tone="rose" />
-          <MiniMetric label="Regular Expense Net" value={formatMoney(expenseNet)} tone={expenseNet >= 0 ? "emerald" : "rose"} />
-          <MiniMetric label="Outstanding Shared Due" value={formatMoney(sharedPurchaseDue)} tone={sharedPurchaseDue > 0 ? "rose" : "slate"} />
-          <MiniMetric label="Outstanding Shared Receivable" value={formatMoney(sharedPurchaseReceivable)} tone={sharedPurchaseReceivable > 0 ? "emerald" : "slate"} />
-          <MiniMetric label="Shared Reimbursement Paid" value={formatMoney(sharedPurchasePaid)} tone={sharedPurchasePaid > 0 ? "emerald" : "slate"} />
-          <MiniMetric label="Shared Reimbursement Received" value={formatMoney(sharedPurchaseReceived)} tone={sharedPurchaseReceived > 0 ? "sky" : "slate"} />
-          <MiniMetric label="Outstanding Shared Net" value={formatMoney(sharedPurchaseNet)} tone={sharedPurchaseNet >= 0 ? "emerald" : "rose"} />
-          <MiniMetric label="Before Wallet Settlement" value={formatMoney(preSettlementNet)} tone={preSettlementNet >= 0 ? "emerald" : "rose"} />
-          <MiniMetric label="Wallet Settlement Paid" value={formatMoney(walletSettlementPaid)} tone={walletSettlementPaid > 0 ? "emerald" : "slate"} />
-          <MiniMetric label="Wallet Settlement Received" value={formatMoney(walletSettlementReceived)} tone={walletSettlementReceived > 0 ? "sky" : "slate"} />
-          <MiniMetric label="Wallet Settlement Net" value={formatMoney(walletSettlementNet)} tone={walletSettlementNet >= 0 ? "emerald" : "rose"} />
-          <MiniMetric label="Final Settlement Net" value={formatMoney(net)} tone={net >= 0 ? "emerald" : "rose"} />
-          <MiniMetric label="Share-Based Balance" value={formatMoney(shareBasedRemaining)} tone="sky" />
-          <MiniMetric label="Transfer In" value={formatMoney(transferIn)} tone="sky" />
-          <MiniMetric label="Transfer Out" value={formatMoney(transferOut)} tone="rose" />
-          <MiniMetric label="Transfer Net" value={formatMoney(transferNet)} tone={transferNet >= 0 ? "emerald" : "rose"} />
-        </div>
-
-        <div className="mt-4 hidden sm:block">
-          <div className="mb-1 flex justify-between gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-            <span>Net impact</span>
-            <span>{pct}%</span>
-          </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${netPositive ? "bg-gradient-to-r from-emerald-500 to-teal-500" : "bg-gradient-to-r from-rose-500 to-pink-500"}`}
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-        </div>
-
-        <div className="mt-4 hidden rounded-2xl border border-slate-100 bg-white px-3 py-2 text-xs leading-5 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 lg:block">
-          Final settlement = regular expense net + outstanding Shared/Large Purchase obligations + verified Wallet settlement transfers. A verified Shared Purchase repayment clears its due and is shown for history only; it is never added a second time.
-        </div>
-      </div>
-    </article>
-  );
+  const m = user.monthlyCashFlow;
+  const valid = m && !m.unreconciled;
+  return <article className="hf-v2-wallet-person">
+    <div className="hf-v2-wallet-person-top"><div><h3>{user.name}</h3><span>এই মাসের ব্যক্তিগত হিসাব</span></div><span className={net<0?'hf-v2-negative':'hf-v2-positive'}>{net<0?'দেবেন':'পাবেন'} {formatMoney(Math.abs(net))}</span></div>
+    <div className="hf-v2-wallet-person-big"><span>মাসের আয় থেকে বাকি</span><strong className={safeNumber(m?.remainingFromMonth)<0?'hf-v2-negative':''}>{valid ? formatMoney(m.remainingFromMonth) : 'যাচাই প্রয়োজন'}</strong></div>
+    {valid && <div className="hf-v2-wallet-person-breakdown"><div><span>আয়</span><b>{formatMoney(m.income)}</b></div><div><span>পরিশোধ</span><b>{formatMoney(m.expenses)}</b></div><div><span>সঞ্চয়</span><b>{formatMoney(m.savedOrInvested)}</b></div></div>}
+    <button type="button" className="hf-v2-person-toggle" onClick={()=>setDetailsOpen(x=>!x)} aria-expanded={detailsOpen}>{detailsOpen?'বিস্তারিত বন্ধ করুন':'খরচ ও অ্যাকাউন্টের বিস্তারিত দেখুন'} <Icon name="chevron" className={cx('h-4 w-4',detailsOpen&&'rotate-180')}/></button>
+    {detailsOpen && <div className="hf-v2-wallet-person-details">
+      <div><span>সাধারণ খরচ দিয়েছেন</span><b>{formatMoney(user.paidExpense)}</b></div>
+      <div><span>সাধারণ খরচে নিজের ভাগ</span><b>{formatMoney(user.shareExpense)}</b></div>
+      <div><span>অ্যাকাউন্টে মোট টাকা (আগের মাসসহ)</span><b>{user.availableCash==null?'যাচাই প্রয়োজন':formatMoney(user.availableCash)}</b></div>
+      <div><span>বড় কেনাকাটায় দেওয়া বাকি</span><b>{formatMoney(user.sharedPurchaseDue)}</b></div>
+      <div><span>বড় কেনাকাটায় পাওনা</span><b>{formatMoney(user.sharedPurchaseReceivable)}</b></div>
+    </div>}
+  </article>;
 }
-
-function QuickInsight({ topSurplus, topDeficit }) {
-  return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.06] sm:p-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-base font-black text-slate-950 dark:text-white sm:text-lg">Quick Insights</h3>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Fast settlement signals for this month.</p>
-        </div>
-        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-violet-600 text-white dark:bg-violet-500">
-          <Icon name="wallet" className="h-5 w-5" />
-        </div>
-      </div>
-
-      <div className="mt-4 space-y-3">
-        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 dark:border-emerald-400/20 dark:bg-emerald-400/10">
-          <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-200">Highest Surplus</div>
-          <div className="mt-1 flex items-center justify-between gap-3 text-sm">
-            <span className="break-words font-bold text-emerald-950 dark:text-emerald-100">{topSurplus?.name || "-"}</span>
-            <span className="font-black text-emerald-950 dark:text-emerald-100">{formatMoney(topSurplus?.net || 0)}</span>
-          </div>
-        </div>
-        <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3 dark:border-rose-400/20 dark:bg-rose-400/10">
-          <div className="text-[11px] font-bold uppercase tracking-wide text-rose-700 dark:text-rose-200">Highest Deficit</div>
-          <div className="mt-1 flex items-center justify-between gap-3 text-sm">
-            <span className="break-words font-bold text-rose-950 dark:text-rose-100">{topDeficit?.name || "-"}</span>
-            <span className="font-black text-rose-950 dark:text-rose-100">{formatMoney(topDeficit?.net || 0)}</span>
-          </div>
-        </div>
-        <div className="hidden rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 sm:block">
-          Use the settlement suggestion to balance shared expenses after cross-owner transfers.
-        </div>
-      </div>
-    </section>
-  );
-}
-
 
 function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus, topDeficit }) {
   const users = data?.users || [];
+  const managedDue = users.reduce((sum, row) => sum + safeNumber(row.sharedPurchaseDue), 0);
+  const mustPaySharedFirst = managedDue > 0.009;
+  const reconciliationBlocked = Number(data?.financialReconciliation?.blocking || 0) > 0;
+
   const suggested = data?.settlement || null;
   const settlementSummary = data?.settlementSummary || [];
   const settlementTotals = data?.settlementTotals || {};
@@ -457,6 +331,8 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
   });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+  // Reuse one key when retrying the exact same submission after a lost response.
+  const settlementRequest = useRef(null);
 
   const userById = useMemo(() => {
     const m = new Map();
@@ -467,7 +343,8 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
   const normalAccounts = useMemo(() => {
     return (accounts || []).filter((a) => {
       const type = String(a?.type || "").toLowerCase();
-      return a?.isActive !== false && ["cash", "bank", "wallet"].includes(type);
+      return a?.isActive !== false && ["cash", "bank", "wallet"].includes(type) &&
+        a?.owner !== "Joint" && !/credit\s*card/i.test(String(a?.name || ""));
     });
   }, [accounts]);
 
@@ -493,7 +370,8 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
 
   function accountOptionsForUser(userId) {
     const matched = normalAccounts.filter((account) => accountMatchesUser(account, userId));
-    return matched.length ? matched : normalAccounts;
+    // Never silently fall back to another person's bank account.
+    return matched;
   }
 
   const fromAccountOptions = useMemo(
@@ -543,7 +421,7 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
   }, [mode, form.fromUserId, form.toUserId, fromAccountOptions, toAccountOptions]);
 
   function fillSuggestion() {
-    if (!suggested) return;
+    if (!suggested || mustPaySharedFirst || reconciliationBlocked) return;
     setForm((prev) => ({
       ...prev,
       fromUserId: getId(suggested.fromUserId),
@@ -565,6 +443,8 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
     if (!amount || amount <= 0) return setMsg("Amount must be greater than 0.");
 
     if (mode === "wallet") {
+      if (mustPaySharedFirst) return setMsg("Record all due Shared & Large Purchase installments first, then refresh Wallet. This avoids duplicate repayments.");
+      if (reconciliationBlocked) return setMsg("Financial reconciliation has blocking issues. Review them before settling ordinary expenses.");
       if (!form.fromAccountId || !form.toAccountId) return setMsg("Select both accounts for wallet settlement.");
       if (String(form.fromAccountId) === String(form.toAccountId)) return setMsg("From and To accounts must be different.");
     }
@@ -572,7 +452,7 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
     try {
       setSaving(true);
 
-      await api.post("/api/wallet/settlements", {
+      const payload = {
         settlementType: mode,
         date: form.date,
         fromUserId: form.fromUserId,
@@ -581,9 +461,21 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
         fromAccountId: mode === "wallet" ? form.fromAccountId : null,
         toAccountId: mode === "wallet" ? form.toAccountId : null,
         note: form.note,
+      };
+      const signature = JSON.stringify(payload);
+      if (!settlementRequest.current || settlementRequest.current.signature !== signature) {
+        settlementRequest.current = {
+          signature,
+          key: globalThis.crypto?.randomUUID?.() || `wallet-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        };
+      }
+      const response = await api.post("/api/wallet/settlements", payload, {
+        headers: { "Idempotency-Key": settlementRequest.current.key },
       });
-
-      setMsg(mode === "wallet" ? "✅ Settlement saved and wallet transfer added to Ledger." : "✅ Past pending issue marked as settled.");
+      settlementRequest.current = null;
+      setMsg(response.data?.replayed
+        ? "✅ This settlement was already saved. No duplicate transfer was created."
+        : mode === "wallet" ? "✅ Settlement and bank transfer saved together." : "✅ Past pending issue marked as settled.");
       setForm((prev) => ({ ...prev, amount: "", note: "" }));
       await onSaved?.();
     } catch (e) {
@@ -618,23 +510,35 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
   const pastPendingSettled = safeNumber(settlementTotals.pastPendingSettled);
 
   return (
-    <section className="rounded-[1.25rem] border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:rounded-[2rem] sm:p-5">
+    <section className="hf-hishab-settlement-section">
+      <div className="hf-hishab-settlement-head">
+        <div><span className="hf-v2-eyebrow">দেনা-পাওনা</span><h2>মাস শেষে কে কাকে দেবেন?</h2>
+        <p>সাধারণ খরচ এবং বড় কেনাকাটার বকেয়া একসঙ্গে হিসাব করা হয়েছে।</p></div>
+        <strong>{formatMoney(pendingTotal)}</strong>
+      </div>
+      {topDeficit && topSurplus && safeNumber(topDeficit.net) < -0.009 && <div className="hf-hishab-settlement-direction"><b>{topDeficit.name}</b><span>দেবেন →</span><b>{topSurplus.name}</b></div>}
+      {mustPaySharedFirst && <div className="hf-hishab-settlement-info">
+        <div><b>বড় কেনাকাটার বকেয়া: {formatMoney(managedDue)}</b><p>এই টাকা উপরের মোট দেনা-পাওনায় অন্তর্ভুক্ত। আগে “ভাগ করে কেনাকাটা” থেকে টাকা দেওয়ার রেকর্ড করুন। তারপর এখানকার বাকি টাকা মেটাতে পারবেন—দুই জায়গায় একই টাকা পাঠাবেন না।</p></div>
+        <a className="hf-v2-btn hf-v2-btn--main" href="/shared-purchases">বকেয়া পরিশোধ করুন</a>
+      </div>}
+      <details className="hf-hishab-settlement-details">
+        <summary>{mustPaySharedFirst ? 'অন্য দেনা-পাওনার বিস্তারিত দেখুন' : 'টাকা মেটানোর ফর্ম খুলুন'}</summary>
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start">
         <div className="min-w-0">
           <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-violet-700 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-100">
-            Settlement Center
+            দেনা-পাওনা
           </div>
-          <h3 className="mt-3 text-lg font-black text-slate-950 dark:text-white sm:text-xl">Settle balances for {shortMonth(month)}</h3>
+          <h3 className="mt-3 text-lg font-black text-slate-950 dark:text-white sm:text-xl">মাসের দেনা-পাওনা: {shortMonth(month)}</h3>
           <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm">
-            Final settlement combines normal expense sharing with only outstanding Shared & Large Purchase obligations. A verified Shared Purchase repayment clears that due; it is not added again as a second adjustment. Only verified Wallet settlement transfers reduce the remaining combined balance.
+            সাধারণ খরচের পার্থক্য ও বড় কেনাকাটার বাকি টাকা এখানে একসঙ্গে দেখানো হয়। বড় কেনাকাটার টাকা দিলে সেটি আবার আলাদা করে দেবেন না।
           </p>
         </div>
 
         <div className="rounded-3xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-slate-950/40">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">Quick Insights</div>
-              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Fast settlement signal for this month.</p>
+              <div className="text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">দ্রুত তথ্য</div>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">এই মাসে কে কাকে টাকা দেবেন</p>
             </div>
             <div className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-violet-600 text-white dark:bg-violet-500">
               <Icon name="wallet" className="h-4 w-4" />
@@ -643,14 +547,14 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
 
           <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-2.5 dark:border-emerald-400/20 dark:bg-emerald-400/10">
-              <div className="text-[10px] font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-200">Highest Surplus</div>
+              <div className="text-[10px] font-black uppercase tracking-wide text-emerald-700 dark:text-emerald-200">সবচেয়ে বেশি পাবেন</div>
               <div className="mt-1 flex items-center justify-between gap-3 text-xs">
                 <span className="break-words font-bold text-emerald-950 dark:text-emerald-100">{topSurplus?.name || "-"}</span>
                 <span className="shrink-0 font-black text-emerald-950 dark:text-emerald-100">{formatMoney(topSurplus?.net || 0)}</span>
               </div>
             </div>
             <div className="rounded-2xl border border-rose-100 bg-rose-50 p-2.5 dark:border-rose-400/20 dark:bg-rose-400/10">
-              <div className="text-[10px] font-black uppercase tracking-wide text-rose-700 dark:text-rose-200">Highest Deficit</div>
+              <div className="text-[10px] font-black uppercase tracking-wide text-rose-700 dark:text-rose-200">সবচেয়ে বেশি দেবেন</div>
               <div className="mt-1 flex items-center justify-between gap-3 text-xs">
                 <span className="break-words font-bold text-rose-950 dark:text-rose-100">{topDeficit?.name || "-"}</span>
                 <span className="shrink-0 font-black text-rose-950 dark:text-rose-100">{formatMoney(topDeficit?.net || 0)}</span>
@@ -658,28 +562,32 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
             </div>
           </div>
 
-          {suggested ? (
+          {suggested && !mustPaySharedFirst ? (
             <button
               type="button"
               onClick={fillSuggestion}
               className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Use suggestion: {formatMoney(suggested.amount)}
+              এই পরিমাণ দিন: {formatMoney(suggested.amount)}
             </button>
+          ) : mustPaySharedFirst ? (
+            <div className="mt-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-center text-xs font-black text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200">
+              আগে বড় কেনাকাটার বকেয়া পরিশোধ করুন
+            </div>
           ) : (
             <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-center text-xs font-black text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100">
-              Monthly settlement settled
+              এই মাসের হিসাব মিটেছে
             </div>
           )}
         </div>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-5">
-        <MiniMetric label="Total Required" value={formatMoney(requiredTotal)} tone="violet" />
-        <MiniMetric label="Shared Repaid" value={formatMoney(sharedPurchaseSettled)} tone="sky" />
-        <MiniMetric label="Wallet Settled" value={formatMoney(walletSettled || monthlySettled)} tone="emerald" />
-        <MiniMetric label="Still Pending" value={formatMoney(pendingTotal)} tone={pendingTotal > 0 ? "rose" : "emerald"} />
-        <MiniMetric label="Past Marked" value={formatMoney(pastPendingSettled)} tone="sky" />
+        <MiniMetric label="মোট দিতে হবে" value={formatMoney(requiredTotal)} tone="violet" />
+        <MiniMetric label="কেনাকাটার টাকা ফেরত" value={formatMoney(sharedPurchaseSettled)} tone="sky" />
+        <MiniMetric label="মিটিয়ে দেওয়া হয়েছে" value={formatMoney(walletSettled || monthlySettled)} tone="emerald" />
+        <MiniMetric label="এখনও বাকি" value={formatMoney(pendingTotal)} tone={pendingTotal > 0 ? "rose" : "emerald"} />
+        <MiniMetric label="আগে মেটানো" value={formatMoney(pastPendingSettled)} tone="sky" />
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
@@ -695,7 +603,7 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
                   : "text-slate-500 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/10"
               )}
             >
-              Wallet Settlement
+              টাকা মিটিয়ে দিন
             </button>
             <button
               type="button"
@@ -707,10 +615,20 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
                   : "text-slate-500 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/10"
               )}
             >
-              Past Pending
+              আগের বকেয়া
             </button>
           </div>
 
+          {mode === "wallet" && reconciliationBlocked && (
+            <div role="alert" className="mt-3 rounded-2xl border border-rose-300 bg-rose-50 p-3 text-xs font-semibold leading-5 text-rose-900 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-200">
+              Wallet settlement is temporarily disabled because cash or expense records do not reconcile. See the Financial consistency check above. This prevents recording a transfer against an unreliable balance.
+            </div>
+          )}
+          {mode === "wallet" && mustPaySharedFirst && (
+            <div role="alert" className="mt-3 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold leading-5 text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200">
+              এই মুহূর্তে দেনা-পাওনা মেটানো বন্ধ, কারণ {formatMoney(managedDue)} of Shared & Large Purchase repayments remain due (including prior months). Record the repayment in Shared & Large Purchases first and refresh Wallet. এতে একই টাকা দুবার দেওয়ার হিসাব হয় না।
+            </div>
+          )}
           <div className={cx(
             "mt-3 rounded-2xl border p-3 text-xs leading-5",
             mode === "wallet"
@@ -724,7 +642,7 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
 
           <div className="mt-4 grid gap-3">
             <label>
-              <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">Date</span>
+              <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">তারিখ</span>
               <input
                 type="date"
                 value={form.date}
@@ -735,13 +653,13 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label>
-                <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">From / Payer</span>
+                <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">টাকা দেবেন</span>
                 <select
                   value={form.fromUserId}
                   onChange={(e) => setForm({ ...form, fromUserId: e.target.value })}
                   className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:focus:ring-violet-400/10"
                 >
-                  <option value="">Select payer</option>
+                  <option value="">যিনি দেবেন</option>
                   {users.map((u) => (
                     <option key={u.userId} value={u.userId}>{u.name}</option>
                   ))}
@@ -749,13 +667,13 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
               </label>
 
               <label>
-                <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">To / Receiver</span>
+                <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">টাকা পাবেন</span>
                 <select
                   value={form.toUserId}
                   onChange={(e) => setForm({ ...form, toUserId: e.target.value })}
                   className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:focus:ring-violet-400/10"
                 >
-                  <option value="">Select receiver</option>
+                  <option value="">যিনি পাবেন</option>
                   {users.map((u) => (
                     <option key={u.userId} value={u.userId}>{u.name}</option>
                   ))}
@@ -766,13 +684,13 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
             {mode === "wallet" ? (
               <div className="grid gap-3 sm:grid-cols-2">
                 <label>
-                  <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">From Account</span>
+                  <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">যে অ্যাকাউন্ট থেকে</span>
                   <select
                     value={form.fromAccountId}
                     onChange={(e) => setForm({ ...form, fromAccountId: e.target.value })}
                     className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:focus:ring-violet-400/10"
                   >
-                    <option value="">Select account</option>
+                    <option value="">অ্যাকাউন্ট বাছুন</option>
                     {fromAccountOptions.map((a) => (
                       <option key={a._id} value={a._id}>{accountLabel(a)}</option>
                     ))}
@@ -780,13 +698,13 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
                 </label>
 
                 <label>
-                  <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">To Account</span>
+                  <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">যে অ্যাকাউন্টে</span>
                   <select
                     value={form.toAccountId}
                     onChange={(e) => setForm({ ...form, toAccountId: e.target.value })}
                     className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:focus:ring-violet-400/10"
                   >
-                    <option value="">Select account</option>
+                    <option value="">অ্যাকাউন্ট বাছুন</option>
                     {toAccountOptions.map((a) => (
                       <option key={a._id} value={a._id}>{accountLabel(a)}</option>
                     ))}
@@ -796,20 +714,20 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
             ) : null}
 
             <label>
-              <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">Amount</span>
+              <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">টাকা</span>
               <input
                 type="number"
                 min="0"
                 step="0.01"
                 value={form.amount}
                 onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                placeholder="Enter settlement amount"
+                placeholder="যত টাকা দেবেন"
                 className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-500 dark:focus:ring-violet-400/10"
               />
             </label>
 
             <label>
-              <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">Optional Note</span>
+              <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">ইচ্ছামতো মন্তব্য</span>
               <textarea
                 value={form.note}
                 onChange={(e) => setForm({ ...form, note: e.target.value })}
@@ -833,7 +751,7 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
             <button
               type="button"
               onClick={saveSettlement}
-              disabled={saving || !data}
+              disabled={saving || !data || (mode === "wallet" && (mustPaySharedFirst || reconciliationBlocked))}
               className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:from-violet-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? "Saving settlement..." : mode === "wallet" ? "Settle & Add Transfer" : "Mark Past Issue Settled"}
@@ -844,20 +762,20 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
         <div className="space-y-4">
           <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40">
             <div className="border-b border-slate-100 px-4 py-3 dark:border-white/10">
-              <h4 className="text-sm font-black text-slate-950 dark:text-white">Per-person settlement status</h4>
+              <h4 className="text-sm font-black text-slate-950 dark:text-white">কার কত দেওয়া বাকি</h4>
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Current position includes regular expenses, unpaid Shared & Large Purchase dues, and verified Wallet settlements.</p>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-xs">
                 <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
                   <tr>
-                    <th className="px-4 py-3">Member</th>
-                    <th className="px-4 py-3">Gross Pay</th>
-                    <th className="px-4 py-3">Gross Receive</th>
-                    <th className="px-4 py-3">Recorded Paid</th>
-                    <th className="px-4 py-3">Recorded Received</th>
-                    <th className="px-4 py-3">Final Position</th>
-                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">সদস্য</th>
+                    <th className="px-4 py-3">দিতে হবে</th>
+                    <th className="px-4 py-3">পাবেন</th>
+                    <th className="px-4 py-3">দেওয়া হয়েছে</th>
+                    <th className="px-4 py-3">পাওয়া হয়েছে</th>
+                    <th className="px-4 py-3">শেষ হিসাব</th>
+                    <th className="px-4 py-3">অবস্থা</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-white/10">
@@ -892,7 +810,7 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
                     );
                   }) : (
                     <tr>
-                      <td colSpan="7" className="px-4 py-5 text-center text-slate-500 dark:text-slate-400">No settlement data yet.</td>
+                      <td colSpan="7" className="px-4 py-5 text-center text-slate-500 dark:text-slate-400">এখনও দেনা-পাওনার তথ্য নেই।</td>
                     </tr>
                   )}
                 </tbody>
@@ -902,19 +820,19 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
 
           <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/40">
             <div className="border-b border-slate-100 px-4 py-3 dark:border-white/10">
-              <h4 className="text-sm font-black text-slate-950 dark:text-white">Settlement history</h4>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Wallet settlements are real transfers; past pending records are informational only.</p>
+              <h4 className="text-sm font-black text-slate-950 dark:text-white">দেনা-পাওনার ইতিহাস</h4>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">দেনা-পাওনা মেটালে বাস্তবে এক অ্যাকাউন্ট থেকে অন্যটিতে টাকা যাবে।</p>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-xs">
                 <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
                   <tr>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Direction</th>
-                    <th className="px-4 py-3">Amount</th>
-                    <th className="px-4 py-3">Type</th>
-                    <th className="px-4 py-3">Note</th>
-                    <th className="px-4 py-3">Action</th>
+                    <th className="px-4 py-3">তারিখ</th>
+                    <th className="px-4 py-3">কে কাকে</th>
+                    <th className="px-4 py-3">টাকা</th>
+                    <th className="px-4 py-3">ধরন</th>
+                    <th className="px-4 py-3">মন্তব্য</th>
+                    <th className="px-4 py-3">কাজ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-white/10">
@@ -943,13 +861,13 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
                           disabled={saving}
                           className="rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-black text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-100"
                         >
-                          Delete
+                          মুছুন
                         </button>
                       </td>
                     </tr>
                   )) : (
                     <tr>
-                      <td colSpan="6" className="px-4 py-5 text-center text-slate-500 dark:text-slate-400">No settlement history for this month.</td>
+                      <td colSpan="6" className="px-4 py-5 text-center text-slate-500 dark:text-slate-400">এই মাসে দেনা-পাওনার লেনদেন নেই।</td>
                     </tr>
                   )}
                 </tbody>
@@ -958,17 +876,21 @@ function SettlementCenter({ data, nameById, accounts, month, onSaved, topSurplus
           </div>
         </div>
       </div>
+      </details>
     </section>
   );
 }
 
 export default function Wallet() {
+  const [hfMore, setHfMore] = useState(false);
   const [month, setMonth] = useState(monthNow());
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [search, setSearch] = useState("");
   const [accounts, setAccounts] = useState([]);
+  const [showAccounts, setShowAccounts] = useState(false);
+  const [showFlows, setShowFlows] = useState(false);
 
   async function load() {
     try {
@@ -1002,6 +924,22 @@ export default function Wallet() {
   }, [data]);
 
   const users = data?.users || [];
+
+  // Missing fields are different from a legitimate zero balance. Do not label
+  // an old backend response as "No accounts" or treat untracked cash as zero.
+  const monthlyCashFlow = data?.monthlyCashFlow;
+  const monthlyFlowIssues = monthlyCashFlow?.issues?.length || 0;
+  const accountCashReady = Array.isArray(data?.accountCash?.accounts);
+  const liquidAccounts = accountCashReady ? data.accountCash.accounts : [];
+  const negativeAccounts = liquidAccounts.filter((account) => safeNumber(account.balance) < -0.009);
+  const likelyCreditAccounts = liquidAccounts.filter((account) => /credit\s*card/i.test(String(account.name || "")));
+  const accountStatus = !data ? "loading" : !accountCashReady ? "server"
+    : liquidAccounts.length === 0 ? "accounts"
+      : users.some((user) => user.availableCash == null) ? "owner" : "ok";
+  const cashDisplay = accountStatus === "loading" ? "—"
+    : accountStatus === "server" ? "Backend update needed"
+      : accountStatus === "accounts" ? "Set up accounts"
+        : formatMoney(data.accountCash.total);
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -1063,76 +1001,189 @@ export default function Wallet() {
 
   return (
     <AppLayout>
+      <div className={`hf-step3-page hf-step3-wallet hf-v2-page hf-v2-wallet ${hfMore ? "hf-step3-expanded" : ""}`}>
+        <HFPageLead title="টাকার হিসাব" description="শুধু এই মাসের আয় থেকে কত টাকা বাকি এবং কে কাকে দেবেন" month={month} onMonthChange={setMonth}
+          metrics={[]}
+          onAdd={undefined} addLabel=""
+          addDisabled={false}
+          onExtra={undefined} extraLabel=""
+          onRefresh={load}
+          more={hfMore} onToggleMore={() => setHfMore(v => !v)} />
+
       <main className="wallet-page min-h-[calc(100vh-64px)] w-full max-w-none min-w-0 overflow-x-hidden bg-slate-50 px-2 py-3 text-slate-950 transition-colors dark:bg-slate-950 dark:text-white sm:px-4 sm:py-4">
         <div className="w-full max-w-none min-w-0 space-y-3 sm:space-y-5">
-          <section className="relative w-full max-w-none min-w-0 overflow-hidden rounded-[1.25rem] bg-gradient-to-br from-slate-950 via-sky-900 to-indigo-900 p-4 text-white shadow-xl dark:border dark:border-white/10 sm:rounded-[2rem] sm:p-7">
-            <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-cyan-400/20 blur-2xl" />
-            <div className="absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-fuchsia-400/20 blur-2xl" />
-            <div className="relative flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-              <div className="min-w-0">
-                <div className="mb-2 hidden w-fit items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-sky-100 backdrop-blur sm:inline-flex">
-                  <span className="h-2 w-2 rounded-full bg-emerald-300" />
-                  Owner-aware wallet summary
-                </div>
-                <h2 className="text-2xl font-black tracking-tight sm:text-3xl lg:text-4xl">Wallet Summary</h2>
-                <p className="mt-2 max-w-3xl text-xs leading-5 text-sky-100 sm:text-base sm:leading-6">
-                  Track personal remaining balance and settlement for {shortMonth(month)}.
-                </p>
-              </div>
-
-              <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto xl:min-w-[420px]">
-                <label
-                  onClick={openNativePicker}
-                  className="cursor-pointer rounded-2xl border border-white/15 bg-white/10 p-2.5 backdrop-blur sm:p-3"
-                >
-                  <span className="mb-1 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-sky-100 sm:text-xs">
-                    <Icon name="calendar" className="h-3.5 w-3.5" /> Month
-                  </span>
-                  <input
-                    type="month"
-                    value={month}
-                    onChange={(e) => setMonth(e.target.value)}
-                    onClick={(e) => {
-                      e.currentTarget.focus();
-                      e.currentTarget.showPicker?.();
-                    }}
-                    className="w-full min-w-0 cursor-pointer bg-transparent text-sm font-bold text-white outline-none [color-scheme:dark] sm:text-base"
-                    aria-label="Select month"
-                  />
-                </label>
-
-                <button
-                  onClick={load}
-                  disabled={loading}
-                  className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-xs font-black text-slate-950 shadow-sm transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[58px] sm:text-sm lg:hover:-translate-y-0.5"
-                >
-                  <Icon name="refresh" className={cx("h-4 w-4", loading && "animate-spin")} />
-                  {loading ? "Refreshing" : "Refresh"}
-                </button>
-              </div>
-            </div>
-          </section>
+          <></>
 
           {err && (
             <div className="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-rose-700 shadow-sm dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-100">
-              <div className="font-black">Couldn’t load data</div>
+              <div className="font-black">তথ্য পাওয়া যায়নি</div>
               <div className="mt-1 break-words text-sm">{err}</div>
             </div>
           )}
 
-          <section className="hidden grid-cols-1 gap-3 sm:grid sm:grid-cols-2 xl:grid-cols-4">
-            <SummaryCard title="Total Income" value={formatMoney(totals.income)} sub={shortMonth(month)} icon="arrowUp" accent="from-emerald-500 to-teal-600" />
-            <SummaryCard title="Expense Share" value={formatMoney(totals.share)} sub="Split-aware total share" icon="arrowDown" accent="from-rose-500 to-pink-600" />
-            <SummaryCard title="Remaining" value={formatMoney(totals.remaining)} sub="Income − paid expense + transfer net" icon="wallet" accent="from-sky-500 to-indigo-600" />
-            <SummaryCard title="Settlement Gap" value={formatMoney(data?.settlementTotals?.pendingTotal ?? Math.max(totals.surplus, totals.deficit))} sub="Pending after recorded settlements" icon="swap" accent="from-amber-500 to-orange-600" />
+          {accountStatus === "server" && (
+            <div role="alert" className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-900 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-100">
+              সার্ভারের নতুন হিসাবের তথ্য পাওয়া যাচ্ছে না। সার্ভার আপডেট ও সংযোগ যাচাই করুন। তথ্য না পাওয়া মানে শূন্য টাকা নয়।
+            </div>
+          )}
+          {accountStatus === "accounts" && (
+            <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100">
+              কোনো নগদ বা ব্যাংক অ্যাকাউন্ট পাওয়া যায়নি। সেটিংস থেকে অ্যাকাউন্ট যাচাই করুন; আগের আয় যেন আবার যোগ না হয়।
+            </div>
+          )}
+          {accountStatus === "owner" && (
+            <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100">
+              কিছু অ্যাকাউন্টের মালিক শনাক্ত করা যায়নি। সেটিংস থেকে সদস্য ও অ্যাকাউন্টের মালিক মিলিয়ে নিন।
+            </div>
+          )}
+
+          {data?.ordinaryExpenseIntegrity?.balanced === false && (
+            <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100">
+              পরিশোধ ও খরচের ভাগে পার্থক্য: {formatMoney(Math.abs(data.ordinaryExpenseIntegrity.discrepancy || 0))}.
+              দেনা-পাওনা মেটানোর আগে সংশ্লিষ্ট খরচগুলো যাচাই করুন।
+            </div>
+          )}
+
+          {data?.accountCash?.issues?.length > 0 && (
+            <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100">
+              অ্যাকাউন্টের হিসাব যাচাই দরকার: {data.accountCash.issues.length} টি সমস্যা পাওয়া গেছে।
+              {data.accountCash.staleClosedCount > 0 ? ` ${data.accountCash.staleClosedCount} closed account balance(s) changed after closing.` : ""}
+              মিলিয়ে না দেখা পর্যন্ত মোট টাকাকে নিশ্চিত ধরে নেবেন না।
+            </div>
+          )}
+
+          {data?.financialReconciliation && (
+            <section className="hf-step3-advanced rounded-2xl border border-slate-300/70 bg-white/90 p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/70" aria-label="Cross-module financial reconciliation">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-black text-slate-950 dark:text-white">হিসাব মিলিয়ে দেখা হচ্ছে · {month}</h3>
+                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Compares Ledger shares, settlement obligations, posted cash movements and Carry Forward. Read-only: no historical records are changed.</p>
+                </div>
+                <span className={cx("rounded-full px-3 py-1 text-xs font-bold",
+                  data.financialReconciliation.blocking > 0
+                    ? "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200"
+                    : data.financialReconciliation.review > 0
+                      ? "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200"
+                      : "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200")}
+                >{data.financialReconciliation.blocking > 0 ? "Needs correction" : data.financialReconciliation.review > 0 ? "Review warnings" : "Records agree internally"}</span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                {[
+                  ["Opening tracked cash", data.financialReconciliation.checks.openingLiquid],
+                  ["This month's cash change", data.financialReconciliation.checks.monthCashMovement],
+                  ["Expected closing cash", data.financialReconciliation.checks.expectedClosingLiquid],
+                  ["Calculated closing cash", data.financialReconciliation.checks.calculatedClosingLiquid],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-xl border border-slate-200 p-2 dark:border-white/10">
+                    <div className="text-slate-500 dark:text-slate-400">{label}</div>
+                    <div className="mt-1 font-black tabular-nums text-slate-950 dark:text-white">{formatMoney(value)}</div>
+                  </div>
+                ))}
+              </div>
+              {data.financialReconciliation.issues?.length > 0 && (
+                <details className="mt-3 rounded-xl border border-amber-200 p-3 dark:border-amber-500/20">
+                  <summary className="cursor-pointer text-xs font-bold text-amber-800 dark:text-amber-200">
+                    যাচাই করুন {data.financialReconciliation.blocking} টি জরুরি এবং {data.financialReconciliation.review} টি সাধারণ সতর্কতা
+                  </summary>
+                  <ul className="mt-2 space-y-2 text-xs text-slate-700 dark:text-slate-200">
+                    {data.financialReconciliation.issues.slice(0, 30).map((issue, index) => (
+                      <li key={`${issue.code}-${issue.transactionId || issue.accountId || index}-${index}`}>
+                        <b>{issue.level === "blocking" ? "Correction needed" : "Review"} · {issue.code}:</b> {issue.message}
+                      </li>
+                    ))}
+                    {data.financialReconciliation.issues.length > 30 && <li>আরও বিস্তারিত তথ্য পাওয়া যাবে।</li>}
+                  </ul>
+                </details>
+              )}
+              <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">{data.financialReconciliation.disclaimer}</p>
+            </section>
+          )}
+
+          {data && (
+            <>
+              <MonthlyRemainingPanel month={month} monthlyCashFlow={monthlyCashFlow} accountStatus={accountStatus} />
+              <details className="hf-hishab-wallet-note">
+                <summary>বড় কেনাকাটার মাসিক ভাগ দেখুন</summary>
+                <div className="hf-hishab-note-inner">
+                  <div className="hf-hishab-note-amount"><span>এই মাসে দুজনের নির্ধারিত ভাগ</span><b>{formatMoney(data?.monthlyBudgetAllocation?.scheduledLargePurchaseAllocation)}</b></div>
+                  <p>এই টাকা মাসের হিসাবের জন্য নির্ধারিত। কেনার সময় পুরো টাকা ব্যাংক থেকে একবারই বের হয়েছে; এখানে আবার টাকা কাটা হয় না।</p>
+                  {(users || []).map(row => <div key={row.userId} className="hf-hishab-detail-row"><span>{row.name}</span><b>{formatMoney(row.scheduledLargePurchaseShare)}</b></div>)}
+                  {!!data?.monthlyBudgetAllocation?.issues?.length && <p role="alert">কিছু কেনাকাটার হিসাব যাচাই করা প্রয়োজন।</p>}
+                </div>
+              </details>
+            </>
+          )}
+
+          <></>
+
+          {data && <details className="hf-hishab-wallet-note">
+            <summary>দেনা-পাওনার হিসাব কীভাবে হয়েছে?</summary>
+            <div className="hf-hishab-note-inner">
+              <p>সাধারণ খরচে যে যার ভাগের বেশি টাকা দিয়েছেন, অন্যজন সেই অতিরিক্ত টাকা দেবেন। বড় কেনাকাটার যে কিস্তি এখনও দেওয়া হয়নি, সেটিও দেনা-পাওনায় যোগ হয়।</p>
+              {topDeficit && topSurplus && safeNumber(topDeficit.net) < -0.009 && <>
+                <div className="hf-hishab-detail-row"><span>সাধারণ খরচের পার্থক্য</span><b>{formatMoney(Math.abs(safeNumber(topDeficit.expenseNet)))}</b></div>
+                <div className="hf-hishab-detail-row"><span>বড় কেনাকাটার বকেয়া</span><b>{formatMoney(Math.max(0, safeNumber(topDeficit.sharedPurchaseDue) - safeNumber(topDeficit.sharedPurchaseReceivable)))}</b></div>
+                <div className="hf-hishab-detail-row"><span>{topDeficit.name} দেবেন {topSurplus.name}-কে</span><b>{formatMoney(Math.abs(safeNumber(topDeficit.net)))}</b></div>
+              </>}
+              <p>দুজনের মধ্যে টাকা পাঠালে একজনের অ্যাকাউন্ট কমবে ও অন্যজনের বাড়বে। দুজনের মোট টাকা অপরিবর্তিত থাকবে।</p>
+            </div>
+          </details>}
+
+          <section className="hf-step3-advanced rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-black text-slate-950 dark:text-white sm:text-lg">সব অ্যাকাউন্টে মোট টাকা</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  Account balances = reconciled opening + real inflows − real outflows. Closed months use their saved closing snapshot.
+                  এটি অ্যাপে লেখা লেনদেন থেকে গণনা করা হয়েছে; সরাসরি ব্যাংক থেকে আনা তথ্য নয়।
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-xl font-black text-slate-950 dark:text-white">{cashDisplay}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">যৌথ অ্যাকাউন্টে টাকা: {formatMoney(data?.accountCash?.joint)}</div>
+              </div>
+            </div>
+            {data?.accountCash?.anchorMonth && (
+              <p className="mt-2 text-xs font-semibold text-sky-700 dark:text-sky-300">আগের মাস থেকে আনা: {data.accountCash.anchorMonth} মাস বন্ধের হিসাব অনুযায়ী।</p>
+            )}
+            {negativeAccounts.length > 0 && (
+              <div role="alert" className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200">
+                {negativeAccounts.length} টি অ্যাকাউন্টে ঋণাত্মক টাকা দেখা যাচ্ছে ({negativeAccounts.map((a) => `${a.name}: ${formatMoney(a.balance)}`).join("; ")})। শুরুতে কত ছিল এবং কোনো লেনদেন বাদ গেছে কি না মিলিয়ে নিন।
+              </div>
+            )}
+            {likelyCreditAccounts.length > 0 && (
+              <div className="mt-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-900 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-200">
+                ক্রেডিট কার্ড যাচাই করুন ({likelyCreditAccounts.map((a) => a.name).join(", ")}). A credit balance or credit limit is not spendable bank cash; this app currently includes any account marked Bank.
+              </div>
+            )}
+            {liquidAccounts.length > 0 && (
+              <button type="button" onClick={() => setShowAccounts((v) => !v)} className="mt-3 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+                {showAccounts ? "Hide individual accounts" : `Show individual accounts (${liquidAccounts.length})`}
+                <Icon name="chevron" className={cx("h-4 w-4 transition-transform", showAccounts && "rotate-180")} />
+              </button>
+            )}
+            {showAccounts && liquidAccounts.length > 0 && (
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {data.accountCash.accounts.map((a) => (
+                  <div key={String(a.accountId)} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-sm font-bold text-slate-800 dark:text-slate-100">{a.name}</span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">{a.owner} · {a.type}</span>
+                    </div>
+                    <div className="mt-1 text-lg font-black text-slate-950 dark:text-white">{formatMoney(a.balance)}</div>
+                    {a.isActive === false && <span className="text-xs text-amber-700 dark:text-amber-300">বন্ধ অ্যাকাউন্টেও আগের টাকা হিসাবের মধ্যে আছে</span>}
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="w-full max-w-none min-w-0 rounded-[1.25rem] border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:rounded-[2rem] sm:p-5">
             <div className="mb-3 flex flex-col gap-3 sm:mb-5 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h3 className="text-lg font-black text-slate-950 dark:text-white sm:text-xl">Individual Wallet</h3>
+                <h3 className="text-lg font-black text-slate-950 dark:text-white sm:text-xl">ব্যক্তিগত টাকার হিসাব</h3>
                 <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm">
-                  Member-wise remaining balance and settlement status.
+                  প্রতিজনের এই মাসে কত টাকা বাকি আছে, নিচে দেখতে পাবেন।
                 </p>
               </div>
 
@@ -1141,7 +1192,7 @@ export default function Wallet() {
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search member..."
+                  placeholder="সদস্য খুঁজুন…"
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-9 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100 dark:border-white/10 dark:bg-slate-950/60 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-sky-400/40 dark:focus:ring-sky-400/10"
                 />
               </div>
@@ -1155,14 +1206,14 @@ export default function Wallet() {
                 </>
               ) : !data ? (
                 <div className="rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-300 xl:col-span-2">
-                  No wallet data yet. Add income, expenses, or transfer entries first.
+                  এখনও কোনো হিসাব নেই। প্রথমে আয় বা খরচ যোগ করুন।
                 </div>
               ) : filteredUsers.length === 0 ? (
                 <div className="rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-300 xl:col-span-2">
-                  No member matched your search.
+                  মিলে যায় এমন সদস্য নেই।
                 </div>
               ) : (
-                filteredUsers.map((u) => <WalletPersonCard key={u.userId} user={u} maxAbsNet={maxAbsNet} />)
+                filteredUsers.map((u) => <WalletPersonCard key={u.userId} user={{ ...u, monthlyCashFlow: monthlyFlowIssues || accountStatus !== "ok" ? null : u.monthlyCashFlow }} maxAbsNet={maxAbsNet} accountStatus={accountStatus} />)
               )}
             </div>
           </section>
@@ -1177,27 +1228,32 @@ export default function Wallet() {
             topDeficit={topDeficit}
           />
 
-          <section className="hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.06] lg:block">
+          <button type="button" onClick={() => setShowFlows((v) => !v)} className="hidden w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-200 lg:flex">
+            {showFlows ? "Hide extra transfer calculations" : "View extra monthly transfer calculations"}
+            <Icon name="chevron" className={cx("h-4 w-4 transition-transform", showFlows && "rotate-180")} />
+          </button>
+          {showFlows && <section className="hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.06] lg:block">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
-                <h3 className="text-lg font-black text-slate-950 dark:text-white">Monthly Flow Overview</h3>
+                <h3 className="text-lg font-black text-slate-950 dark:text-white">মাসের আয়-খরচের সারাংশ</h3>
                 <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                  Total money movement for {shortMonth(month)} from the wallet summary data.
+                  মাসের আয়-খরচের মোট হিসাব: {shortMonth(month)} from the wallet summary data.
                 </p>
               </div>
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <MiniMetric label="Paid Expenses" value={formatMoney(totals.paid)} tone="violet" />
-              <MiniMetric label="Transfer In" value={formatMoney(totals.transferIn)} tone="sky" />
-              <MiniMetric label="Transfer Out" value={formatMoney(totals.transferOut)} tone="rose" />
-              <MiniMetric label="Transfer Net" value={formatMoney(totals.transferNet)} tone={totals.transferNet >= 0 ? "emerald" : "rose"} />
+              <MiniMetric label="পরিশোধিত খরচ" value={formatMoney(totals.paid)} tone="violet" />
+              <MiniMetric label="টাকা এসেছে" value={formatMoney(totals.transferIn)} tone="sky" />
+              <MiniMetric label="টাকা গেছে" value={formatMoney(totals.transferOut)} tone="rose" />
+              <MiniMetric label="টাকা আদান-প্রদানের পার্থক্য" value={formatMoney(totals.transferNet)} tone={totals.transferNet >= 0 ? "emerald" : "rose"} />
             </div>
-          </section>
+          </section>}
 
           <div className="h-6" />
         </div>
       </main>
+          </div>
     </AppLayout>
   );
 }

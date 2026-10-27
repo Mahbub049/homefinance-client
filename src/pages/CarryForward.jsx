@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import HFPageLead from "../components/design/HFPageLead";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AppLayout from "../components/layout/AppLayout";
 import api from "../services/api";
 import Loader from "../components/ui/Loader";
@@ -146,18 +147,18 @@ function StatusPill({ closed, loading }) {
   if (loading) {
     return (
       <span className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-        Loading
+        লোড হচ্ছে
       </span>
     );
   }
 
   return closed ? (
     <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
-      Closed
+      বন্ধ
     </span>
   ) : (
     <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-black text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200">
-      Open
+      খোলা
     </span>
   );
 }
@@ -211,6 +212,7 @@ function StatCard({ title, value, sub, icon, tone = "emerald" }) {
 }
 
 export default function CarryForward() {
+  const [hfMore, setHfMore] = useState(false);
   const [month, setMonth] = useState(monthNow());
   const [item, setItem] = useState(null);
   const [calc, setCalc] = useState(null);
@@ -222,17 +224,28 @@ export default function CarryForward() {
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const loadSerial = useRef(0);
+  const [revisionMode, setRevisionMode] = useState(false);
+  const [revisionReason, setRevisionReason] = useState("");
+  const [revisionConfirmation, setRevisionConfirmation] = useState("");
 
   async function load() {
+    const serial = ++loadSerial.current;
     setMsg("");
     setErr("");
+    setItem(null);
+    setComputed(null);
     setBusy(true);
 
     try {
       const res = await api.get("/api/month-balance", { params: { month } });
+      if (serial !== loadSerial.current) return;
 
       setItem(res.data.item);
       setComputed(res.data.computed || null);
+      setRevisionMode(false);
+      setRevisionReason("");
+      setRevisionConfirmation("");
       setCalc(null);
 
       const nextDraft = {};
@@ -241,113 +254,63 @@ export default function CarryForward() {
       }
       setDraftClosing(nextDraft);
     } catch (e) {
-      setErr(e?.response?.data?.message || "Failed to load carry forward data.");
+      if (serial === loadSerial.current) setErr(e?.response?.data?.message || "Failed to load carry forward data.");
     } finally {
-      setBusy(false);
+      if (serial === loadSerial.current) setBusy(false);
     }
   }
 
-  async function saveDraft() {
-    setMsg("");
-    setErr("");
-    setBusy(true);
-
-    try {
-      const accountBalances = rows.map((row) => ({
-        accountId: row.accountId,
-        balance: Number(row.editedClosing || 0),
-      }));
-
-      const res = await api.post("/api/month-balance/save", {
-        month,
-        accountBalances,
-      });
-
-      setItem(res.data.item);
-
-      // This is only a draft save, not a month closing.
-      setCalc(null);
-
-      setComputed((prev) => ({
-        ...(prev || {}),
-        month,
-        openingTotal: res.data.calc?.openingTotal,
-        closingTotal: res.data.calc?.closingTotal,
-        systemClosingTotal: res.data.calc?.systemClosingTotal,
-        accountsOpening: res.data.accounts?.opening || [],
-        accountsClosing: res.data.accounts?.closing || [],
-        systemAccountsClosing: res.data.accounts?.systemClosing || [],
-        summary: {
-          income: res.data.calc?.income,
-          expense: res.data.calc?.expense,
-          transfer: res.data.calc?.transfer,
-          netCashflow: res.data.calc?.netCashflow,
-        },
-      }));
-
-      const nextDraft = {};
-      for (const row of res.data.accounts?.closing || []) {
-        nextDraft[String(row.accountId)] = row.balance;
-      }
-      setDraftClosing(nextDraft);
-
-      setMsg("Balances saved temporarily. The month is still open.");
-    } catch (e) {
-      setErr(e?.response?.data?.message || "Save balances failed.");
-    } finally {
-      setBusy(false);
-    }
+  // Only changed account values are sent. Sending every displayed system balance
+  // would accidentally freeze unchanged accounts when another payment arrives.
+  function manualOverrides() {
+    return rows.filter((row) => row.manualEdited).map((row) => ({
+      accountId: row.accountId, balance: row.editedClosing,
+    }));
   }
 
-  async function closeMonth() {
+  async function performSave(action) {
     setMsg("");
     setErr("");
+    if (!computed?.fingerprint) {
+      setErr("Refresh the month before saving balances.");
+      return;
+    }
+    if (action === "close" && !window.confirm(`Close ${month}? This locks its month-end balances and rolls them into later months.`)) return;
+    if (action === "revise" && !window.confirm(`Revise the already closed ${month}? This correction will be recorded in the audit history.`)) return;
     setBusy(true);
-
     try {
-      const accountBalances = rows.map((row) => ({
-        accountId: row.accountId,
-        balance: Number(row.editedClosing || 0),
-      }));
-
-      const res = await api.post("/api/month-balance/close", {
+      const res = await api.post(`/api/month-balance/${action}`, {
         month,
-        accountBalances,
+        accountBalances: manualOverrides(),
+        expectedFingerprint: computed.fingerprint,
+        expectedVersion: computed.snapshotVersion || "",
+        ...(action === "revise" ? {
+          reason: revisionReason.trim(),
+          confirmation: revisionConfirmation.trim(),
+        } : {}),
       });
-
       setItem(res.data.item);
+      setComputed(res.data.computed);
       setCalc(res.data.calc);
-
-      setComputed((prev) => ({
-        ...(prev || {}),
-        month,
-        openingTotal: res.data.calc?.openingTotal,
-        closingTotal: res.data.calc?.closingTotal,
-        systemClosingTotal: res.data.calc?.systemClosingTotal,
-        accountsOpening: res.data.accounts?.opening || [],
-        accountsClosing: res.data.accounts?.closing || [],
-        systemAccountsClosing: res.data.accounts?.systemClosing || [],
-        summary: {
-          income: res.data.calc?.income,
-          expense: res.data.calc?.expense,
-          transfer: res.data.calc?.transfer,
-          netCashflow: res.data.calc?.netCashflow,
-        },
-      }));
-
-      const nextDraft = {};
-      for (const row of res.data.accounts?.closing || []) {
-        nextDraft[String(row.accountId)] = row.balance;
+      const newDraft = {};
+      for (const row of res.data.computed?.accountsClosing || []) {
+        newDraft[String(row.accountId)] = row.balance;
       }
-      setDraftClosing(nextDraft);
-
-      setMsg("Month closed successfully with account-wise closing balance.");
+      setDraftClosing(newDraft);
+      setRevisionMode(false);
+      setRevisionReason("");
+      setRevisionConfirmation("");
+      setMsg(action === "save"
+        ? "Draft saved. Month is still open; account cash will continue updating from new transactions."
+        : action === "revise"
+          ? "Month-end correction saved with an audit record."
+          : "Completed month closed. Its balances will carry forward into later months.");
     } catch (e) {
-      setErr(e?.response?.data?.message || "Close month failed.");
-    } finally {
-      setBusy(false);
-    }
+      setErr(e?.response?.data?.message || "Could not save month. Refresh and retry.");
+    } finally { setBusy(false); }
   }
+  const saveDraft = () => performSave("save");
+  const closeMonth = () => performSave(isClosed ? "revise" : "close");
 
   useEffect(() => {
     load();
@@ -360,6 +323,7 @@ export default function CarryForward() {
   const rows = useMemo(() => {
     const opening = computed?.accountsOpening || [];
     const closing = computed?.accountsClosing || [];
+    const latestSystem = computed?.systemAccountsClosing || [];
 
     const result = opening.map((o) => {
       const c = closing.find(
@@ -368,7 +332,8 @@ export default function CarryForward() {
 
       const accountId = String(o.accountId);
       const openingAmount = money(o.balance ?? 0);
-      const systemClosing = money(c?.systemBalance ?? c?.balance ?? 0);
+      const live = latestSystem.find((x) => String(x.accountId) === String(o.accountId));
+      const systemClosing = money(live?.balance ?? c?.systemBalance ?? c?.balance ?? 0);
       const editedClosing = money(
         draftClosing[accountId] ?? c?.balance ?? systemClosing
       );
@@ -414,6 +379,8 @@ export default function CarryForward() {
   const editedCount = rows.filter((row) => row.manualEdited).length;
 
   function openEdit(row) {
+    if (isClosed && !revisionMode) return;
+    if (computed?.protectedHistorical) return;
     setEditRow(row);
     setEditAmount(String(row.editedClosing ?? 0));
   }
@@ -442,6 +409,7 @@ export default function CarryForward() {
   }
 
   function resetAccount(row) {
+    if ((isClosed && !revisionMode) || computed?.protectedHistorical) return;
     setDraftClosing((prev) => ({
       ...prev,
       [row.accountId]: money(row.systemClosing),
@@ -449,6 +417,7 @@ export default function CarryForward() {
   }
 
   function resetAllToSystem() {
+    if ((isClosed && !revisionMode) || computed?.protectedHistorical) return;
     const next = {};
 
     for (const row of rows) {
@@ -460,74 +429,25 @@ export default function CarryForward() {
 
   return (
     <AppLayout>
+      <div className={`hf-step3-page hf-step3-carryforward hf-v2-page hf-v2-carryforward ${hfMore ? "hf-step3-expanded" : ""}`}>
+        <HFPageLead title="মাস শেষে হিসাব" description="অ্যাকাউন্ট অনুযায়ী হিসাব মিলিয়ে মাস শেষ করুন" month={month} onMonthChange={setMonth}
+          metrics={[
+ {label:'শুরুর টাকা',value:totals.opening},
+ {label:'হিসাব অনুযায়ী শেষ',value:totals.systemClosing},
+ {label:'আপনার দেওয়া শেষ টাকা',value:totals.editedClosing,primary:true},
+ {label:'অমিল',value:totals.variance}
+]}
+          onAdd={undefined} addLabel=""
+          addDisabled={false}
+          onExtra={undefined} extraLabel=""
+          onRefresh={load}
+          more={undefined} onToggleMore={undefined} />
+
       <div
         className={`carry-forward-page min-h-screen w-full max-w-full overflow-x-hidden bg-white px-0 pb-8 text-[13px] text-slate-900 dark:bg-[#020617] dark:text-slate-100 sm:text-sm ${hiddenScrollbarClass}`}
       >
         <div className="space-y-5">
-          <section className="relative overflow-hidden rounded-[30px] border border-white/60 bg-[radial-gradient(circle_at_top_left,#059669_0%,#065f46_38%,#0f172a_100%)] p-5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.14)] dark:border-white/10 dark:shadow-[0_24px_70px_rgba(0,0,0,0.35)] sm:p-6 lg:p-7">
-            <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/15 blur-3xl" />
-            <div className="absolute -bottom-24 left-12 h-64 w-64 rounded-full bg-emerald-300/20 blur-3xl" />
-            <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(255,255,255,0.10),transparent_45%,rgba(255,255,255,0.06))]" />
-
-            <div className="relative z-10 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-              <div className="max-w-3xl">
-                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-50 ring-1 ring-white/20 backdrop-blur">
-                  <span className="grid h-5 w-5 place-items-center rounded-full bg-white/15">
-                    <Icon name="wallet" className="h-3.5 w-3.5" />
-                  </span>
-                  Month closing
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3">
-                  <h2 className="text-[1.65rem] font-black tracking-tight sm:text-3xl lg:text-4xl">
-                    Carry Forward
-                  </h2>
-                  <StatusPill closed={isClosed} loading={!item && busy} />
-                </div>
-
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-50/90 sm:text-base">
-                  Review account-wise closing balances, correct actual cash or
-                  bank remaining amounts, and carry the total forward cleanly.
-                </p>
-              </div>
-
-              <div className="hidden gap-3 md:grid md:grid-cols-3 xl:w-[620px]">
-                <div className="rounded-[24px] border border-white/15 bg-white/12 p-4 shadow-inner shadow-white/5 backdrop-blur-xl">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-50/80">
-                    Opening
-                  </div>
-                  <div className="mt-1 text-xl font-black">
-                    {bdt(totals.opening)}
-                  </div>
-                  <div className="mt-1 text-xs text-emerald-50/80">
-                    Start balance
-                  </div>
-                </div>
-
-                <div className="rounded-[24px] border border-white/15 bg-white/12 p-4 shadow-inner shadow-white/5 backdrop-blur-xl">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-50/80">
-                    Actual Closing
-                  </div>
-                  <div className="mt-1 text-xl font-black">
-                    {bdt(totals.editedClosing)}
-                  </div>
-                  <div className="mt-1 text-xs text-emerald-50/80">
-                    Sum of accounts
-                  </div>
-                </div>
-
-                <div className="rounded-[24px] border border-white/15 bg-white/12 p-4 shadow-inner shadow-white/5 backdrop-blur-xl">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-50/80">
-                    Adjusted
-                  </div>
-                  <div className="mt-1 text-xl font-black">{editedCount}</div>
-                  <div className="mt-1 text-xs text-emerald-50/80">
-                    Edited account(s)
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
+          <></>
 
           <section className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_14px_40px_rgba(15,23,42,0.05)] dark:border-white/10 dark:bg-slate-900/70 dark:shadow-[0_20px_60px_rgba(0,0,0,0.25)] sm:p-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -535,7 +455,7 @@ export default function CarryForward() {
                 <IconBox name="calendar" tone="emerald" />
                 <div>
                   <h3 className="text-lg font-black text-slate-950 dark:text-white">
-                    Closing Control
+                    মাস বন্ধ করার ব্যবস্থা
                   </h3>
                   <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
                     Select a month, edit actual closing balances if needed, then
@@ -559,32 +479,63 @@ export default function CarryForward() {
                   className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
                 >
                   <Icon name="refresh" className="h-4 w-4" />
-                  Refresh
+                  রিফ্রেশ
                 </button>
 
                 <button
                   type="button"
                   onClick={saveDraft}
-                  disabled={busy || !rows.length || isClosed}
+                  disabled={busy || !rows.length || isClosed || computed?.protectedHistorical}
                   className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200 dark:hover:bg-emerald-400/15"
                 >
                   <Icon name="save" className="h-4 w-4" />
-                  Save
+                  সংরক্ষণ করুন
                 </button>
 
                 <button
                   type="button"
                   onClick={closeMonth}
-                  disabled={busy || !rows.length}
+                  disabled={busy || !rows.length || computed?.protectedHistorical || (isClosed ? !revisionMode : !computed?.canClose)}
                   className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:shadow-[0_14px_30px_rgba(255,255,255,0.08)] dark:hover:bg-slate-100"
                 >
                   <Icon name="lock" className="h-4 w-4" />
-                  {isClosed ? "Update Closing" : "Close Month"}
+                  {isClosed ? "Confirm Revision" : "Close Month"}
                 </button>
               </div>
             </div>
           </section>
 
+          {computed?.protectedHistorical && (
+            <div role="status" className="rounded-2xl border border-sky-300 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-900 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-100">
+              Historical protection: months before October 2026 are read-only. Your earlier manual corrections remain unchanged.
+            </div>
+          )}
+          {!isClosed && computed?.pendingMonth && (
+            <div role="status" className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100">
+              This month is still in progress. You may save a draft, but permanent closing is available only after the month has ended (Asia/Dhaka).
+            </div>
+          )}
+          {isClosed && !computed?.protectedHistorical && (
+            <section className="rounded-2xl border border-violet-300 bg-violet-50 px-4 py-3 text-sm font-semibold text-violet-900 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-100">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span>মাসটি বন্ধ। সংশোধন হয়েছে: {computed?.revisions || 0}. Use a revision only to correct a verified bank/account balance.</span>
+                <button type="button" disabled={busy} className="rounded-xl border border-violet-400 px-3 py-2 font-black" onClick={() => setRevisionMode((x) => !x)}>
+                  {revisionMode ? "Cancel revision" : "Review / revise closed month"}
+                </button>
+              </div>
+              {revisionMode && (
+                <div className="mt-4 grid gap-3">
+                  <label className="text-xs">কেন সংশোধন করছেন (কমপক্ষে ১২ অক্ষর)
+                    <textarea rows={2} className={fieldClass} value={revisionReason} onChange={(e) => setRevisionReason(e.target.value)} placeholder="অ্যাকাউন্টের অমিলের কারণ লিখুন" />
+                  </label>
+                  <label className="text-xs">REVISE লিখুন {month} নিশ্চিত করতে
+                    <input className={fieldClass} value={revisionConfirmation} onChange={(e) => setRevisionConfirmation(e.target.value)} />
+                  </label>
+                  <p className="text-xs">Earlier closes cannot be revised here if a later month is already closed. No historical transactions are deleted.</p>
+                </div>
+              )}
+            </section>
+          )}
           {msg && (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
               {msg}
@@ -604,71 +555,39 @@ export default function CarryForward() {
             />
           ) : (
             <>
-              <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <StatCard
-                  title="Opening Total"
-                  value={bdt(totals.opening)}
-                  sub="Month start balance"
-                  icon="wallet"
-                  tone="emerald"
-                />
+              <></>
 
-                <StatCard
-                  title="System Closing"
-                  value={bdt(totals.systemClosing)}
-                  sub="Calculated from transactions"
-                  icon="chart"
-                  tone="sky"
-                />
-
-                <StatCard
-                  title="Actual Closing"
-                  value={bdt(totals.editedClosing)}
-                  sub="Sum of edited accounts"
-                  icon="check"
-                  tone="violet"
-                />
-
-                <StatCard
-                  title="Difference"
-                  value={bdt(totals.variance)}
-                  sub="Actual closing - system closing"
-                  icon="edit"
-                  tone={totals.variance === 0 ? "emerald" : "amber"}
-                />
-              </section>
+              {!isClosed && item?.draftSavedAt && (
+                <div className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-semibold text-violet-900 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-100">
+                  You have saved draft balance edits. These are provisional and may differ from Wallet's transaction-calculated available cash until you formally close this month.
+                </div>
+              )}
+              {computed?.openingSource === "previous_closed_month" && (
+                <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-900 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-100">
+                  শুরুর টাকা এসেছে আগের বন্ধ মাস থেকে ({computed.anchorMonth || "previous month"}) এবং মাঝের মাসের লেনদেনসহ।
+                </div>
+              )}
+              {(computed?.reconciliationIssues?.length > 0 || computed?.staleClosedCount > 0) && (
+                <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100">
+                  হিসাবে অমিল: {computed?.reconciliationIssues?.length || 0} টি সমস্যা।
+                  {computed?.staleClosedCount ? ` ${computed.staleClosedCount} account(s) differ from the calculations saved when the month was closed.` : ""}
+                  মাস বন্ধ করার আগে সব পরিশোধ মিলিয়ে নিন।
+                </div>
+              )}
 
               {computed?.summary && (
-                <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <StatCard
-                    title="Income"
-                    value={bdt(computed.summary.income)}
-                    sub="This month"
-                    icon="wallet"
-                    tone="emerald"
-                  />
-                  <StatCard
-                    title="Expense"
-                    value={bdt(computed.summary.expense)}
-                    sub="This month"
-                    icon="wallet"
-                    tone="amber"
-                  />
-                  <StatCard
-                    title="Transfers"
-                    value={bdt(computed.summary.transfer)}
-                    sub="Account movement"
-                    icon="refresh"
-                    tone="sky"
-                  />
-                  <StatCard
-                    title="Net Cashflow"
-                    value={bdt(computed.summary.netCashflow)}
-                    sub="Income - expense"
-                    icon="chart"
-                    tone="violet"
-                  />
-                </section>
+            <section className="rounded-2xl border border-teal-200 bg-teal-50 p-4 dark:border-teal-400/20 dark:bg-teal-400/10">
+              <div className="text-xs font-black uppercase tracking-wide text-teal-800 dark:text-teal-200">এই মাসে অ্যাকাউন্টে আসল টাকা বেড়েছে বা কমেছে</div>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-sm font-semibold text-teal-900 dark:text-teal-100">
+                <span>শুরুর টাকা {bdt(computed.summary.liquidOpening)} + পরিবর্তন {bdt(computed.summary.liquidMovement)}</span>
+                <span className="text-lg font-black">হিসাব অনুযায়ী শেষ {bdt(computed.summary.liquidSystemClosing)}</span>
+              </div>
+              <p className="mt-1 text-xs text-teal-700 dark:text-teal-200">Transfers between two liquid accounts cancel out in the combined total. Transfers to savings reduce liquid cash but remain assets.</p>
+            </section>
+          )}
+
+          {computed?.summary && (
+                <></>
               )}
 
               <section className="overflow-hidden rounded-[28px] border border-slate-200/70 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900/70">
@@ -678,7 +597,7 @@ export default function CarryForward() {
                       <IconBox name="account" tone="sky" />
                       <div>
                         <h3 className="text-lg font-black text-slate-950 dark:text-white">
-                          Account-wise Closing Balance
+                          অ্যাকাউন্ট অনুযায়ী শেষের হিসাব
                         </h3>
                         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                           Edit each account to match actual remaining cash, bank,
@@ -690,10 +609,11 @@ export default function CarryForward() {
                     <button
                       type="button"
                       onClick={resetAllToSystem}
+                      disabled={(isClosed && !revisionMode) || computed?.protectedHistorical}
                       className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 sm:w-auto"
                     >
                       <Icon name="refresh" className="h-4 w-4" />
-                      Reset to System
+                      হিসাব অনুযায়ী ফিরিয়ে নিন
                     </button>
                   </div>
                 </div>
@@ -705,7 +625,7 @@ export default function CarryForward() {
                   />
                 ) : rows.length === 0 ? (
                   <div className="p-8 text-center text-sm text-slate-500 dark:text-slate-400">
-                    No account balance found.
+                    কোনো অ্যাকাউন্টের হিসাব পাওয়া যায়নি।
                   </div>
                 ) : (
                   <>
@@ -715,13 +635,13 @@ export default function CarryForward() {
                       <table className="w-full min-w-[960px] text-sm">
                         <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/50 dark:text-slate-400">
                           <tr className="text-left">
-                            <th className="p-4 font-black">Account</th>
-                            <th className="p-4 font-black">Opening</th>
-                            <th className="p-4 font-black">System Closing</th>
-                            <th className="p-4 font-black">Actual Closing</th>
-                            <th className="p-4 font-black">Difference</th>
+                            <th className="p-4 font-black">অ্যাকাউন্ট</th>
+                            <th className="p-4 font-black">শুরুর টাকা</th>
+                            <th className="p-4 font-black">হিসাব অনুযায়ী শেষ</th>
+                            <th className="p-4 font-black">আসল শেষ টাকা</th>
+                            <th className="p-4 font-black">অমিল</th>
                             <th className="p-4 text-right font-black">
-                              Action
+                              কাজ
                             </th>
                           </tr>
                         </thead>
@@ -755,7 +675,7 @@ export default function CarryForward() {
                                 </div>
                                 {row.manualEdited && (
                                   <div className="mt-1 text-xs font-bold text-amber-600 dark:text-amber-300">
-                                    Manually adjusted
+                                    নিজে সংশোধিত
                                   </div>
                                 )}
                               </td>
@@ -769,18 +689,20 @@ export default function CarryForward() {
                                   <button
                                     type="button"
                                     onClick={() => openEdit(row)}
+                                    disabled={(isClosed && !revisionMode) || computed?.protectedHistorical}
                                     className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
                                   >
                                     <Icon name="edit" className="h-3.5 w-3.5" />
-                                    Edit
+                                    সম্পাদনা
                                   </button>
 
                                   <button
                                     type="button"
                                     onClick={() => resetAccount(row)}
+                                    disabled={(isClosed && !revisionMode) || computed?.protectedHistorical}
                                     className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs font-black text-amber-700 transition hover:bg-amber-50 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200 dark:hover:bg-amber-400/15"
                                   >
-                                    Reset
+                                    ফিরিয়ে নিন
                                   </button>
                                 </div>
                               </td>
@@ -791,7 +713,7 @@ export default function CarryForward() {
                         <tfoot className="border-t border-slate-100 bg-slate-50 dark:border-white/10 dark:bg-slate-950/50">
                           <tr>
                             <td className="p-4 font-black text-slate-950 dark:text-white">
-                              Total
+                              মোট
                             </td>
                             <td className="p-4 font-black text-slate-950 dark:text-white">
                               {bdt(totals.opening)}
@@ -834,7 +756,7 @@ export default function CarryForward() {
                           <div className="mt-4 grid grid-cols-2 gap-2">
                             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-white/10 dark:bg-white/[0.04]">
                               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
-                                Opening
+                                শুরুর টাকা
                               </p>
                               <p className="mt-1 text-base font-black text-slate-950 dark:text-white">
                                 {bdt(row.opening)}
@@ -843,7 +765,7 @@ export default function CarryForward() {
 
                             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-white/10 dark:bg-white/[0.04]">
                               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
-                                Actual
+                                বাস্তব
                               </p>
                               <p className="mt-1 text-base font-black text-slate-950 dark:text-white">
                                 {bdt(row.editedClosing)}
@@ -853,7 +775,7 @@ export default function CarryForward() {
 
                           {row.manualEdited && (
                             <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200">
-                              System: {bdt(row.systemClosing)} • adjusted by{" "}
+                              হিসাব অনুযায়ী: {bdt(row.systemClosing)} • সংশোধন করেছেন{" "}
                               {bdt(row.variance)}
                             </div>
                           )}
@@ -862,18 +784,20 @@ export default function CarryForward() {
                             <button
                               type="button"
                               onClick={() => openEdit(row)}
+                              disabled={(isClosed && !revisionMode) || computed?.protectedHistorical}
                               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
                             >
                               <Icon name="edit" className="h-3.5 w-3.5" />
-                              Edit
+                              সম্পাদনা
                             </button>
 
                             <button
                               type="button"
                               onClick={() => resetAccount(row)}
+                              disabled={(isClosed && !revisionMode) || computed?.protectedHistorical}
                               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-white px-3 py-2.5 text-xs font-black text-amber-700 transition hover:bg-amber-50 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200 dark:hover:bg-amber-400/15"
                             >
-                              Reset
+                              ফিরিয়ে নিন
                             </button>
                           </div>
                         </article>
@@ -881,7 +805,7 @@ export default function CarryForward() {
 
                       <div className="rounded-[22px] border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-400/20 dark:bg-emerald-400/10">
                         <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-200">
-                          Total Actual Closing
+                          সব অ্যাকাউন্টে শেষে আছে
                         </p>
                         <p className="mt-1 text-2xl font-black text-emerald-800 dark:text-emerald-100">
                           {bdt(totals.editedClosing)}
@@ -902,7 +826,7 @@ export default function CarryForward() {
                     <IconBox name="check" tone="emerald" />
                     <div>
                       <h3 className="text-lg font-black text-emerald-800 dark:text-emerald-100">
-                        Closing Saved
+                        মাসের হিসাব সংরক্ষিত
                       </h3>
                       <p className="mt-1 text-sm font-semibold text-emerald-700/80 dark:text-emerald-200/80">
                         Opening: {bdt(calc.openingTotal)} • Closing:{" "}
@@ -937,11 +861,11 @@ export default function CarryForward() {
                     <IconBox name="edit" tone="amber" />
                     <div>
                       <div className="mb-2 inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200">
-                        Closing correction
+                        শেষ হিসাব সংশোধন
                       </div>
 
                       <h3 className="text-xl font-black text-slate-950 dark:text-white">
-                        Edit Account Closing
+                        শেষের টাকা সংশোধন
                       </h3>
 
                       <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
@@ -965,7 +889,7 @@ export default function CarryForward() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.04]">
                     <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
-                      System Closing
+                      হিসাব অনুযায়ী শেষ
                     </p>
                     <p className="mt-1 text-base font-black text-slate-950 dark:text-white">
                       {bdt(editRow.systemClosing)}
@@ -974,7 +898,7 @@ export default function CarryForward() {
 
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.04]">
                     <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
-                      Opening
+                      শুরুর টাকা
                     </p>
                     <p className="mt-1 text-base font-black text-slate-950 dark:text-white">
                       {bdt(editRow.opening)}
@@ -982,14 +906,14 @@ export default function CarryForward() {
                   </div>
                 </div>
 
-                <Field label="Actual Closing Balance">
+                <Field label="বাস্তবে মাস শেষে আছে">
                   <input
                     type="number"
                     step="0.01"
                     className={fieldClass}
                     value={editAmount}
                     onChange={(e) => setEditAmount(e.target.value)}
-                    placeholder="Enter actual remaining balance"
+                    placeholder="বাস্তবে যত টাকা আছে লিখুন"
                   />
                 </Field>
 
@@ -1006,7 +930,7 @@ export default function CarryForward() {
                     onClick={closeEdit}
                     className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 sm:w-auto"
                   >
-                    Cancel
+                    বাতিল
                   </button>
 
                   <button
@@ -1015,7 +939,7 @@ export default function CarryForward() {
                     className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-[0_14px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800 active:translate-y-0 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 sm:w-auto"
                   >
                     <Icon name="check" className="h-4 w-4" />
-                    Save Balance
+                    টাকা সংরক্ষণ
                   </button>
                 </div>
               </div>
@@ -1023,6 +947,7 @@ export default function CarryForward() {
           </div>
         )}
       </div>
+          </div>
     </AppLayout>
   );
 }

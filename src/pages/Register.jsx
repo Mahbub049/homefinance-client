@@ -24,7 +24,7 @@ export default function Register() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <form onSubmit={submit} className="w-full max-w-md bg-white border rounded-lg p-6">
         <h1 className="text-2xl font-bold mb-1">Create account</h1>
-        <p className="text-sm text-gray-500 mb-6">HomeFinance Ledger</p>
+        <p className="text-sm text-gray-500 mb-6">হিসাব নিকাশ</p>
 
         {err && <div className="mb-4 text-sm text-red-600">{err}</div>}
 

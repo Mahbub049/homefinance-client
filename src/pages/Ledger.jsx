@@ -1,3 +1,4 @@
+import HFPageLead from "../components/design/HFPageLead";
 import { useEffect, useMemo, useRef, useState } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -35,12 +36,10 @@ function toLocalYMD(dateLike) {
 }
 
 function formatPrettyDate(dateLike) {
-  if (!dateLike) return "No date";
+  if (!dateLike) return "তারিখ নেই";
   const d = new Date(dateLike);
-  return d.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
+  return d.toLocaleDateString("bn-BD", {
+    day: "2-digit", month: "short", year: "numeric"
   });
 }
 
@@ -49,7 +48,7 @@ function formatMonthLabel(value) {
   const [year, month] = String(value).split("-");
   const d = new Date(Number(year), Number(month || 1) - 1, 1);
   if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  return d.toLocaleDateString("bn-BD", { month: "long", year: "numeric" });
 }
 
 function money(n) {
@@ -100,10 +99,10 @@ function getId(v) {
 }
 
 function typeLabel(t) {
-  if (t === "income") return "Income";
-  if (t === "expense") return "Expense";
-  if (t === "transfer") return "Transfer";
-  return t || "Transaction";
+  if (t === "income") return "আয়";
+  if (t === "expense") return "খরচ";
+  if (t === "transfer") return "টাকা পাঠানো";
+  return t || "হিসাব";
 }
 
 function splitLabel(split) {
@@ -393,6 +392,7 @@ function FieldSelect({ className = "", children, ...props }) {
 }
 
 export default function Ledger() {
+  const [hfMore, setHfMore] = useState(false);
   const me = getUser();
 
   const [month, setMonth] = useState(monthNow());
@@ -407,8 +407,10 @@ export default function Ledger() {
   const [q, setQ] = useState("");
 
   const [items, setItems] = useState([]);
+  const [memberReconciliation, setMemberReconciliation] = useState(null);
   const [allItems, setAllItems] = useState([]);
   const [ledgerItems, setLedgerItems] = useState([]);
+  const [budgetAllocation, setBudgetAllocation] = useState(null);
 
   const [totals, setTotals] = useState({
     income: 0,
@@ -420,6 +422,7 @@ export default function Ledger() {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
   const savingRef = useRef(false);
+  const createAttempt = useRef(null);
   const [savingTx, setSavingTx] = useState(false);
 
   const [open, setOpen] = useState(false);
@@ -447,21 +450,6 @@ export default function Ledger() {
     fixedMe: "",
     fixedOther: "",
   });
-
-  const fixedExpenseTotal = useMemo(() => {
-    return (allItems || [])
-      .filter(
-        (t) =>
-          t.txType === "expense" &&
-          (t.note?.toLowerCase().includes("fixed") ||
-            t.categoryId?.name?.toLowerCase().includes("housing"))
-      )
-      .reduce((s, t) => s + Number(t.amount || 0), 0);
-  }, [allItems]);
-
-  const remainingExpense = useMemo(() => {
-    return Number(totals.expense || 0) - Number(fixedExpenseTotal || 0);
-  }, [totals, fixedExpenseTotal]);
 
   async function loadBasics() {
     const [mRes, inc, exp, acc] = await Promise.all([
@@ -510,6 +498,8 @@ export default function Ledger() {
         }
       );
       setLedgerItems(ledgerRes.data.items || []);
+      setMemberReconciliation(ledgerRes.data.memberReconciliation || null);
+      setBudgetAllocation(ledgerRes.data.budgetAllocation || null);
     } catch (e) {
       setMsg(e?.response?.data?.message || "Failed to load data");
     } finally {
@@ -779,6 +769,7 @@ export default function Ledger() {
   }
 
   function openModal() {
+    createAttempt.current = null;
     setMsg("");
     setIsEditing(false);
     setEditId(null);
@@ -846,6 +837,7 @@ export default function Ledger() {
   }
 
   function closeModal() {
+    createAttempt.current = null;
     setOpen(false);
     setIsEditing(false);
     setEditId(null);
@@ -962,7 +954,13 @@ export default function Ledger() {
       if (isEditing && editId) {
         await api.put(`/api/transactions/${editId}`, payload);
       } else {
-        await api.post("/api/transactions", payload);
+        const fingerprint = JSON.stringify(payload);
+        if (!createAttempt.current || createAttempt.current.fingerprint !== fingerprint) {
+          createAttempt.current = { fingerprint, key: crypto.randomUUID() };
+        }
+        await api.post("/api/transactions", payload, {
+          headers: { 'Idempotency-Key': createAttempt.current.key },
+        });
       }
 
       closeModal();
@@ -989,16 +987,6 @@ export default function Ledger() {
     }
   }
 
-  async function rebuildLedger() {
-    setMsg("");
-    try {
-      await api.post("/api/ledger/rebuild", { month });
-      await loadTransactions();
-      setMsg("✅ Ledger rebuilt successfully for " + month);
-    } catch (e) {
-      setMsg(e?.response?.data?.message || "Rebuild failed");
-    }
-  }
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -1010,7 +998,11 @@ export default function Ledger() {
         if (it.txType === "expense") {
           const parts = Array.isArray(it.paymentParts) ? it.paymentParts : [];
           const memberPaidInSplit = it.paymentMode === "split" && parts.some((part) => getId(part.userId) === filterId);
-          if (!memberPaidInSplit && getId(it.paidByUserId) !== filterId) return false;
+          const memberResponsible = ledgerItems.some(entry =>
+            getId(entry.sourceId) === getId(it._id) &&
+            (entry.splits || []).some(share => getId(share.userId) === filterId)
+          );
+          if (!memberPaidInSplit && getId(it.paidByUserId) !== filterId && !memberResponsible) return false;
         }
       }
 
@@ -1027,7 +1019,7 @@ export default function Ledger() {
     });
 
     return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [items, memberFilter, q]);
+  }, [items, memberFilter, q, ledgerItems]);
 
   const availableDates = useMemo(() => {
     const s = new Set();
@@ -1161,9 +1153,19 @@ export default function Ledger() {
       };
     });
 
-    list.sort((a, b) => b.remaining - a.remaining);
+    const reconciled = new Map((memberReconciliation?.rows || []).map(r => [String(r.userId), r]));
+    for (const stat of list) {
+      const row = reconciled.get(String(stat.id));
+      stat.actuallyPaid = Number(row?.actuallyPaid || 0);
+      stat.ordinaryExpenseShare = Number(row?.expenseShare || 0);
+      stat.ordinarySettlementNet = Number(row?.ordinarySettlementNet || 0);
+      stat.scheduledLargePurchaseShare = Number(budgetAllocation?.byMember?.[stat.id] || 0);
+      // Includes scheduled purchase responsibility, but not savings deposits.
+      stat.budgetMarginBeforeSaving = Number(row?.income || 0) - stat.ordinaryExpenseShare - stat.scheduledLargePurchaseShare;
+    }
+    list.sort((a, b) => b.budgetMarginBeforeSaving - a.budgetMarginBeforeSaving);
     return list;
-  }, [ledgerItems, allItems, members, accountsById, ownerToMemberId]);
+  }, [ledgerItems, allItems, members, accountsById, ownerToMemberId, memberReconciliation, budgetAllocation]);
 
   const topExpenseCategory = useMemo(() => {
     const m = new Map();
@@ -1185,7 +1187,7 @@ export default function Ledger() {
   }, [allItems]);
 
   const memberRemainingTotal = useMemo(() => {
-    return memberStats.reduce((s, x) => s + Number(x.remaining || 0), 0);
+    return memberStats.reduce((s, x) => s + Number(x.budgetMarginBeforeSaving || 0), 0);
   }, [memberStats]);
 
   async function savePdfToPhone(doc, fileName) {
@@ -1485,7 +1487,7 @@ export default function Ledger() {
         cardY,
         cardW,
         cardH,
-        "Net Cashflow",
+        "Budget delta",
         moneyPdf(totals.netCashflow),
         totals.netCashflow >= 0 ? COLORS.green : COLORS.red,
         totals.netCashflow >= 0 ? COLORS.greenSoft : COLORS.redSoft
@@ -1496,8 +1498,8 @@ export default function Ledger() {
         cardY,
         cardW,
         cardH,
-        "Remaining Expense",
-        moneyPdf(remainingExpense),
+        "Paid ordinary",
+        moneyPdf(memberReconciliation?.paidTotal || 0),
         COLORS.amber,
         COLORS.amberSoft
       );
@@ -1522,21 +1524,21 @@ export default function Ledger() {
           [
             "Member",
             "Income",
-            "Expense",
-            "Transfer In",
-            "Transfer Out",
-            "Transfer Net",
-            "Remaining",
+            "Expense share",
+            "Actually paid",
+            "Regular net",
+            "Large budget",
+            "Margin*",
           ],
         ],
         body: memberStats.map((m) => [
           safeText(m.name),
           moneyPdf(m.income),
-          moneyPdf(m.expense),
-          moneyPdf(m.transferIn),
-          moneyPdf(m.transferOut),
-          moneyPdf(m.transferNet),
-          moneyPdf(m.remaining),
+          moneyPdf(m.ordinaryExpenseShare),
+          moneyPdf(m.actuallyPaid),
+          moneyPdf(m.ordinarySettlementNet),
+          moneyPdf(m.scheduledLargePurchaseShare),
+          moneyPdf(m.budgetMarginBeforeSaving),
         ]),
         styles: {
           font: "helvetica",
@@ -1589,7 +1591,7 @@ export default function Ledger() {
             ? memberById.get(getId(it.receivedByUserId))?.name || "-"
             : it.txType === "expense"
               ? it.paymentMode === "split"
-                ? "Split Payment"
+                ? "দুজন মিলে দিয়েছেন"
                 : memberById.get(getId(it.paidByUserId))?.name || "-"
               : "-";
 
@@ -1738,88 +1740,40 @@ export default function Ledger() {
 
   return (
     <AppLayout>
+      <div className={`hf-step3-page hf-step3-ledger hf-v2-page hf-v2-ledger ${hfMore ? "hf-step3-expanded" : ""}`}>
+        <HFPageLead title="আয়-খরচ" description="প্রতিদিনের আয়, খরচ ও টাকা আদান-প্রদানের তালিকা" month={month} onMonthChange={setMonth}
+          metrics={[
+ {label:'এই মাসের আয়',value:totals.income}, {label:'এই মাসের খরচ',value:totals.expense},
+ {label:'টাকা আদান-প্রদান',value:totals.transfer}
+]}
+          onAdd={openModal} addLabel="নতুন হিসাব"
+          addDisabled={false}
+          onExtra={exportTransactionsPdf} extraLabel="PDF নিন"
+          onRefresh={undefined}
+          more={undefined} onToggleMore={undefined} />
+
       <div className="ledger-page min-h-[calc(100vh-64px)] bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-white">
         <div className="relative p-3 sm:p-5 lg:p-3">
-          <section className="overflow-hidden rounded-2xl border border-white/60 bg-gradient-to-br from-slate-950 via-indigo-950 to-fuchsia-900 p-4 text-white shadow-xl shadow-violet-900/20 dark:border-white/10 sm:rounded-[1.75rem] sm:p-6">
-            <div className="relative z-10 grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
-              <div className="min-w-0">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/80 backdrop-blur sm:px-3 sm:py-1.5 sm:text-xs">
-                  <Icon name="spark" className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  Monthly ledger
-                </div>
-                <h1 className="mt-3 max-w-3xl text-2xl font-black tracking-tight sm:mt-4 sm:text-4xl lg:text-4xl">
-                  Ledger Overview
-                </h1>
-                <p className="mt-2 max-w-3xl text-xs leading-5 text-white/75 sm:mt-3 sm:text-sm sm:leading-7 md:text-base">
-                  Track income, expenses, transfers, splits, accounts, and member-wise remaining balance.
-                </p>
-
-                <div className="mt-4 flex flex-wrap items-center gap-2 sm:mt-5 sm:gap-3">
-                  <ActionButton onClick={openModal} variant="warm">
-                    <Icon name="plus" className="h-4 w-4" /> Add Transaction
-                  </ActionButton>
-                  <ActionButton onClick={exportTransactionsPdf} variant="soft">
-                    <Icon name="download" className="h-4 w-4" /> Export PDF
-                  </ActionButton>
-                </div>
-              </div>
-
-              <div className="hidden min-w-[260px] grid-cols-2 gap-3 rounded-[1.5rem] border border-white/10 bg-white/10 p-3 backdrop-blur-xl sm:grid lg:min-w-[360px]">
-                <div className="rounded-2xl bg-white/10 p-4">
-                  <div className="text-xs text-white/60">Month</div>
-                  <div className="mt-1 text-xl font-black">{monthLabel}</div>
-                </div>
-                <div className="rounded-2xl bg-white/10 p-4">
-                  <div className="text-xs text-white/60">Transactions</div>
-                  <div className="mt-1 text-xl font-black">{allItems.length}</div>
-                </div>
-                <div className="col-span-2 rounded-2xl bg-white/10 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-xs text-white/60">Net Cashflow</div>
-                      <div className="mt-1 text-2xl font-black">{money(totals.netCashflow)}</div>
-                    </div>
-                    <div className="rounded-2xl bg-white px-3 py-2 text-xs font-bold text-slate-950">
-                      {totals.netCashflow < 0 ? "Needs control" : "Healthy"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
+          <></>
 
           <section className="mt-4 grid gap-3 sm:mt-5 lg:grid-cols-[1fr_auto] lg:items-center">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <FieldLabel>Month</FieldLabel>
-                <div className="relative">
-                  <Icon name="calendar" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <FieldInput
-                    value={month}
-                    onChange={(e) => setMonth(e.target.value)}
-                    onClick={(e) => e.currentTarget.showPicker?.()}
-                    type="month"
-                    className="pl-10 sm:pl-11"
-                    aria-label="Select month"
-                  />
-                </div>
-              </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <div className="sm:col-span-1 lg:col-span-2">
-                <FieldLabel>Search</FieldLabel>
+                <FieldLabel>খুঁজুন</FieldLabel>
                 <div className="relative">
                   <Icon name="search" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <FieldInput
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     className="pl-11"
-                    placeholder="Search category, note, account..."
+                    placeholder="ধরন, নোট বা অ্যাকাউন্ট খুঁজুন…"
                   />
                 </div>
               </div>
               <div>
-                <FieldLabel>Member</FieldLabel>
-                <FieldSelect value={memberFilter} onChange={(e) => setMemberFilter(e.target.value)} title="Filter by member">
-                  <option value="all">All members</option>
+                <FieldLabel>সদস্য</FieldLabel>
+                <FieldSelect value={memberFilter} onChange={(e) => setMemberFilter(e.target.value)} title="সদস্য অনুযায়ী দেখুন">
+                  <option value="all">সব সদস্য</option>
                   {members.map((m) => (
                     <option key={getId(m)} value={getId(m)}>
                       {m.name}
@@ -1838,206 +1792,41 @@ export default function Ledger() {
 
           <section className="ledger-no-scrollbar mt-4 flex touch-pan-x gap-2 overflow-x-auto pb-1 sm:mt-5">
             <PillButton active={activeTab === "all"} onClick={() => setActiveTab("all")}>
-              All <span className="ml-1 opacity-70">{tabCount.all}</span>
+              সব <span className="ml-1 opacity-70">{tabCount.all}</span>
             </PillButton>
             <PillButton active={activeTab === "income"} tone="income" onClick={() => setActiveTab("income")}>
-              Income <span className="ml-1 opacity-70">{tabCount.income}</span>
+              আয় <span className="ml-1 opacity-70">{tabCount.income}</span>
             </PillButton>
             <PillButton active={activeTab === "expense"} tone="expense" onClick={() => setActiveTab("expense")}>
-              Expense <span className="ml-1 opacity-70">{tabCount.expense}</span>
+              খরচ <span className="ml-1 opacity-70">{tabCount.expense}</span>
             </PillButton>
             <PillButton active={activeTab === "transfer"} tone="transfer" onClick={() => setActiveTab("transfer")}>
-              Transfer <span className="ml-1 opacity-70">{tabCount.transfer}</span>
+              টাকা আদান-প্রদান <span className="ml-1 opacity-70">{tabCount.transfer}</span>
             </PillButton>
           </section>
 
-          <section className="mt-4 grid grid-cols-2 gap-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:mt-5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-5 xl:[&>*:last-child:nth-child(odd)]:col-span-1">
-            <MetricCard title="Income" value={money(totals.income)} tone="income" icon="wallet" />
-            <MetricCard title="Expense" value={money(totals.expense)} tone="expense" icon="chart" />
-            <MetricCard title="Remaining Expense" value={money(remainingExpense)} subtitle={`Expense - Fixed (${money(fixedExpenseTotal)})`} tone="neutral" icon="spark" />
-            <MetricCard title="Transfer" value={money(totals.transfer)} tone="transfer" icon="download" />
-            <MetricCard
-              title="Net Cashflow"
-              value={money(totals.netCashflow)}
-              subtitle={totals.netCashflow < 0 ? "Expense is higher than income" : "Income is covering expenses"}
-              tone="net"
-              icon="chart"
-            />
-          </section>
+          {budgetAllocation && (
+            <></>
+          )}
 
-          <section className="mt-4 grid items-start gap-4 sm:mt-5 xl:grid-cols-[1fr_380px] xl:gap-5">
-            <div className="space-y-4 sm:space-y-5">
-              <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/50 sm:rounded-[1.75rem] sm:p-5">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <div className="text-base font-black text-slate-950 dark:text-white sm:text-lg">Individual Summary</div>
-                    <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm sm:leading-6">
-                      Remaining = income split − expense split + transfer net.
-                    </p>
-                    <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 sm:text-xs">
-                      Ledger entries: <b>{ledgerItems.length}</b> • Transactions: <b>{allItems.length}</b>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 sm:rounded-2xl sm:px-4 sm:text-sm">
-                      Total Remaining: <b className="text-slate-950 dark:text-white">{money(memberRemainingTotal)}</b>
-                    </div>
-                    {ledgerItems.length === 0 && allItems.length > 0 ? (
-                      <ActionButton onClick={rebuildLedger} variant="soft">
-                        Rebuild Ledger
-                      </ActionButton>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-                  {memberStats.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-slate-300 p-5 text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
-                      No family members found.
-                    </div>
-                  ) : (
-                    memberStats.map((m, idx) => {
-                      const maxAbs = Math.max(
-                        1,
-                        ...memberStats.map((x) =>
-                          Math.max(
-                            Math.abs(x.income),
-                            Math.abs(x.expense),
-                            Math.abs(x.remaining),
-                            Math.abs(x.transferIn),
-                            Math.abs(x.transferOut)
-                          )
-                        )
-                      );
-
-                      const remP = pct(Math.abs(m.remaining), maxAbs);
-                      const isNeg = m.remaining < 0;
-
-                      return (
-                        <div key={m.id} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-3 shadow-sm dark:border-white/10 dark:from-white/10 dark:to-white/5 sm:rounded-3xl sm:p-4">
-                          <div className={cn("absolute -right-10 -top-10 h-24 w-24 rounded-full blur-2xl", idx % 2 === 0 ? "bg-violet-400/20" : "bg-emerald-400/20")} />
-                          <div className="relative flex items-start gap-3">
-                            <div className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-sm font-black text-white shadow-lg shadow-slate-900/20 dark:bg-white dark:text-slate-950 sm:flex">
-                              {initials(m.name)}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0">
-                                  <div className="truncate text-sm font-bold text-slate-950 dark:text-white sm:text-base">{m.name}</div>
-                                  <div className="mt-1 text-[11px] leading-4 text-slate-500 dark:text-slate-400 sm:text-xs sm:leading-5">
-                                    Income {money(m.income)} • Expense {money(m.expense)}
-                                    <span className="hidden sm:inline">
-                                      <br />
-                                      In {money(m.transferIn)} • Out {money(m.transferOut)} • Net {money(m.transferNet)}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className={cn("shrink-0 rounded-xl px-2.5 py-1 text-xs font-black sm:rounded-2xl sm:px-3 sm:text-sm", isNeg ? "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200" : "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200")}>
-                                  {money(m.remaining)}
-                                </div>
-                              </div>
-
-                              <div className="mt-3 sm:mt-4">
-                                <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10 sm:h-3">
-                                  <div className={cn("h-full rounded-full", isNeg ? "bg-gradient-to-r from-rose-500 to-orange-400" : "bg-gradient-to-r from-emerald-500 to-teal-400")} style={{ width: `${remP}%` }} />
-                                </div>
-                                <div className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400 sm:mt-2 sm:text-xs">
-                                  {isNeg ? "Negative balance" : "Remaining after expenses"}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/50 sm:rounded-[1.75rem] sm:p-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <div className="text-base font-black text-slate-950 dark:text-white sm:text-lg">Selected Day</div>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
-                      Income, expense and transfer for {formatPrettyDate(day)}.
-                    </p>
-                  </div>
-                  <div className="w-full sm:w-[190px]">
-                    <FieldInput
-                      type="date"
-                      value={day}
-                      onChange={(e) => setDay(e.target.value)}
-                      onClick={(e) => e.currentTarget.showPicker?.()}
-                      aria-label="Select day"
-                    />
-                  </div>
-                </div>
-                <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[11px] sm:mt-4 sm:text-xs">
-                  <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200 sm:rounded-2xl sm:p-3">
-                    <div>Income</div>
-                    <b>{money(dayTotals.income)}</b>
-                  </div>
-                  <div className="rounded-xl bg-rose-50 p-2.5 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200 sm:rounded-2xl sm:p-3">
-                    <div>Expense</div>
-                    <b>{money(dayTotals.expense)}</b>
-                  </div>
-                  <div className="rounded-xl bg-sky-50 p-2.5 text-sky-700 dark:bg-sky-500/10 dark:text-sky-200 sm:rounded-2xl sm:p-3">
-                    <div>Transfer</div>
-                    <b>{money(dayTotals.transfer)}</b>
-                  </div>
-                </div>
-              </div>
+          {memberReconciliation?.issues?.length > 0 && (
+            <div className="mt-4 rounded-2xl border border-amber-300/30 bg-amber-500/10 p-4 text-xs leading-5 text-amber-800 dark:text-amber-200">
+              <b>আয়-খরচের হিসাব মেলাতে হবে:</b> {memberReconciliation.issues.length} টি সতর্কতা।
+              Some recorded funding and assigned cost shares differ or have missing links. This display does not change transactions; check Wallet before settling.
             </div>
+          )}
 
-            <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/50 sm:rounded-[1.75rem] sm:p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-base font-black text-slate-950 dark:text-white sm:text-lg">Quick Insights</div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">Readable overview for this month.</p>
-                </div>
-                <div className="hidden h-11 w-11 items-center justify-center rounded-2xl bg-violet-600 text-white sm:flex">
-                  <Icon name="spark" className="h-5 w-5" />
-                </div>
-              </div>
+          <></>
 
-              <div className="mt-3 space-y-2.5 sm:mt-4 sm:space-y-3">
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5 text-xs dark:bg-white/5 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm">
-                  <span className="text-slate-500 dark:text-slate-400">Shown transactions</span>
-                  <b>{rows.length}</b>
-                </div>
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5 text-xs dark:bg-white/5 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm">
-                  <span className="text-slate-500 dark:text-slate-400">Selected day items</span>
-                  <b>{dayRows.length}</b>
-                </div>
-                <div className="rounded-xl bg-slate-50 px-3 py-2.5 text-xs dark:bg-white/5 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm">
-                  <div className="text-slate-500 dark:text-slate-400">Top expense category</div>
-                  <div className="mt-1 flex items-center justify-between gap-3">
-                    <b className="truncate" title={topExpenseCategory.name}>{topExpenseCategory.name}</b>
-                    <b className="text-rose-600 dark:text-rose-300">{money(topExpenseCategory.amount)}</b>
-                  </div>
-                </div>
-                <div className="rounded-xl bg-slate-50 px-3 py-2.5 text-xs dark:bg-white/5 sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm">
-                  <div className="text-slate-500 dark:text-slate-400">Biggest transaction</div>
-                  <div className="mt-1 flex items-center justify-between gap-3">
-                    <b>{biggestTransaction ? typeLabel(biggestTransaction.txType) : "—"}</b>
-                    <b>{biggestTransaction ? money(biggestTransaction.amount) : money(0)}</b>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 hidden rounded-2xl border border-violet-100 bg-violet-50 p-4 text-xs leading-5 text-violet-800 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-200 sm:block">
-                Transfers use account ownership: Mahbub, Mirza, or Joint. Same-owner transfers and expense settlements are excluded from member spending because the original split already assigned the cost.
-              </div>
-            </div>
-          </section>
+          <></>
 
           <section className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white/85 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/50 sm:mt-5 sm:rounded-[1.75rem]">
             <div className="border-b border-slate-200 p-4 dark:border-white/10 sm:p-5">
               <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div>
-                  <div className="text-base font-black text-slate-950 dark:text-white sm:text-lg">Transaction Timeline</div>
+                  <div className="text-base font-black text-slate-950 dark:text-white sm:text-lg">তারিখ অনুযায়ী সব হিসাব</div>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
-                    {monthLabel} — {dayRows.length} item(s) for {formatPrettyDate(day)}
+                    {monthLabel} — {dayRows.length} টি হিসাব · {formatPrettyDate(day)}
                   </p>
                 </div>
                 <div className="grid grid-cols-[1fr_auto] gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
@@ -2051,10 +1840,10 @@ export default function Ledger() {
                     />
                   </div>
                   <ActionButton onClick={() => setDay(dayNow())} variant="soft">
-                    Today
+                    আজ
                   </ActionButton>
                   <div className="col-span-2 rounded-xl bg-slate-50 px-3 py-2 text-[11px] text-slate-500 dark:bg-white/5 dark:text-slate-400 sm:rounded-2xl sm:px-4 sm:text-xs">
-                    Logged in as <b className="text-slate-900 dark:text-white">{me?.name || "User"}</b>
+                    ব্যবহারকারী <b className="text-slate-900 dark:text-white">{me?.name || "User"}</b>
                   </div>
                 </div>
               </div>
@@ -2081,14 +1870,14 @@ export default function Ledger() {
             </div>
 
             {loading ? (
-              <Loader text="Loading ledger" subtext="Collecting transactions and balances" />
+              <Loader text="হিসাব আসছে" subtext="লেনদেনগুলো দেখা হচ্ছে" />
             ) : rows.length === 0 ? (
               <div className="p-8 text-center text-sm leading-6 text-slate-500 dark:text-slate-400">
-                No transactions match your filters. Click <b>+ Add Transaction</b> to create one.
+                নির্বাচিত শর্তে কোনো হিসাব নেই। <b>+ নতুন হিসাব</b> নতুন হিসাব যোগ করুন।
               </div>
             ) : dayRows.length === 0 ? (
               <div className="p-8 text-center text-sm leading-6 text-slate-500 dark:text-slate-400">
-                No transactions found for <b>{day}</b>. Try another date.
+                এই দিনের কোনো হিসাব নেই: <b>{day}</b>. অন্য তারিখ বাছুন।
               </div>
             ) : (
               <div className="divide-y divide-slate-100 dark:divide-white/10">
@@ -2099,7 +1888,7 @@ export default function Ledger() {
 
                   let details = "";
                   if (it.txType === "transfer") details = `${fromName || "-"} → ${toName || "-"}`;
-                  else if (it.txType === "income") details = `${catName || "-"} • To: ${toName || "-"}`;
+                  else if (it.txType === "income") details = `${catName || "-"} • জমা: ${toName || "-"}`;
                   else {
                     const payText = paymentSummary(it);
                     details = `${catName || "-"}${payText ? ` • ${payText}` : ""}`;
@@ -2112,10 +1901,15 @@ export default function Ledger() {
                       ? memberById.get(getId(it.receivedByUserId))?.name
                       : it.txType === "expense"
                         ? it.paymentMode === "split"
-                          ? "Split Payment"
+                          ? "দুজন মিলে দিয়েছেন"
                           : memberById.get(getId(it.paidByUserId))?.name
                         : null;
 
+                  const managedRecord = it.sourceType && !['manual', 'transaction'].includes(String(it.sourceType).toLowerCase());
+                  const linkedLedgerEntry = ledgerItems.find(e => getId(e.sourceId) === getId(it._id) && e.entryType === 'expense' && !e.virtual);
+                  const responsibilityText = it.txType === 'expense' && linkedLedgerEntry
+                    ? (linkedLedgerEntry.splits || []).map(part => `${memberById.get(getId(part.userId))?.name || part.userId?.name || 'Member'}: ${money(part.shareAmount)}`).join(' • ')
+                    : '';
                   return (
                     <div key={it._id} className="group px-3 py-3 transition hover:bg-slate-50/70 dark:hover:bg-white/[0.03] sm:px-5 sm:py-4">
                       <div className="flex items-start justify-between gap-3">
@@ -2134,7 +1928,7 @@ export default function Ledger() {
                               ) : null}
                               {splitText ? (
                                 <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-500/10 dark:text-violet-200 sm:px-2.5 sm:py-1 sm:text-xs">
-                                  <span className="hidden sm:inline">Split: </span>{splitText}
+                                  <span className="hidden sm:inline">খরচ ভাগ: </span>{splitText}
                                 </span>
                               ) : null}
                             </div>
@@ -2142,6 +1936,14 @@ export default function Ledger() {
                             <div className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300 sm:text-sm sm:leading-6">
                               {details}
                             </div>
+                            {responsibilityText && (
+                              <div className="mt-1 text-[11px] font-semibold text-violet-700 dark:text-violet-200">
+                                খরচের দায়িত্ব: {responsibilityText}
+                              </div>
+                            )}
+                            {managedRecord && (
+                              <div className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">এটি যেই পেজে দেওয়া হয়েছে, সেখান থেকে সংশোধন করুন</div>
+                            )}
                             {it.note ? (
                               <div className="mt-2 max-w-full truncate rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-white/5 dark:text-slate-400 sm:rounded-2xl sm:text-sm" title={it.note}>
                                 {it.note}
@@ -2167,15 +1969,17 @@ export default function Ledger() {
                           <div className="mt-2 flex items-center justify-end gap-1.5 sm:gap-2">
                             <button
                               onClick={() => openEditModal(it)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 sm:gap-1.5 sm:rounded-xl sm:px-3 sm:py-1.5 sm:text-xs"
+                              disabled={managedRecord}
+                              className="disabled:cursor-not-allowed disabled:opacity-40 inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 sm:gap-1.5 sm:rounded-xl sm:px-3 sm:py-1.5 sm:text-xs"
                             >
-                              <Icon name="edit" className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Edit</span>
+                              <Icon name="edit" className="h-3.5 w-3.5" /> <span className="hidden sm:inline">সম্পাদনা</span>
                             </button>
                             <button
                               onClick={() => deleteTx(it._id)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200 sm:gap-1.5 sm:rounded-xl sm:px-3 sm:py-1.5 sm:text-xs"
+                              disabled={managedRecord}
+                              className="disabled:cursor-not-allowed disabled:opacity-40 inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200 sm:gap-1.5 sm:rounded-xl sm:px-3 sm:py-1.5 sm:text-xs"
                             >
-                              <Icon name="trash" className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Delete</span>
+                              <Icon name="trash" className="h-3.5 w-3.5" /> <span className="hidden sm:inline">মুছুন</span>
                             </button>
                           </div>
                         </div>
@@ -2190,8 +1994,8 @@ export default function Ledger() {
 
         <ConfirmModal
           open={confirmOpen}
-          title="Delete Transaction"
-          message="Are you sure you want to delete this transaction?"
+          title="হিসাব মুছে ফেলবেন?"
+          message="আপনি কি নিশ্চিত এই হিসাবটি মুছতে চান?"
           onCancel={() => setConfirmOpen(false)}
           onConfirm={handleConfirmDelete}
         />
@@ -2210,7 +2014,7 @@ export default function Ledger() {
                     </div>
 
                     <h3 className="pt-1 text-lg font-black text-slate-950 dark:text-white sm:pt-0 sm:text-xl">
-                      {isEditing ? "Edit Transaction" : "Add Transaction"}
+                      {isEditing ? "Edit Transaction" : "নতুন হিসাব"}
                     </h3>
 
                     <p className="mt-1 hidden text-sm leading-5 text-slate-500 dark:text-slate-400 sm:block">
@@ -2222,7 +2026,7 @@ export default function Ledger() {
                     type="button"
                     onClick={closeModal}
                     className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-lg font-black leading-none text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
-                    aria-label="Close"
+                    aria-label="বন্ধ করুন"
                   >
                     ×
                   </button>
@@ -2238,17 +2042,17 @@ export default function Ledger() {
 
                     <div>
                       <h4 className="text-base font-black text-slate-950 dark:text-white">
-                        Transaction Information
+                        কেনাকাটার তথ্য
                       </h4>
                       <p className="hidden text-sm text-slate-500 dark:text-slate-400 sm:block">
-                        Keep the form compact and readable in both mobile and desktop.
+                        প্রয়োজনীয় তথ্য দিয়ে নতুন হিসাব যোগ করুন।
                       </p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 sm:gap-4">
                     <div>
-                      <FieldLabel>Type</FieldLabel>
+                      <FieldLabel>ধরন</FieldLabel>
                       <FieldSelect
                         value={form.txType}
                         onChange={(e) => {
@@ -2294,14 +2098,14 @@ export default function Ledger() {
                           });
                         }}
                       >
-                        <option value="income">Income</option>
-                        <option value="expense">Expense</option>
-                        <option value="transfer">Transfer</option>
+                        <option value="income">আয়</option>
+                        <option value="expense">খরচ</option>
+                        <option value="transfer">টাকা আদান-প্রদান</option>
                       </FieldSelect>
                     </div>
 
                     <div>
-                      <FieldLabel>Date</FieldLabel>
+                      <FieldLabel>তারিখ</FieldLabel>
                       <div className="relative">
                         <FieldInput
                           type="date"
@@ -2325,12 +2129,12 @@ export default function Ledger() {
 
                     {showCategory && (
                       <div className="md:col-span-2">
-                        <FieldLabel>Category</FieldLabel>
+                        <FieldLabel>খরচের ধরন</FieldLabel>
                         <FieldSelect
                           value={form.categoryId}
                           onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
                         >
-                          <option value="">Select category</option>
+                          <option value="">ধরন বাছুন</option>
 
                           {visibleCategoryList.map((c) => (
                             <option key={c._id} value={c._id}>
@@ -2343,7 +2147,7 @@ export default function Ledger() {
 
                     {form.txType === "expense" && (
                       <div className="md:col-span-2">
-                        <FieldLabel>Paid By</FieldLabel>
+                        <FieldLabel>টাকা দিয়েছেন</FieldLabel>
                         <FieldSelect
                           value={form.paymentMode === "split" ? "__split__" : form.paidByUserId}
                           onChange={(e) => {
@@ -2385,25 +2189,25 @@ export default function Ledger() {
                             });
                           }}
                         >
-                          <option value="">Select member</option>
+                          <option value="">সদস্য বাছুন</option>
                           {members.map((m) => (
                             <option key={getId(m)} value={getId(m)}>
                               {m.name}
                             </option>
                           ))}
-                          <option value="__split__">Split Payment</option>
+                          <option value="__split__">যৌথ পরিশোধ</option>
                         </FieldSelect>
                       </div>
                     )}
 
                     {showFrom && (
                       <div className="md:col-span-2">
-                        <FieldLabel>From Account</FieldLabel>
+                        <FieldLabel>যে অ্যাকাউন্ট থেকে</FieldLabel>
                         <FieldSelect
                           value={form.fromAccountId}
                           onChange={(e) => setForm({ ...form, fromAccountId: e.target.value })}
                         >
-                          <option value="">Select account</option>
+                          <option value="">অ্যাকাউন্ট বাছুন</option>
 
                           {fromAccountOptions.map((a) => (
                             <option key={a._id} value={a._id}>
@@ -2418,10 +2222,10 @@ export default function Ledger() {
                       <div className="md:col-span-2 rounded-[1.25rem] border border-emerald-100 bg-emerald-50/70 p-3 dark:border-emerald-500/20 dark:bg-emerald-500/10 sm:rounded-[1.5rem] sm:p-4">
                         <div className="mb-3">
                           <div className="font-black text-slate-950 dark:text-white">
-                            Split Payment Sources
+                            কে কত টাকা দিয়েছেন
                           </div>
                           <div className="text-xs text-slate-500 dark:text-slate-400">
-                            Select which account each member paid from and how much they paid.
+                            যে যার অ্যাকাউন্ট থেকে কত দিয়েছেন, তা লিখুন।
                           </div>
                         </div>
 
@@ -2436,19 +2240,19 @@ export default function Ledger() {
                                 className="grid grid-cols-1 gap-3 rounded-2xl border border-white/70 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.04] sm:grid-cols-[1fr_1.3fr_1fr]"
                               >
                                 <div>
-                                  <FieldLabel>Member</FieldLabel>
+                                  <FieldLabel>সদস্য</FieldLabel>
                                   <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700 dark:border-white/10 dark:bg-slate-950/60 dark:text-slate-200 sm:rounded-2xl sm:px-4 sm:py-2.5 sm:text-sm">
                                     {member?.name || "Member"}
                                   </div>
                                 </div>
 
                                 <div>
-                                  <FieldLabel>Paid From Account</FieldLabel>
+                                  <FieldLabel>যে অ্যাকাউন্ট থেকে দিয়েছেন</FieldLabel>
                                   <FieldSelect
                                     value={part.accountId || ""}
                                     onChange={(e) => setPaymentPart(index, "accountId", e.target.value)}
                                   >
-                                    <option value="">Select account</option>
+                                    <option value="">অ্যাকাউন্ট বাছুন</option>
                                     {accountOptions.map((a) => (
                                       <option key={a._id} value={a._id}>
                                         {a.name}
@@ -2458,7 +2262,7 @@ export default function Ledger() {
                                 </div>
 
                                 <div>
-                                  <FieldLabel>Paid Amount</FieldLabel>
+                                  <FieldLabel>দেওয়া টাকা</FieldLabel>
                                   <FieldInput
                                     type="number"
                                     value={part.amount || ""}
@@ -2472,16 +2276,16 @@ export default function Ledger() {
                         </div>
 
                         <div className="mt-3 rounded-2xl bg-white/70 p-3 text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">
-                          Total paid: <b>{money(getPaymentPartsTotal(form.paymentParts))}</b>
+                          মোট পরিশোধ: <b>{money(getPaymentPartsTotal(form.paymentParts))}</b>
                           <span className="mx-2">•</span>
-                          Transaction amount: <b>{money(form.amount)}</b>
+                          মোট খরচ: <b>{money(form.amount)}</b>
                         </div>
                       </div>
                     )}
 
                     {form.txType === "income" && (
                       <div className="md:col-span-2">
-                        <FieldLabel>Received By</FieldLabel>
+                        <FieldLabel>পেয়েছেন</FieldLabel>
                         <FieldSelect
                           value={form.receivedByUserId}
                           onChange={(e) => {
@@ -2501,7 +2305,7 @@ export default function Ledger() {
                             });
                           }}
                         >
-                          <option value="">Select member</option>
+                          <option value="">সদস্য বাছুন</option>
                           {members.map((m) => (
                             <option key={getId(m)} value={getId(m)}>
                               {m.name}
@@ -2513,12 +2317,12 @@ export default function Ledger() {
 
                     {showTo && (
                       <div className="md:col-span-2">
-                        <FieldLabel>To Account</FieldLabel>
+                        <FieldLabel>যে অ্যাকাউন্টে</FieldLabel>
                         <FieldSelect
                           value={form.toAccountId}
                           onChange={(e) => setForm({ ...form, toAccountId: e.target.value })}
                         >
-                          <option value="">Select account</option>
+                          <option value="">অ্যাকাউন্ট বাছুন</option>
 
                           {toAccountOptions.map((a) => (
                             <option key={a._id} value={a._id}>
@@ -2530,7 +2334,7 @@ export default function Ledger() {
                     )}
 
                     <div className="md:col-span-2">
-                      <FieldLabel>Amount</FieldLabel>
+                      <FieldLabel>টাকা</FieldLabel>
                       <FieldInput
                         type="number"
                         value={form.amount}
@@ -2552,7 +2356,7 @@ export default function Ledger() {
                       />
                       {form.txType === "expense" && form.paymentMode === "split" ? (
                         <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                          This amount is automatically calculated from the member-wise paid amounts above.
+                          দুজনের দেওয়া টাকা যোগ করে মোট হিসাব হবে।
                         </p>
                       ) : null}
                     </div>
@@ -2562,38 +2366,38 @@ export default function Ledger() {
                         <div className="mb-3 flex items-center justify-between gap-3">
                           <div>
                             <div className="font-black text-slate-950 dark:text-white">
-                              Split Details
+                              খরচের ভাগ
                             </div>
                             <div className="text-xs text-slate-500 dark:text-slate-400">
-                              Select how this expense should affect personal remaining.
+                              এই খরচ কার কতটা, তা বাছুন।
                             </div>
                           </div>
                         </div>
 
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                           <div className="sm:col-span-2">
-                            <FieldLabel>Split Type</FieldLabel>
+                            <FieldLabel>খরচ ভাগ হবে</FieldLabel>
                             <FieldSelect
                               value={form.splitType}
                               onChange={(e) => setForm({ ...form, splitType: e.target.value })}
                             >
-                              <option value="personal">Personal</option>
-                              <option value="equal">Equal</option>
-                              <option value="ratio">Ratio</option>
-                              <option value="fixed">Fixed Amount</option>
+                              <option value="personal">ব্যক্তিগত</option>
+                              <option value="equal">সমান</option>
+                              <option value="ratio">অনুপাত অনুযায়ী</option>
+                              <option value="fixed">নির্দিষ্ট টাকা</option>
                             </FieldSelect>
                           </div>
 
                           {form.splitType === "personal" && (
                             <div className="sm:col-span-2">
-                              <FieldLabel>Personal For</FieldLabel>
+                              <FieldLabel>কার জন্য</FieldLabel>
                               <FieldSelect
                                 value={form.personalUserId}
                                 onChange={(e) =>
                                   setForm({ ...form, personalUserId: e.target.value })
                                 }
                               >
-                                <option value="">Select member</option>
+                                <option value="">সদস্য বাছুন</option>
                                 {members.map((m) => (
                                   <option key={getId(m)} value={getId(m)}>
                                     {m.name}
@@ -2606,7 +2410,7 @@ export default function Ledger() {
                           {form.splitType === "ratio" && otherMember && (
                             <>
                               <div>
-                                <FieldLabel>My %</FieldLabel>
+                                <FieldLabel>আমার শতাংশ</FieldLabel>
                                 <FieldInput
                                   type="number"
                                   value={form.ratioMe}
@@ -2628,7 +2432,7 @@ export default function Ledger() {
                               </div>
 
                               <div className="sm:col-span-2 text-xs text-slate-500 dark:text-slate-400">
-                                Ratio total must be exactly 100.
+                                মোট শতাংশ ১০০ হতে হবে।
                               </div>
                             </>
                           )}
@@ -2636,7 +2440,7 @@ export default function Ledger() {
                           {form.splitType === "fixed" && otherMember && (
                             <>
                               <div>
-                                <FieldLabel>My Amount</FieldLabel>
+                                <FieldLabel>আমার ভাগ</FieldLabel>
                                 <FieldInput
                                   type="number"
                                   value={form.fixedMe}
@@ -2648,7 +2452,7 @@ export default function Ledger() {
                               </div>
 
                               <div>
-                                <FieldLabel>{otherMember.name} Amount</FieldLabel>
+                                <FieldLabel>{otherMember.name} টাকা</FieldLabel>
                                 <FieldInput
                                   type="number"
                                   value={form.fixedOther}
@@ -2660,14 +2464,14 @@ export default function Ledger() {
                               </div>
 
                               <div className="sm:col-span-2 text-xs text-slate-500 dark:text-slate-400">
-                                Fixed amounts must be equal to the total expense amount.
+                                ভাগের মোট টাকা পুরো খরচের সমান হতে হবে।
                               </div>
                             </>
                           )}
 
                           {form.splitType === "equal" && (
                             <div className="sm:col-span-2 rounded-2xl bg-white/80 p-3 text-xs leading-5 text-slate-500 dark:bg-white/5 dark:text-slate-400">
-                              The expense will be shared equally among all family members.
+                              সবার মধ্যে সমানভাবে খরচ ভাগ হবে।
                             </div>
                           )}
                         </div>
@@ -2675,7 +2479,7 @@ export default function Ledger() {
                     )}
 
                     <div className="md:col-span-2">
-                      <FieldLabel>Note</FieldLabel>
+                      <FieldLabel>মন্তব্য</FieldLabel>
                       <FieldInput
                         value={form.note}
                         onChange={(e) => setForm({ ...form, note: e.target.value })}
@@ -2741,7 +2545,7 @@ export default function Ledger() {
                     onClick={closeModal}
                     className="order-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 sm:order-1 sm:w-auto sm:px-5 sm:text-sm"
                   >
-                    Cancel
+                    বাতিল
                   </button>
                 </div>
               </div>
@@ -2749,6 +2553,7 @@ export default function Ledger() {
           </div>
         )}
       </div>
+          </div>
     </AppLayout>
   );
 }

@@ -327,6 +327,25 @@ export default function IndividualSummary() {
     }
   }
 
+  async function exportMonthlyExcel() {
+    try {
+      setError("");
+      const response = await api.get("/api/export/monthly-summary", {
+        params: { month }, responseType: "blob",
+      });
+      const blobUrl = URL.createObjectURL(response.data);
+      const anchor = document.createElement("a");
+      anchor.href = blobUrl;
+      anchor.download = `Monthly_Financial_Report_${month}.xlsx`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+      setError("Could not download the monthly report. Check that the updated server is running.");
+    }
+  }
+
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -386,7 +405,7 @@ export default function IndividualSummary() {
 
                 <h2 className="text-[1.65rem] font-black tracking-tight sm:text-3xl lg:text-4xl">Member-wise Monthly Picture</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-cyan-50/90 sm:text-base">
-                  See each member’s income, expense responsibility, actual paid amount, cash remaining, top categories, and top 10 expenses for the selected month.
+                  Compare each member’s budget responsibility, recorded payments, this month’s actual cash change, and closing account balances. Large-purchase schedules are not additional bank payments.
                 </p>
               </div>
 
@@ -399,7 +418,7 @@ export default function IndividualSummary() {
                 <div className="rounded-[24px] border border-white/15 bg-white/12 p-4 shadow-inner shadow-white/5 backdrop-blur-xl">
                   <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-cyan-50/80">Strongest cash</div>
                   <div className="mt-1 truncate text-xl font-black">{data?.family?.strongestCash?.name || "-"}</div>
-                  <div className="mt-1 text-xs text-cyan-50/80">{bdt(data?.family?.strongestCash?.amount || 0)}</div>
+                  <div className="mt-1 text-xs text-cyan-50/80">{bdt(data?.family?.strongestCash?.amount || 0)} · recorded cash balance</div>
                 </div>
               </div>
             </div>
@@ -452,6 +471,10 @@ export default function IndividualSummary() {
                   <Icon name="refresh" className="h-4 w-4" />
                   {loading ? "Loading" : "Refresh"}
                 </button>
+                <button type="button" onClick={exportMonthlyExcel}
+                  className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-xs font-black text-cyan-900 hover:bg-cyan-100 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-100">
+                  Export monthly Excel
+                </button>
               </div>
             </div>
           </section>
@@ -468,25 +491,31 @@ export default function IndividualSummary() {
             <EmptyChart text="No family member data found for this month." />
           ) : (
             <>
-              <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-                <StatCard title="Income" value={bdt(selectedUser.summary?.income)} sub="Received this month" icon="cash" tone="emerald" />
-                <StatCard title="Spent" value={bdt(selectedUser.summary?.spent)} sub="Own expense share" icon="chart" tone="rose" />
-                <StatCard title="Actually Paid" value={bdt(selectedUser.summary?.paid)} sub="Paid from this member" icon="wallet" tone="amber" />
+              <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+                <StatCard title="Budget Income" value={bdt(selectedUser.summary?.income)} sub="Allocated income share" icon="cash" tone="emerald" />
+                <StatCard title="Budget Expense Share" value={bdt(selectedUser.summary?.spent)} sub="Includes scheduled large purchases" icon="chart" tone="rose" />
+                <StatCard title="Ledger Payments" value={bdt(selectedUser.summary?.paid)} sub="Funded posted regular expenses" icon="wallet" tone="amber" />
+                <StatCard title="This Month's Cash Change" value={bdt(selectedUser.summary?.monthlyCashRemaining)} sub="Received less actual payments/deposits, including transfers" icon="cash" tone={Number(selectedUser.summary?.monthlyCashRemaining || 0) >= 0 ? "emerald" : "rose"} />
                 <StatCard
-                  title="Cash Remaining"
+                  title="Total Recorded Cash"
                   value={bdt(selectedUser.summary?.cashRemaining)}
-                  sub="Cash, bank, wallet accounts"
+                  sub="Includes earlier months, personal accounts"
                   icon="cash"
                   tone="cyan"
                 />
                 <StatCard
-                  title="Net Remaining"
+                  title="Budget Remaining"
                   value={bdt(selectedUser.summary?.netRemaining)}
-                  sub="Income minus own spending"
+                  sub="Budget income minus personal allocation; excludes savings"
                   icon="arrow"
                   tone={Number(selectedUser.summary?.netRemaining || 0) >= 0 ? "emerald" : "rose"}
                 />
               </section>
+
+              <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-xs font-semibold leading-6 text-cyan-900 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-100">
+                This month’s cash change comes from posted account transactions. Budget expense share includes {bdt(selectedUser.summary?.sharedPurchaseAllocation)} in scheduled large purchases and is not the same as cash paid. The settlement below covers ordinary expense sharing only; Wallet also handles outstanding Shared Purchase reimbursements.
+                {data?.issues?.length > 0 ? ` ${data.issues.length} reconciliation warning(s) should be reviewed.` : ''}
+              </div>
 
               <section className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {users.map((user) => (
@@ -495,7 +524,7 @@ export default function IndividualSummary() {
               </section>
 
               <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-                <SectionCard title="Expense Type Split" subtitle="Fixed, grocery, EMI, remaining and investment-wise spending." icon="chart" tone="violet">
+                <SectionCard title="Expense Type Split" subtitle="Allocated budget share, including large purchases, not actual bank debits." icon="chart" tone="violet">
                   {expenseTypeData.length ? (
                     <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr] xl:grid-cols-1 2xl:grid-cols-[1fr_0.9fr]">
                       <div className="h-[250px] min-w-0">
@@ -563,13 +592,13 @@ export default function IndividualSummary() {
                   )}
                 </SectionCard>
 
-                <SectionCard className="xl:col-span-2" title="Account Position" subtitle={`Balance source: ${data?.accountSource === "closed_month" ? "closed month" : "system calculated"}.`} icon="wallet" tone="amber">
+                <SectionCard className="xl:col-span-2" title="Account Position" subtitle={`Personal account balances · ${data?.accountSource === "closed_month" ? "closed month" : "system calculated"}. Joint accounts excluded.`} icon="wallet" tone="amber">
                   <AccountList accounts={selectedUser.accountBalances} />
                 </SectionCard>
               </section>
 
               <section className="grid grid-cols-1 gap-5 xl:grid-cols-5">
-                <SectionCard className="xl:col-span-3" title="Top 10 Paid Expenses" subtitle="Largest expenses actually paid by this member, regardless of who shared the cost." icon="cash" tone="rose">
+                <SectionCard className="xl:col-span-3" title="Top 10 Ledger Payments" subtitle="Posted regular expenses funded by this member. Large-purchase allocations are shown separately, not as cash." icon="cash" tone="rose">
                   <div className="overflow-hidden rounded-3xl border border-slate-200/70 dark:border-white/10">
                     <div className={`max-h-[460px] overflow-auto overscroll-contain ${hiddenScrollbarClass}`}>
                       <table className="min-w-full text-left text-sm">
@@ -623,7 +652,7 @@ export default function IndividualSummary() {
                         <div className={`mt-1 text-lg font-black ${Number(selectedUser.summary?.settlementPosition || 0) >= 0 ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300"}`}>
                           {bdt(selectedUser.summary?.settlementPosition)}
                         </div>
-                        <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">Paid - own share</p>
+                        <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">Ordinary shared expenses only; excludes managed installment obligations</p>
                       </div>
                       <div className="rounded-3xl bg-slate-100 p-4 dark:bg-white/5">
                         <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Avg / Day</div>

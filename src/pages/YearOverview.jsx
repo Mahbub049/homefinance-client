@@ -245,6 +245,29 @@ export default function YearOverview() {
     }
   }
 
+  function downloadYearCsv() {
+    if (!months.length) return;
+    const columns = [
+      ["month", "Month"], ["income", "Budget income"], ["expense", "Budget expenses"],
+      ["sharedAllocation", "Scheduled shared purchases"], ["budgetRemaining", "Budget remaining"],
+      ["cashIncome", "Cash income received"], ["cashExpenses", "Actual expenses paid"],
+      ["netCashflow", "Actual monthly cash change"], ["savingsIn", "Savings deposited"],
+      ["savingsOut", "Savings withdrawn"], ["openingBalance", "Opening cash"],
+      ["closingBalance", "Closing cash"], ["warningCount", "Warnings"],
+    ];
+    const csvCell = (v) => `"${String(v ?? "").replaceAll('"', '""')}"`;
+    const csv = [columns.map(([, title]) => csvCell(title)).join(","),
+      ...months.map((item) => columns.map(([field]) => csvCell(item[field])).join(","))].join("\r\n");
+    const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `HomeFinance_Year_Overview_${year}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
+
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -272,13 +295,14 @@ export default function YearOverview() {
   }, [months]);
 
   const analytics = useMemo(() => {
-    const activeMonths = months.length || 1;
+    const observedMonths = months.filter((m) => !m.isFuture);
+    const activeMonths = observedMonths.length || 1;
     const income = safeNum(totals.income);
     const expense = safeNum(totals.expense);
     const net = safeNum(totals.netCashflow);
     const savingsGrowth = safeNum(totals.savingsGrowth);
 
-    const bestNetMonth = months.reduce(
+    const bestNetMonth = observedMonths.reduce(
       (best, current) =>
         safeNum(current.netCashflow) > safeNum(best?.netCashflow)
           ? current
@@ -286,7 +310,7 @@ export default function YearOverview() {
       months[0] || null
     );
 
-    const lowestNetMonth = months.reduce(
+    const lowestNetMonth = observedMonths.reduce(
       (worst, current) =>
         safeNum(current.netCashflow) < safeNum(worst?.netCashflow)
           ? current
@@ -306,7 +330,7 @@ export default function YearOverview() {
       months[0] || null
     );
 
-    const positiveMonths = months.filter(
+    const positiveMonths = observedMonths.filter(
       (m) => safeNum(m.netCashflow) >= 0
     ).length;
 
@@ -348,12 +372,12 @@ export default function YearOverview() {
               </h2>
 
               <p className="mt-3 max-w-3xl text-sm leading-6 text-white/80 sm:text-base">
-                Review income, expenses, savings movement, net cashflow, and
-                month-by-month performance in one clean view.
+                Compare monthly budget allocations with actual cash movements, savings deposits,
+                and reconciled account balances. Opening the report never changes transactions.
               </p>
             </div>
 
-            <div className="relative z-[9999] grid w-full grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] xl:w-auto">
+            <div className="relative z-[9999] grid w-full grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto] xl:w-auto">
               <YearPicker value={year} onChange={setYear} />
 
               <button
@@ -363,14 +387,18 @@ export default function YearOverview() {
               >
                 {loading ? "Refreshing..." : "Refresh Report"}
               </button>
+              <button type="button" onClick={downloadYearCsv} disabled={!months.length}
+                className="rounded-2xl border border-white/30 bg-white/15 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/25 disabled:opacity-40">
+                Export CSV
+              </button>
             </div>
           </div>
 
           {data && (
             <div className="mt-6 hidden gap-3 md:grid md:grid-cols-2 xl:grid-cols-4">
               <HeroMini label="Total income" value={tk(totals.income)} />
-              <HeroMini label="Total expense" value={tk(totals.expense)} />
-              <HeroMini label="Net cashflow" value={tk(totals.netCashflow)} />
+              <HeroMini label="Budget expenses" value={tk(totals.expense)} />
+              <HeroMini label="Actual cash change" value={tk(totals.netCashflow)} />
               <HeroMini
                 label="Savings rate"
                 value={`${fmt(totals.savingsRate)}%`}
@@ -378,6 +406,20 @@ export default function YearOverview() {
             </div>
           )}
         </section>
+
+        {data && (
+          <div className="mb-5 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900 dark:border-indigo-400/20 dark:bg-indigo-400/10 dark:text-indigo-100">
+            <div className="font-black">Budget is not cash · {year} reporting</div>
+            <p className="mt-1 leading-6">Budget expenses include each member’s scheduled large-purchase allocation, even before repayment. Actual cash change includes only money that moved through tracked liquid accounts, including EMI and savings deposits. Internal transfers never create household income or spending.</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+              <div><span className="block text-xs opacity-75">Actual cash change</span><strong>{tk(totals.netCashflow)}</strong></div>
+              <div><span className="block text-xs opacity-75">Budget remaining</span><strong>{tk(totals.budgetRemaining)}</strong></div>
+              <div><span className="block text-xs opacity-75">Scheduled large purchases</span><strong>{tk(totals.sharedAllocation)}</strong></div>
+              <div><span className="block text-xs opacity-75">Cash repayments / outflows</span><strong>{tk(totals.cashExpenses)}</strong></div>
+            </div>
+            {totals.warningCount > 0 && <p className="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-200">{totals.warningCount} calculation or account-reconciliation warning(s) require review before trusting historical account balances.</p>}
+          </div>
+        )}
 
         {msg && (
           <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 shadow-sm dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200">
@@ -406,21 +448,21 @@ export default function YearOverview() {
               />
 
               <StatCard
-                title="Total Expense"
+                title="Budget Expense Allocations"
                 value={tk(totals.expense)}
                 subtitle={`${analytics.expenseRatio}% of yearly income`}
                 tone="expense"
               />
 
               <StatCard
-                title="Net Cashflow"
+                title="Actual Cash Change"
                 value={tk(totals.netCashflow)}
                 subtitle={`${analytics.positiveMonths}/${months.length || 0} positive months`}
                 tone={safeNum(totals.netCashflow) >= 0 ? "positive" : "danger"}
               />
 
               <StatCard
-                title="Savings Growth"
+                title="Net Savings Deposits"
                 value={tk(totals.savingsGrowth)}
                 subtitle={`Savings rate ${fmt(totals.savingsRate)}%`}
                 tone="savings"
@@ -429,8 +471,8 @@ export default function YearOverview() {
 
             <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-3">
               <Panel
-                title="Yearly Cashflow Trend"
-                subtitle="Income, expense, and net movement across the full year"
+                title="Budget vs Cash Movement"
+                subtitle="Budget income and allocated expenses are planning figures; cash change reflects posted payments and deposits."
                 className="xl:col-span-2"
               >
                 {chartData.length === 0 ? (
@@ -504,7 +546,7 @@ export default function YearOverview() {
                         <Area
                           type="monotone"
                           dataKey="income"
-                          name="Income"
+                          name="Budget Income"
                           stroke="#10b981"
                           fill="url(#incomeFill)"
                           strokeWidth={3}
@@ -513,7 +555,7 @@ export default function YearOverview() {
                         <Area
                           type="monotone"
                           dataKey="expense"
-                          name="Expense"
+                          name="Budget Expenses"
                           stroke="#fb7185"
                           fill="url(#expenseFill)"
                           strokeWidth={3}
@@ -521,7 +563,7 @@ export default function YearOverview() {
                         />
                         <Bar
                           dataKey="netCashflow"
-                          name="Net Cashflow"
+                          name="Actual Cash Change"
                           fill="#6366f1"
                           radius={[8, 8, 0, 0]}
                           barSize={22}
@@ -548,7 +590,7 @@ export default function YearOverview() {
                   />
 
                   <HealthBar
-                    label="Net Cashflow Ratio"
+                    label="Monthly Cash Change Ratio"
                     value={analytics.netRatio}
                     helper="Positive means surplus"
                     tone={
@@ -583,7 +625,7 @@ export default function YearOverview() {
                   />
 
                   <InsightCard
-                    label="Highest expense"
+                    label="Highest allocated budget expense"
                     title={analytics.highestExpenseMonth?.month || "-"}
                     value={tk(analytics.highestExpenseMonth?.expense)}
                     tone="rose"
@@ -740,15 +782,15 @@ export default function YearOverview() {
                     <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-400">
                       <th className="p-4">Month</th>
                       <th className="p-4">Income</th>
-                      <th className="p-4">Expense</th>
-                      <th className="p-4">Transfers</th>
-                      <th className="p-4">Net Cashflow</th>
-                      <th className="p-4">Savings In</th>
-                      <th className="p-4">Savings Out</th>
-                      <th className="p-4">Savings Growth</th>
+                      <th className="p-4">Budget expenses</th>
+                      <th className="p-4">Transfers (gross)</th>
+                      <th className="p-4">Actual cash change</th>
+                      <th className="p-4">Deposited</th>
+                      <th className="p-4">Withdrawn</th>
+                      <th className="p-4">Net deposits</th>
                       <th className="p-4">Savings %</th>
-                      <th className="p-4">Opening</th>
-                      <th className="p-4">Closing</th>
+                      <th className="p-4">Opening cash</th>
+                      <th className="p-4">Closing cash</th>
                     </tr>
                   </thead>
 
@@ -829,9 +871,9 @@ export default function YearOverview() {
 
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <TotalMini label="Income" value={totals.income} />
-                    <TotalMini label="Expense" value={totals.expense} />
-                    <TotalMini label="Net" value={totals.netCashflow} />
-                    <TotalMini label="Growth" value={totals.savingsGrowth} />
+                    <TotalMini label="Budget Expenses" value={totals.expense} />
+                    <TotalMini label="Cash Change" value={totals.netCashflow} />
+                    <TotalMini label="Net Deposits" value={totals.savingsGrowth} />
 
                     <div className="rounded-2xl border border-white/60 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                       <div className="text-xs text-slate-500 dark:text-slate-400">
@@ -992,7 +1034,7 @@ function MonthCard({ month }) {
   const net = safeNum(month.netCashflow);
   const savingsRate = safeNum(month.savingsRate);
   const expensePct =
-    income > 0 ? Math.min(100, Math.round((expense / income) * 100)) : 0;
+    income > 0 ? Math.round((expense / income) * 100) : 0;
   const positive = net >= 0;
 
   return (
@@ -1003,7 +1045,7 @@ function MonthCard({ month }) {
             {month.month}
           </div>
           <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {positive ? "Surplus month" : "Deficit month"}
+            {month.isFuture ? "Future / not yet paid" : positive ? "Cash surplus" : "Cash deficit"}
           </div>
         </div>
 
@@ -1020,7 +1062,7 @@ function MonthCard({ month }) {
 
       <div className="grid grid-cols-2 gap-3 text-sm">
         <Mini label="Income" value={income} />
-        <Mini label="Expense" value={expense} />
+        <Mini label="Budget Expense" value={expense} />
         <Mini label="Savings Growth" value={month.savingsGrowth} />
 
         <div className="rounded-2xl border border-slate-100 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
@@ -1035,7 +1077,7 @@ function MonthCard({ month }) {
 
       <div className="mt-4">
         <div className="mb-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
-          <span>Expense vs Income</span>
+          <span>Budget expenses vs income</span>
           <span>{expensePct}%</span>
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
@@ -1046,7 +1088,7 @@ function MonthCard({ month }) {
                 ? "bg-amber-500"
                 : "bg-rose-500"
               }`}
-            style={{ width: `${expensePct}%` }}
+            style={{ width: `${Math.min(100, Math.max(0, expensePct))}%` }}
           />
         </div>
       </div>
@@ -1089,9 +1131,9 @@ function MobileBreakdownCard({ month }) {
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         <Mini label="Income" value={income} />
-        <Mini label="Expense" value={expense} />
-        <Mini label="Net" value={net} color />
-        <Mini label="Growth" value={growth} color />
+        <Mini label="Budget Expense" value={expense} />
+        <Mini label="Cash Change" value={net} color />
+        <Mini label="Net Deposits" value={growth} color />
       </div>
 
       {closing !== null && (

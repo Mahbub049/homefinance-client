@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import HFPageLead from "../components/design/HFPageLead";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AppLayout from "../components/layout/AppLayout";
 import api from "../services/api";
 import { getUser } from "../services/authStorage";
@@ -364,7 +365,7 @@ function SmartTextDropdown({
           )}
 
           <div className="mt-2 border-t border-slate-100 px-3 pt-2 text-[11px] font-bold text-slate-400 dark:border-white/10 dark:text-slate-500">
-            You can also type manually.
+            চাইলে নিজে লিখতে পারবেন।
           </div>
         </div>
       )}
@@ -373,12 +374,16 @@ function SmartTextDropdown({
 }
 
 export default function Grocery() {
+  const [hfMore, setHfMore] = useState(false);
   const me = getUser();
   const currentUserId = String(me?.id || me?._id || "");
 
   const [month, setMonth] = useState(monthNow());
   const [day, setDay] = useState(dayNow());
   const [msg, setMsg] = useState("");
+  const [savingTxn, setSavingTxn] = useState(false);
+  const savingTxnInFlight = useRef(false);
+  const groceryAttempt = useRef(null);
 
   const [members, setMembers] = useState([]);
   const [expenseCats, setExpenseCats] = useState([]);
@@ -963,6 +968,7 @@ export default function Grocery() {
   }
 
   function openModal() {
+    groceryAttempt.current = null;
     setMsg("");
     setIsEditing(false);
     setEditId(null);
@@ -973,6 +979,7 @@ export default function Grocery() {
   }
 
   function openEditModal(txn) {
+    groceryAttempt.current = null;
     setMsg("");
     setIsEditing(true);
     setEditId(txn._id);
@@ -1031,6 +1038,7 @@ export default function Grocery() {
   }
 
   function closeModal() {
+    groceryAttempt.current = null;
     setOpen(false);
     setIsEditing(false);
     setEditId(null);
@@ -1157,6 +1165,9 @@ export default function Grocery() {
   }
 
   async function saveTxn() {
+    if (savingTxnInFlight.current) return;
+    savingTxnInFlight.current = true;
+    setSavingTxn(true);
     setMsg("");
     try {
       if (!form.categoryId) return setMsg("Select expense category");
@@ -1239,7 +1250,13 @@ export default function Grocery() {
       if (isEditing && editId) {
         await api.put(`/api/grocery/${editId}`, payload);
       } else {
-        await api.post("/api/grocery", payload);
+        const fingerprint = JSON.stringify(payload);
+        if (!groceryAttempt.current || groceryAttempt.current.fingerprint !== fingerprint) {
+          groceryAttempt.current = { fingerprint, key: crypto.randomUUID() };
+        }
+        await api.post("/api/grocery", payload, {
+          headers: { 'Idempotency-Key': groceryAttempt.current.key },
+        });
       }
 
       const nextMonth = String(form.txnDate || "").slice(0, 7);
@@ -1255,8 +1272,11 @@ export default function Grocery() {
       }
     } catch (e) {
       setMsg(
-        e?.response?.data?.message || (isEditing ? "Update failed" : "Save failed")
+        e?.response?.data?.message || (isEditing ? "Update failed" : "Save failed. Retry the same form.")
       );
+    } finally {
+      savingTxnInFlight.current = false;
+      setSavingTxn(false);
     }
   }
 
@@ -1286,131 +1306,33 @@ export default function Grocery() {
 
   return (
     <AppLayout>
+      <div className={`hf-step3-page hf-step3-grocery hf-v2-page hf-v2-grocery ${hfMore ? "hf-step3-expanded" : ""}`}>
+        <HFPageLead title="বাজার" description="কোন দোকান থেকে কী কিনেছেন, তার তালিকা" month={month} onMonthChange={setMonth}
+          metrics={[
+ {label:'এই মাসে বাজার খরচ',value:monthlyStats.monthTotal,primary:true},
+ {label:'কেনাকাটার সংখ্যা',value:monthlyStats.txnCount,kind:'count'}
+]}
+          onAdd={openModal} addLabel="নতুন বাজার"
+          addDisabled={false}
+          onExtra={undefined} extraLabel=""
+          onRefresh={undefined}
+          more={undefined} onToggleMore={undefined} />
+
       <div className="grocery-page min-h-screen w-full max-w-full overflow-x-hidden bg-white px-0 pb-8 text-[13px] text-slate-900 dark:bg-[#020617] dark:text-slate-100 sm:text-sm">
         <ConfirmModal
           open={confirmOpen}
-          title="Delete Grocery Transaction"
-          message="Are you sure you want to delete this grocery transaction?"
+          title="বাজারের হিসাব মুছবেন?"
+          message="আপনি কি নিশ্চিত এই বাজারের হিসাবটি মুছতে চান?"
           onCancel={() => setConfirmOpen(false)}
           onConfirm={handleConfirmDelete}
         />
 
         <div className="space-y-5">
           {/* Hero */}
-          <section className="relative overflow-hidden rounded-[30px] border border-white/60 bg-[radial-gradient(circle_at_top_left,#059669_0%,#065f46_38%,#0f172a_100%)] p-5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.14)] dark:border-white/10 dark:shadow-[0_24px_70px_rgba(0,0,0,0.35)] sm:p-6 lg:p-7">
-            <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/15 blur-3xl" />
-            <div className="absolute -bottom-24 left-12 h-64 w-64 rounded-full bg-emerald-300/20 blur-3xl" />
-            <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(255,255,255,0.12),transparent_45%,rgba(255,255,255,0.07))]" />
-
-            <div className="relative z-10 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-              <div className="max-w-3xl">
-                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-50 ring-1 ring-white/20 backdrop-blur">
-                  <span className="grid h-5 w-5 place-items-center rounded-full bg-white/15">
-                    <Icon name="cart" className="h-3.5 w-3.5" />
-                  </span>
-                  Grocery tracker
-                </div>
-
-                <div className="mt-2 flex items-center justify-between gap-3 sm:mt-0">
-                  <h2 className="min-w-0 text-[1.45rem] font-black tracking-tight sm:text-3xl lg:text-4xl">
-                    Grocery Transactions
-                  </h2>
-
-                  <button
-                    type="button"
-                    onClick={openModal}
-                    className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-2xl bg-white px-3 py-2 text-xs font-black text-emerald-700 shadow-lg shadow-slate-950/10 ring-1 ring-white/30 transition active:scale-95 dark:bg-white dark:text-emerald-700 sm:hidden"
-                  >
-                    <Icon name="plus" className="h-4 w-4" />
-                    Add
-                  </button>
-                </div>
-
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-50/90 sm:text-base">
-                  Track receipt-wise grocery expenses, payable amount, accounts,
-                  and member-wise split records with a clean monthly overview.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:w-[520px]">
-                <div className="rounded-[24px] border border-white/15 bg-white/12 p-4 shadow-inner shadow-white/5 backdrop-blur-xl">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-50/80">
-                        Month Total
-                      </div>
-                      <div className="mt-1 text-2xl font-black">
-                        {bdt(monthlyStats.monthTotal)}
-                      </div>
-                      <div className="mt-1 text-xs text-emerald-50/80">
-                        {monthLabel(month)}
-                      </div>
-                    </div>
-                    <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white/12 ring-1 ring-white/15">
-                      <Icon name="wallet" className="h-5 w-5" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-[24px] border border-white/15 bg-white/12 p-4 shadow-inner shadow-white/5 backdrop-blur-xl">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-50/80">
-                        Selected Day
-                      </div>
-                      <div className="mt-1 text-2xl font-black">
-                        {bdt(monthlyStats.dayTotal)}
-                      </div>
-                      <div className="mt-1 text-xs text-emerald-50/80">
-                        {filteredTxns.length} shown transaction(s)
-                      </div>
-                    </div>
-                    <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white/12 ring-1 ring-white/15">
-                      <Icon name="calendar" className="h-5 w-5" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
+          <></>
 
           {/* Top controls */}
-          <section className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_14px_40px_rgba(15,23,42,0.05)] backdrop-blur dark:border-white/10 dark:bg-slate-900/70 dark:shadow-[0_20px_60px_rgba(0,0,0,0.25)] sm:p-5">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <div>
-                <h3 className="text-lg font-black text-slate-950 dark:text-white">
-                  Control Center
-                </h3>
-                <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
-                  Choose a month and date, then add or review daily grocery records.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 xl:min-w-[660px]">
-                <input
-                  type="month"
-                  className={fieldClass}
-                  value={month}
-                  onChange={(e) => setMonth(e.target.value)}
-                />
-
-                <input
-                  type="date"
-                  value={day}
-                  onChange={(e) => setDay(e.target.value)}
-                  className={fieldClass}
-                />
-
-                <button
-                  onClick={openModal}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)] transition duration-200 hover:-translate-y-0.5 hover:bg-slate-800 active:translate-y-0 dark:bg-white dark:text-slate-950 dark:shadow-[0_14px_30px_rgba(255,255,255,0.08)] dark:hover:bg-slate-100"
-                >
-                  <Icon name="plus" className="h-4 w-4" />
-                  Add Transaction
-                </button>
-              </div>
-            </div>
-          </section>
+          <></>
 
           {msg && (
             <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200">
@@ -1419,82 +1341,12 @@ export default function Grocery() {
           )}
 
           {/* Stats */}
-          <section className="grid grid-cols-1 hidden md:grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="group rounded-[26px] border border-slate-200/70 bg-white p-5 shadow-[0_14px_35px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_22px_45px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900/70 dark:hover:border-emerald-400/25">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-300">
-                    Transactions
-                  </p>
-                  <h4 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">
-                    {monthlyStats.txnCount}
-                  </h4>
-                </div>
-                <IconBox name="receipt" tone="emerald" />
-              </div>
-              <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">
-                Total grocery entries this month
-              </p>
-            </div>
-
-            <div className="group rounded-[26px] border border-slate-200/70 bg-white p-5 shadow-[0_14px_35px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-[0_22px_45px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900/70 dark:hover:border-sky-400/25">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-sky-600 dark:text-sky-300">
-                    Total Items
-                  </p>
-                  <h4 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">
-                    {monthlyStats.totalItemCount}
-                  </h4>
-                </div>
-                <IconBox name="cart" tone="sky" />
-              </div>
-              <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">
-                Item rows recorded in receipts
-              </p>
-            </div>
-
-            <div className="group rounded-[26px] border border-slate-200/70 bg-white p-5 shadow-[0_14px_35px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-violet-200 hover:shadow-[0_22px_45px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900/70 dark:hover:border-violet-400/25">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-violet-600 dark:text-violet-300">
-                    Average
-                  </p>
-                  <h4 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">
-                    {bdt(monthlyStats.avgTxn)}
-                  </h4>
-                </div>
-                <IconBox name="chart" tone="violet" />
-              </div>
-              <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">
-                Average payable per transaction
-              </p>
-            </div>
-
-            <div className="group rounded-[26px] border border-slate-200/70 bg-white p-5 shadow-[0_14px_35px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-[0_22px_45px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900/70 dark:hover:border-amber-400/25">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-amber-600 dark:text-amber-300">
-                    Biggest Bill
-                  </p>
-                  <h4 className="mt-2 truncate text-xl font-black text-slate-950 dark:text-white">
-                    {monthlyStats.biggest
-                      ? bdt(monthlyStats.biggest.totalPayable)
-                      : "৳ 0"}
-                  </h4>
-                </div>
-                <IconBox name="flame" tone="amber" />
-              </div>
-              <p className="mt-3 truncate text-xs font-medium text-slate-500 dark:text-slate-400">
-                {monthlyStats.biggest?.shopName || "No transaction yet"}
-              </p>
-            </div>
-          </section>
+          <></>
 
           {/* Filters */}
           <section className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_14px_40px_rgba(15,23,42,0.05)] backdrop-blur dark:border-white/10 dark:bg-slate-900/70 sm:p-5">
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.5fr_1fr_1fr_auto]">
-              <Field label="Search">
+              <Field label="খুঁজুন">
                 <div className="relative">
                   <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
                     <Icon name="search" className="h-4 w-4" />
@@ -1503,19 +1355,19 @@ export default function Grocery() {
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search shop, item, account, note..."
+                    placeholder="দোকান, জিনিস বা নোট খুঁজুন…"
                     className={`${fieldClass} pl-10`}
                   />
                 </div>
               </Field>
 
-              <Field label="Category">
+              <Field label="খরচের ধরন">
                 <select
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
                   className={fieldClass}
                 >
-                  <option value="">All categories</option>
+                  <option value="">সব ধরন</option>
                   {groceryExpenseCats.map((c) => (
                     <option key={c._id} value={c._id}>
                       {c.name}
@@ -1524,13 +1376,13 @@ export default function Grocery() {
                 </select>
               </Field>
 
-              <Field label="Paid By">
+              <Field label="টাকা দিয়েছেন">
                 <select
                   value={paidByFilter}
                   onChange={(e) => setPaidByFilter(e.target.value)}
                   className={fieldClass}
                 >
-                  <option value="">All members</option>
+                  <option value="">সব সদস্য</option>
                   {members.map((m) => (
                     <option key={getId(m)} value={getId(m)}>
                       {m.name}
@@ -1550,7 +1402,7 @@ export default function Grocery() {
                   }}
                   className="w-full rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-sm font-black text-slate-700 transition duration-200 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.99] dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-200 dark:hover:border-white/20 dark:hover:bg-white/5"
                 >
-                  Today + Reset
+                  আজকের তারিখ
                 </button>
               </div>
             </div>
@@ -1562,16 +1414,16 @@ export default function Grocery() {
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h3 className="text-lg font-black text-slate-950 dark:text-white">
-                    Transactions on {day}
+                    এই দিনের হিসাব {day}
                   </h3>
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Showing {filteredTxns.length} of {dayTxns.length} transaction(s)
+                    দেখাচ্ছে {filteredTxns.length} এর মধ্যে {dayTxns.length} transaction(s)
                     for the selected day.
                   </p>
                 </div>
 
                 <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
-                  Daily total: {bdt(monthlyStats.dayTotal)}
+                  দিনের মোট: {bdt(monthlyStats.dayTotal)}
                 </div>
               </div>
             </div>
@@ -1584,17 +1436,17 @@ export default function Grocery() {
                   <Icon name="cart" className="h-7 w-7" />
                 </div>
                 <h4 className="mt-4 text-lg font-black text-slate-950 dark:text-white">
-                  No grocery data yet
+                  এখনও কোনো বাজার যোগ হয়নি
                 </h4>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  Add your first grocery transaction to start tracking.
+                  প্রথম বাজারের হিসাব যোগ করুন।
                 </p>
                 <button
                   onClick={openModal}
                   className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
                 >
                   <Icon name="plus" className="h-4 w-4" />
-                  Add Transaction
+                  নতুন বাজার
                 </button>
               </div>
             ) : filteredTxns.length === 0 ? (
@@ -1603,10 +1455,10 @@ export default function Grocery() {
                   <Icon name="search" className="h-7 w-7" />
                 </div>
                 <h4 className="mt-4 text-lg font-black text-slate-950 dark:text-white">
-                  No matching transaction
+                  মিলে যায় এমন বাজার নেই
                 </h4>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  Change the date, search text, or filters to see more results.
+                  অন্য তারিখ বা খোঁজার শর্ত বাছুন।
                 </p>
               </div>
             ) : (
@@ -1639,7 +1491,7 @@ export default function Grocery() {
 
                             <div className="shrink-0 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-right dark:border-emerald-400/20 dark:bg-emerald-400/10 md:hidden">
                               <div className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-200">
-                                Total
+                                মোট
                               </div>
                               <div className="text-sm font-black text-slate-950 dark:text-white">
                                 {bdt(t.totalPayable)}
@@ -1653,7 +1505,7 @@ export default function Grocery() {
                           >
                             <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
                               <span className="block text-slate-400 dark:text-slate-500">
-                                Category
+                                খরচের ধরন
                               </span>
                               <strong className="text-slate-800 dark:text-slate-100">
                                 {getName(t.categoryId)}
@@ -1662,7 +1514,7 @@ export default function Grocery() {
 
                             <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
                               <span className="block text-slate-400 dark:text-slate-500">
-                                Paid By
+                                টাকা দিয়েছেন
                               </span>
                               <strong className="text-slate-800 dark:text-slate-100">
                                 {getName(t.paidByUserId)}
@@ -1671,7 +1523,7 @@ export default function Grocery() {
 
                             <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
                               <span className="block text-slate-400 dark:text-slate-500">
-                                From Account
+                                যে অ্যাকাউন্ট থেকে
                               </span>
                               <strong className="text-slate-800 dark:text-slate-100">
                                 {getName(t.fromAccountId)}
@@ -1680,7 +1532,7 @@ export default function Grocery() {
 
                             <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
                               <span className="block text-slate-400 dark:text-slate-500">
-                                Split
+                                ভাগ
                               </span>
                               <strong
                                 className={`inline-flex rounded-full px-2 py-0.5 text-[11px] ring-1 ${splitBadgeClass[splitType] || splitBadgeClass.equal
@@ -1695,7 +1547,7 @@ export default function Grocery() {
                         <div className="flex flex-col gap-2 md:items-end">
                           <div className="hidden rounded-[24px] border border-slate-200 bg-slate-950 px-5 py-4 text-white shadow-[0_18px_35px_rgba(15,23,42,0.16)] dark:border-emerald-400/20 dark:bg-slate-950/80 dark:text-white dark:shadow-[0_18px_35px_rgba(0,0,0,0.35)] md:block">
                             <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-300 dark:text-emerald-200">
-                              Total Payable
+                              মোট পরিশোধ
                             </div>
                             <div className="mt-1 text-2xl font-black">
                               {bdt(t.totalPayable)}
@@ -1708,7 +1560,7 @@ export default function Grocery() {
                               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition duration-200 hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-200 dark:hover:border-white/20 dark:hover:bg-white/5"
                             >
                               <Icon name="edit" className="h-4 w-4" />
-                              Edit
+                              সম্পাদনা
                             </button>
 
                             <button
@@ -1716,7 +1568,7 @@ export default function Grocery() {
                               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-white px-4 py-2 text-sm font-black text-rose-600 transition duration-200 hover:bg-rose-50 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200 dark:hover:bg-rose-400/15"
                             >
                               <Icon name="trash" className="h-4 w-4" />
-                              Delete
+                              মুছুন
                             </button>
                           </div>
                         </div>
@@ -1739,11 +1591,11 @@ export default function Grocery() {
                           <table className="w-full min-w-[680px] text-sm">
                             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/50 dark:text-slate-400">
                               <tr className="text-left">
-                                <th className="p-3">Item</th>
-                                <th className="p-3">Qty</th>
-                                <th className="p-3">Unit</th>
-                                <th className="p-3">Unit Price</th>
-                                <th className="p-3 text-right">Line Total</th>
+                                <th className="p-3">পণ্য</th>
+                                <th className="p-3">পরিমাণ</th>
+                                <th className="p-3">একক</th>
+                                <th className="p-3">একক দাম</th>
+                                <th className="p-3 text-right">মোট দাম</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-white/10">
@@ -1795,28 +1647,28 @@ export default function Grocery() {
 
                         <div className="mt-4 grid grid-cols-1 gap-2 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-4">
                           <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
-                            Subtotal:{" "}
+                            পণ্যের মোট:{" "}
                             <strong className="text-slate-800 dark:text-slate-100">
                               {bdt(t.itemsSubtotal)}
                             </strong>
                           </div>
 
                           <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
-                            Txn Discount:{" "}
+                            ছাড়:{" "}
                             <strong className="text-slate-800 dark:text-slate-100">
                               {bdt(t.discountTotal)}
                             </strong>
                           </div>
 
                           <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
-                            Delivery:{" "}
+                            ডেলিভারি খরচ:{" "}
                             <strong className="text-slate-800 dark:text-slate-100">
                               {bdt(t.deliveryFee)}
                             </strong>
                           </div>
 
                           <div className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-slate-950/40">
-                            VAT:{" "}
+                            ভ্যাট:{" "}
                             <strong className="text-slate-800 dark:text-slate-100">
                               {bdt(t.vatAmount)}
                             </strong>{" "}
@@ -1850,14 +1702,14 @@ export default function Grocery() {
                     </h3>
 
                     <p className="mt-1 hidden text-sm leading-5 text-slate-500 dark:text-slate-400 sm:block">
-                      Add receipt details, account source, item rows, payable total, and split type in one clean form.
+                      বাজারের পণ্য, পরিমাণ, দাম ও কোন অ্যাকাউন্ট থেকে দিয়েছেন তা লিখুন।
                     </p>
                   </div>
 
                   <button
                     onClick={closeModal}
                     className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
-                    aria-label="Close"
+                    aria-label="বন্ধ করুন"
                   >
                     <Icon name="close" className="h-4 w-4" />
                   </button>
@@ -1871,16 +1723,16 @@ export default function Grocery() {
                     <IconBox name="tag" tone="emerald" />
                     <div>
                       <h4 className="text-base font-black text-slate-950 dark:text-white">
-                        Transaction Information
+                        কেনাকাটার তথ্য
                       </h4>
                       <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Keep the top section minimal, readable, and balanced in both themes.
+                        কেনাকাটার প্রয়োজনীয় তথ্য দিন।
                       </p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <Field label="Date">
+                    <Field label="তারিখ">
                       <input
                         type="date"
                         className={fieldClass}
@@ -1891,7 +1743,7 @@ export default function Grocery() {
                       />
                     </Field>
 
-                    <Field label="Shop">
+                    <Field label="দোকান">
                       <SmartTextDropdown
                         value={form.shopName}
                         onTextChange={handleShopNameChange}
@@ -1899,7 +1751,7 @@ export default function Grocery() {
                         options={visibleGroceryShops}
                         open={shopDropdownOpen}
                         setOpen={setShopDropdownOpen}
-                        placeholder="Choose saved shop or type manually"
+                        placeholder="দোকান বেছে নিন বা লিখুন"
                         emptyText="No saved shop found"
                         iconName="bag"
                         getKey={(shop) => shop._id}
@@ -1908,7 +1760,7 @@ export default function Grocery() {
                       />
                     </Field>
 
-                    <Field label="Location">
+                    <Field label="স্থান">
                       <SmartTextDropdown
                         value={form.location}
                         onTextChange={handleLocationChange}
@@ -1916,7 +1768,7 @@ export default function Grocery() {
                         options={visibleGroceryLocations}
                         open={locationDropdownOpen}
                         setOpen={setLocationDropdownOpen}
-                        placeholder="Choose saved location or type manually"
+                        placeholder="স্থান বেছে নিন বা লিখুন"
                         emptyText="No saved location found"
                         iconName="tag"
                         getKey={(location) => location}
@@ -1925,7 +1777,7 @@ export default function Grocery() {
                       />
                     </Field>
 
-                    <Field label="Expense Category">
+                    <Field label="খরচের ধরন">
                       <select
                         className={fieldClass}
                         value={form.categoryId}
@@ -1942,7 +1794,7 @@ export default function Grocery() {
                       </select>
                     </Field>
 
-                    <Field label="Paid By">
+                    <Field label="টাকা দিয়েছেন">
                       <select
                         className={fieldClass}
                         value={form.paidByUserId}
@@ -1956,7 +1808,7 @@ export default function Grocery() {
                       </select>
                     </Field>
 
-                    <Field label="From Account">
+                    <Field label="যে অ্যাকাউন্ট থেকে">
                       <select
                         className={fieldClass}
                         value={form.fromAccountId}
@@ -1976,7 +1828,7 @@ export default function Grocery() {
                       </select>
                     </Field>
 
-                    <Field label="Payment Method">
+                    <Field label="টাকা দেওয়ার মাধ্যম">
                       <select
                         className={fieldClass}
                         value={form.paymentMethodId}
@@ -1993,7 +1845,7 @@ export default function Grocery() {
                       </select>
                     </Field>
 
-                    <Field label="Card Label">
+                    <Field label="কার্ডের পরিচিতি">
                       <select
                         className={fieldClass}
                         value={form.cardLabelId}
@@ -2016,12 +1868,12 @@ export default function Grocery() {
                       </select>
                     </Field>
 
-                    <Field label="Note" className="sm:col-span-2 xl:col-span-4">
+                    <Field label="মন্তব্য" className="sm:col-span-2 xl:col-span-4">
                       <input
                         className={fieldClass}
                         value={form.note}
                         onChange={(e) => setForm({ ...form, note: e.target.value })}
-                        placeholder="Optional note"
+                        placeholder="নোট (ইচ্ছা হলে)"
                       />
                     </Field>
                   </div>
@@ -2034,10 +1886,10 @@ export default function Grocery() {
                       <IconBox name="cart" tone="sky" />
                       <div>
                         <h4 className="text-base font-black text-slate-950 dark:text-white">
-                          Receipt Items
+                          বাজারের পণ্য
                         </h4>
                         <p className="text-sm text-slate-500 dark:text-slate-400">
-                          Add item name, unit, quantity, and unit price.
+                          পণ্য, পরিমাণ ও একক দাম লিখুন।
                         </p>
                       </div>
                     </div>
@@ -2047,7 +1899,7 @@ export default function Grocery() {
                       className="hidden items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 lg:inline-flex"
                     >
                       <Icon name="plus" className="h-4 w-4" />
-                      Add Item
+                      পণ্য যোগ করুন
                     </button>
                   </div>
 
@@ -2056,12 +1908,12 @@ export default function Grocery() {
                     <table className="w-full min-w-[780px] text-sm">
                       <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/50 dark:text-slate-400">
                         <tr className="text-left">
-                          <th className="p-3">Item Name</th>
-                          <th className="p-3">Unit</th>
-                          <th className="p-3">Qty</th>
-                          <th className="p-3">Unit Price</th>
-                          <th className="p-3">Line Total</th>
-                          <th className="p-3 text-center">Remove</th>
+                          <th className="p-3">পণ্যের নাম</th>
+                          <th className="p-3">একক</th>
+                          <th className="p-3">পরিমাণ</th>
+                          <th className="p-3">একক দাম</th>
+                          <th className="p-3">মোট দাম</th>
+                          <th className="p-3 text-center">সরান</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-white/10">
@@ -2074,7 +1926,7 @@ export default function Grocery() {
                                 onChange={(e) =>
                                   updateItem(idx, "name", e.target.value)
                                 }
-                                placeholder="Rice, Oil, Milk..."
+                                placeholder="চাল, তেল, দুধ…"
                               />
                             </td>
 
@@ -2148,7 +2000,7 @@ export default function Grocery() {
                       >
                         <div className="mb-3 flex items-center justify-between gap-3">
                           <div className="font-black text-slate-950 dark:text-white">
-                            Item {idx + 1}
+                            পণ্য {idx + 1}
                           </div>
                           <button
                             onClick={() => removeItemRow(idx)}
@@ -2156,23 +2008,23 @@ export default function Grocery() {
                             className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-xs font-black text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200 dark:hover:bg-rose-400/15"
                           >
                             <Icon name="trash" className="h-3.5 w-3.5" />
-                            Remove
+                            সরান
                           </button>
                         </div>
 
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <Field label="Item Name" className="sm:col-span-2">
+                          <Field label="পণ্যের নাম" className="sm:col-span-2">
                             <input
                               className={fieldClass}
                               value={it.name}
                               onChange={(e) =>
                                 updateItem(idx, "name", e.target.value)
                               }
-                              placeholder="Rice, Oil, Milk..."
+                              placeholder="চাল, তেল, দুধ…"
                             />
                           </Field>
 
-                          <Field label="Unit">
+                          <Field label="একক">
                             <select
                               className={fieldClass}
                               value={it.unit}
@@ -2188,7 +2040,7 @@ export default function Grocery() {
                             </select>
                           </Field>
 
-                          <Field label="Qty">
+                          <Field label="পরিমাণ">
                             <input
                               type="number"
                               min="0"
@@ -2201,7 +2053,7 @@ export default function Grocery() {
                             />
                           </Field>
 
-                          <Field label="Unit Price">
+                          <Field label="একক দাম">
                             <input
                               type="number"
                               min="0"
@@ -2216,7 +2068,7 @@ export default function Grocery() {
 
                           <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/5">
                             <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
-                              Line Total
+                              মোট দাম
                             </div>
                             <div className="mt-1 text-lg font-black text-slate-950 dark:text-white">
                               {bdt(Number(it.qty || 0) * Number(it.unitPrice || 0))}
@@ -2233,7 +2085,7 @@ export default function Grocery() {
                     className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 lg:hidden"
                   >
                     <Icon name="plus" className="h-4 w-4" />
-                    Add Item
+                    পণ্য যোগ করুন
                   </button>
                 </div>
 
@@ -2241,14 +2093,14 @@ export default function Grocery() {
                 <div className="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-4">
                   <div className="rounded-[24px] border border-slate-200/70 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.035]">
                     <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                      Items Subtotal
+                      পণ্যের মোট দাম
                     </div>
                     <div className="mt-2 text-2xl font-black text-slate-950 dark:text-white">
                       {bdt(itemsSubtotal)}
                     </div>
                   </div>
 
-                  <Field label="Transaction Discount">
+                  <Field label="মোট ছাড়">
                     <input
                       type="number"
                       min="0"
@@ -2261,7 +2113,7 @@ export default function Grocery() {
                     />
                   </Field>
 
-                  <Field label="Delivery Fee">
+                  <Field label="ডেলিভারি খরচ">
                     <input
                       type="number"
                       min="0"
@@ -2274,7 +2126,7 @@ export default function Grocery() {
                     />
                   </Field>
 
-                  <Field label="VAT Amount">
+                  <Field label="ভ্যাট">
                     <input
                       type="number"
                       min="0"
@@ -2298,10 +2150,10 @@ export default function Grocery() {
                     />
                     <span>
                       <span className="block text-sm font-black text-slate-800 dark:text-slate-100">
-                        VAT already included in item prices
+                        পণ্যের দামে ভ্যাট যোগ করা আছে
                       </span>
                       <span className="text-xs text-slate-500 dark:text-slate-400">
-                        Uncheck this if VAT should be added with total payable.
+                        ভ্যাট আলাদা যোগ করতে হলে টিক তুলে দিন।
                       </span>
                     </span>
                   </label>
@@ -2312,7 +2164,7 @@ export default function Grocery() {
 
                     <div className="relative z-10">
                       <div className="inline-flex rounded-lg bg-white/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100 ring-1 ring-white/10">
-                        Total Payable
+                        মোট পরিশোধ
                       </div>
 
                       <div className="mt-3 text-3xl font-black tracking-tight text-white">
@@ -2320,7 +2172,7 @@ export default function Grocery() {
                       </div>
 
                       <p className="mt-1 text-xs font-medium text-slate-300">
-                        Final amount after discount, delivery fee, and VAT.
+                        ছাড়, ডেলিভারি ও ভ্যাট মিলিয়ে চূড়ান্ত টাকা।
                       </p>
                     </div>
                   </div>
@@ -2332,30 +2184,30 @@ export default function Grocery() {
                     <IconBox name="split" tone="violet" />
                     <div>
                       <h4 className="text-base font-black text-slate-950 dark:text-white">
-                        Split Details
+                        খরচের ভাগ
                       </h4>
                       <p className="text-sm text-slate-500 dark:text-slate-400">
-                        This split will be reflected in the ledger summary automatically.
+                        ভাগের হিসাব আয়-খরচের তালিকায়ও দেখা যাবে।
                       </p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <Field label="Split Type" className="sm:col-span-2">
+                    <Field label="খরচ ভাগ হবে" className="sm:col-span-2">
                       <select
                         className={fieldClass}
                         value={form.splitType}
                         onChange={(e) => handleSplitTypeChange(e.target.value)}
                       >
-                        <option value="equal">Equal</option>
-                        <option value="personal">Personal</option>
-                        <option value="ratio">Ratio</option>
-                        <option value="fixed">Fixed Amount</option>
+                        <option value="equal">সমান</option>
+                        <option value="personal">ব্যক্তিগত</option>
+                        <option value="ratio">অনুপাত অনুযায়ী</option>
+                        <option value="fixed">নির্দিষ্ট টাকা</option>
                       </select>
                     </Field>
 
                     {form.splitType === "personal" && (
-                      <Field label="Personal For" className="sm:col-span-2">
+                      <Field label="কার জন্য" className="sm:col-span-2">
                         <select
                           className={fieldClass}
                           value={form.personalUserId}
@@ -2397,7 +2249,7 @@ export default function Grocery() {
                         </Field>
 
                         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200 sm:col-span-2 xl:col-span-4">
-                          Ratio values must sum to 100.
+                          শতাংশের মোট ১০০ হতে হবে।
                         </div>
                       </>
                     )}
@@ -2427,7 +2279,7 @@ export default function Grocery() {
                         </Field>
 
                         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200 sm:col-span-2 xl:col-span-4">
-                          Fixed amounts must sum to the total payable.
+                          দুইজনের ভাগের যোগফল মোট খরচের সমান হতে হবে।
                         </div>
                       </>
                     )}
@@ -2439,17 +2291,18 @@ export default function Grocery() {
                   <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
                     <button
                       onClick={saveTxn}
+                      disabled={savingTxn}
                       className="order-1 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-xs font-black text-white shadow-[0_14px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800 active:translate-y-0 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 sm:order-2 sm:w-auto sm:px-5 sm:text-sm"
                     >
                       <Icon name="receipt" className="h-4 w-4" />
-                      {isEditing ? "Update" : "Save"}
+                      {savingTxn ? 'Saving…' : (isEditing ? "Update" : "Save")}
                     </button>
 
                     <button
                       onClick={closeModal}
                       className="order-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 sm:order-1 sm:w-auto sm:px-5 sm:text-sm"
                     >
-                      Cancel
+                      বাতিল
                     </button>
                   </div>
 
@@ -2464,6 +2317,7 @@ export default function Grocery() {
           </div>
         )}
       </div>
+          </div>
     </AppLayout>
   );
 }

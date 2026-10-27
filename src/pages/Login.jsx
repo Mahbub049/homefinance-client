@@ -151,7 +151,7 @@ export default function Login() {
               </div>
 
               <h1 className="mt-7 max-w-2xl text-5xl font-black leading-[0.98] tracking-[-0.055em] text-white xl:text-7xl">
-                HomeFinance
+                হিসাব নিকাশ
               </h1>
 
               <p className="mt-6 max-w-xl text-lg leading-8 text-slate-300">
@@ -214,7 +214,7 @@ export default function Login() {
                     </h2>
 
                     <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-                      Login to manage your HomeFinance ledger and budget
+                      আপনার আয়-খরচের হিসাব দেখুন
                       insights.
                     </p>
                   </div>

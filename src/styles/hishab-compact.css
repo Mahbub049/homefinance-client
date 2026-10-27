@@ -1,0 +1,105 @@
+/* হিসাব নিকাশ — consistent, compact layouts for daily finance workflows.
+   Only presentation is changed here; financial posting and account arithmetic are untouched. */
+.hf-hishab-overview{background:linear-gradient(120deg,var(--hf-primary-soft),var(--hf-surface) 80%);}
+.hf-hishab-overview-title{font-weight:800;font-size:clamp(15px,1.5vw,19px);margin-top:5px;color:var(--hf-text);}
+.hf-hishab-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;}
+.hf-hishab-kpi{min-width:0;display:flex;flex-direction:column;gap:5px;padding:18px 17px;background:var(--hf-surface);border:1px solid var(--hf-line);border-radius:15px;}
+.hf-hishab-kpi>span{font-size:12px;font-weight:750;color:var(--hf-muted);}
+.hf-hishab-kpi>strong{font-size:clamp(19px,2.35vw,29px);line-height:1.4;color:var(--hf-text);font-weight:850;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
+.hf-hishab-kpi>small{font-size:11px;color:var(--hf-muted);line-height:1.6;}
+.hf-hishab-kpi-income>strong{color:var(--hf-positive);}
+.hf-hishab-kpi-spend>strong{color:var(--hf-negative);}
+.hf-hishab-secondary-row{border:1px solid var(--hf-line);border-radius:13px;display:flex;flex-wrap:wrap;gap:12px;padding:10px 16px;background:var(--hf-surface);}
+.hf-hishab-secondary-row>div{display:flex;align-items:center;justify-content:space-between;flex:1 1 210px;gap:12px;font-size:12px;}
+.hf-hishab-secondary-row span{color:var(--hf-muted);}
+.hf-hishab-secondary-row b{font-size:14px;color:var(--hf-text);white-space:nowrap;}
+.hf-hishab-explain{padding:12px 17px!important;box-shadow:none!important;}
+.hf-hishab-explain summary{cursor:pointer;color:var(--hf-primary);font-size:12px;font-weight:750;}
+.hf-hishab-explain-content{display:grid;gap:9px;margin-top:12px;font-size:12px;line-height:1.85;color:var(--hf-text);}
+.hf-hishab-settlement-total{display:grid;gap:6px;}
+.hf-hishab-settlement-total>span{font-weight:750;color:var(--hf-text);font-size:13px;}
+.hf-hishab-settlement-total>strong{font-size:clamp(20px,2.2vw,27px);color:var(--hf-text);}
+.hf-hishab-settlement-total>small{font-size:11px;color:var(--hf-muted);}
+/* Ledger — consistent surfaces rather than nested tinted stripes. */
+.hf-v2-ledger .ledger-page,.hf-v2-ledger .ledger-page>div{background:transparent!important;}
+.hf-v2-ledger .ledger-page>div>section:last-of-type{background:var(--hf-surface)!important;}
+.hf-v2-ledger .ledger-page :is(.bg-slate-50,.bg-slate-100,.bg-white\/90,.bg-white\/80,.bg-slate-950,.bg-slate-900\/70){background:var(--hf-surface)!important;}
+.hf-v2-ledger .ledger-page :is(.bg-slate-200,.bg-slate-800){background:var(--hf-surface-alt)!important;}
+.hf-v2-ledger .ledger-page :is(.border-white\/10,.border-white\/15,.border-slate-100,.border-slate-200,.border-slate-700,.border-slate-800){border-color:var(--hf-line)!important;}
+.hf-v2-ledger .ledger-page .ledger-no-scrollbar{width:fit-content;max-width:100%;}
+.hf-v2-ledger .ledger-page section:has(.ledger-no-scrollbar){background:transparent!important;}
+/* Fixed bills — action-first condensed list, retain original edit and post handlers. */
+.hf-hishab-fixed-list{display:flex;flex-direction:column;gap:0;background:var(--hf-surface);border:1px solid var(--hf-line);border-radius:15px;overflow:hidden;}
+.hf-hishab-fixed-row{display:grid;grid-template-columns:minmax(160px,1.5fr) minmax(130px,.55fr) auto;gap:15px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--hf-line);}
+.hf-hishab-fixed-row:last-child{border-bottom:0;}
+.hf-hishab-fixed-main h3{font-size:14px;font-weight:800;color:var(--hf-text);}
+.hf-hishab-fixed-main p{font-size:11px;color:var(--hf-muted);line-height:1.6;margin-top:4px;}
+.hf-hishab-fixed-money{display:grid;gap:3px;}
+.hf-hishab-fixed-money small{font-size:10px;color:var(--hf-muted);}
+.hf-hishab-fixed-money b{color:var(--hf-text);font-size:15px;}
+.hf-hishab-fixed-actions{display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:6px;}
+.hf-hishab-fixed-actions button{min-height:34px!important;box-shadow:none!important;border-radius:9px!important;padding:7px 10px!important;font-size:11px!important;}
+.hf-v2-fixed .fixed-page{background:transparent!important;}
+.hf-v2-fixed .fixed-page>div>section:first-of-type{position:static!important;top:auto!important;background:var(--hf-surface)!important;box-shadow:none!important;border:1px solid var(--hf-line)!important;}
+/* Shared purchases — one row per item, expanded only for payment and monthly details. */
+.hf-v2-sharedpurchases .hf-hishab-purchase-row{background:var(--hf-surface)!important;border:1px solid var(--hf-line)!important;border-radius:14px!important;overflow:hidden;margin-bottom:10px;}
+.hf-hishab-purchase-row-main{display:grid;grid-template-columns:minmax(185px,2fr) repeat(3,minmax(105px,1fr));align-items:center;gap:14px;padding:15px 18px;}
+.hf-hishab-purchase-row-main h2{font-size:14px;color:var(--hf-text);font-weight:850;line-height:1.55;}
+.hf-hishab-purchase-row-main p{font-size:11px;color:var(--hf-muted);margin-top:4px;line-height:1.6;}
+.hf-hishab-purchase-number{display:flex;flex-direction:column;gap:5px;}
+.hf-hishab-purchase-number span{font-size:10px;color:var(--hf-muted);}
+.hf-hishab-purchase-number strong{font-size:15px;color:var(--hf-text);font-weight:800;}
+.hf-hishab-purchase-more{border-top:1px solid var(--hf-line);}
+.hf-hishab-purchase-more>summary{cursor:pointer;color:var(--hf-primary);font-size:12px;font-weight:800;padding:11px 18px;list-style:none;display:flex;justify-content:space-between;}
+.hf-hishab-purchase-more>summary::after{content:'⌄';}
+.hf-hishab-purchase-more[open]>summary::after{content:'⌃';}
+.hf-hishab-purchase-more>div{border-top:1px solid var(--hf-line);}
+.hf-hishab-purchase-more .hf-v2-shared-facts{grid-template-columns:repeat(3,minmax(0,1fr));}
+/* Savings — display individual accounts as rows, not a grid of nested cards. */
+.hf-hishab-savings-list{display:flex;flex-direction:column;background:var(--hf-surface);border:1px solid var(--hf-line);border-radius:14px;overflow:hidden;}
+.hf-hishab-savings-row{display:grid;grid-template-columns:minmax(160px,1.5fr) minmax(110px,.8fr) minmax(120px,.8fr);align-items:center;gap:15px;padding:14px 17px;border-bottom:1px solid var(--hf-line);}
+.hf-hishab-savings-row:last-child{border:0;}
+.hf-hishab-savings-row h3{font-size:14px;font-weight:800;color:var(--hf-text);}
+.hf-hishab-savings-row p,.hf-hishab-savings-row span{font-size:11px;color:var(--hf-muted);margin-top:3px;}
+.hf-hishab-savings-row>div:not(:first-child){display:grid;gap:3px;}
+.hf-hishab-savings-row b,.hf-hishab-savings-row strong{font-size:15px;color:var(--hf-text);}
+.hf-v2-savings .savings-page{background:transparent!important;}
+/* Wallet — info on demand, one compact settlement line and guided payment workflow. */
+.hf-v2-wallet .wallet-page{background:transparent!important;}
+.hf-hishab-wallet-note{background:var(--hf-surface);border:1px solid var(--hf-line);border-radius:13px;padding:12px 15px;}
+.hf-hishab-wallet-note>summary{cursor:pointer;font-size:12px;font-weight:750;color:var(--hf-primary);}
+.hf-hishab-note-inner{display:grid;gap:10px;margin-top:12px;font-size:12px;line-height:1.75;color:var(--hf-text);}
+.hf-hishab-note-amount,.hf-hishab-detail-row{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--hf-line);padding-bottom:8px;align-items:center;}
+.hf-hishab-detail-row span,.hf-hishab-note-amount span{color:var(--hf-muted);}
+.hf-hishab-settlement-section{background:var(--hf-surface);border:1px solid var(--hf-line);border-radius:15px;padding:18px 19px;min-width:0;}
+.hf-hishab-settlement-head{display:flex;align-items:center;justify-content:space-between;gap:18px;}
+.hf-hishab-settlement-head h2{font-size:17px;font-weight:850;color:var(--hf-text);margin-top:3px;}
+.hf-hishab-settlement-head p{font-size:11px;color:var(--hf-muted);margin-top:5px;line-height:1.6;}
+.hf-hishab-settlement-head>strong{font-size:clamp(20px,2.3vw,28px);color:var(--hf-text);white-space:nowrap;}
+.hf-hishab-settlement-direction{display:flex;flex-wrap:wrap;align-items:center;gap:11px;background:var(--hf-surface-alt);border-radius:10px;padding:12px 14px;margin-top:14px;font-size:13px;}
+.hf-hishab-settlement-direction>span{color:var(--hf-primary);font-weight:750;}
+.hf-hishab-settlement-info{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap;border:1px solid var(--hf-line);border-radius:10px;padding:12px 14px;margin-top:12px;}
+.hf-hishab-settlement-info b{font-size:12px;}
+.hf-hishab-settlement-info p{font-size:11px;color:var(--hf-muted);line-height:1.7;margin-top:4px;max-width:640px;}
+.hf-hishab-settlement-details{margin-top:13px;border-top:1px solid var(--hf-line);padding-top:13px;}
+.hf-hishab-settlement-details>summary{cursor:pointer;font-size:12px;font-weight:750;color:var(--hf-primary);}
+.hf-hishab-settlement-details>div{padding-top:16px;}
+@media(max-width:1100px){.hf-hishab-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.hf-hishab-purchase-row-main{grid-template-columns:minmax(160px,1.4fr) repeat(2,minmax(95px,1fr));}.hf-hishab-purchase-number:last-child{display:none;}}
+@media(max-width:850px){.hf-hishab-fixed-row{grid-template-columns:1fr 1fr;}.hf-hishab-fixed-actions{grid-column:1/-1;justify-content:flex-start;}.hf-hishab-savings-row{grid-template-columns:1fr 1fr;}.hf-hishab-savings-row>div:first-child{grid-column:1/-1;}.hf-hishab-purchase-row-main{grid-template-columns:1fr 1fr;}.hf-hishab-purchase-row-main>div:first-child{grid-column:1/-1;}.hf-hishab-purchase-number:last-child{display:flex;}}
+@media(max-width:580px){.hf-hishab-kpi-grid{grid-template-columns:1fr 1fr;gap:9px;}.hf-hishab-kpi{padding:12px;}.hf-hishab-kpi>strong{font-size:19px;}.hf-hishab-fixed-row{grid-template-columns:1fr;gap:9px;}.hf-hishab-fixed-actions{grid-column:auto;}.hf-hishab-settlement-head{align-items:start;flex-direction:column;gap:9px;}.hf-hishab-purchase-row-main{gap:8px;padding:13px;}.hf-hishab-savings-row{gap:9px;padding:12px;}}
+.hf-hishab-purchase-pay{grid-column:1/-1;justify-self:end;}
+.hf-v2-ledger .ledger-page .group>div>div{min-width:0;}
+.hf-v2-ledger .ledger-page .group .bg-slate-50{background:var(--hf-surface-alt)!important;}
+.hf-v2-ledger .ledger-page .group:hover{background:var(--hf-surface-alt)!important;}
+
+/* Dashboard: every figure is visible, with a readable definition close to it. */
+.hf-hishab-extra-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.hf-hishab-extra-card{min-height:138px}
+.hf-hishab-extra-card>strong{font-size:clamp(21px,2.2vw,30px)}
+.hf-hishab-budget-balance{border-color:var(--hf-primary);background:var(--hf-primary-soft)}
+.hf-hishab-kpi>small{font-size:12px;line-height:1.65;white-space:normal}
+.hf-hishab-plan-context{grid-column:1/-1;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;border-top:1px solid var(--hf-line);padding-top:8px;color:var(--hf-muted);font-size:11px}
+.hf-hishab-plan-context strong{color:var(--hf-text);font-size:12px}
+.hf-hishab-plan-context small{color:var(--hf-muted);font-size:11px}
+@media(max-width:1000px){.hf-hishab-extra-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hf-hishab-budget-balance{grid-column:1/-1}}
+@media(max-width:580px){.hf-hishab-extra-grid{grid-template-columns:1fr}.hf-hishab-budget-balance{grid-column:auto}}

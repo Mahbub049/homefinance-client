@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import HFPageLead from "../components/design/HFPageLead";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AppLayout from "../components/layout/AppLayout";
 import api from "../services/api";
 import toast from "react-hot-toast";
@@ -280,7 +281,7 @@ function AccountCard({ account, totalBalance }) {
 
         <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-3 dark:border-white/10 dark:bg-slate-950/40 sm:p-4">
           <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400 sm:text-xs">
-            Current Balance
+            বর্তমান জমা
           </div>
           <div className="mt-1 break-words text-2xl font-black text-slate-950 dark:text-white">
             {money(balance)}
@@ -293,18 +294,18 @@ function AccountCard({ account, totalBalance }) {
             />
           </div>
           <div className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-            {share}% of total savings balance
+            {share}মোট সঞ্চয়ের অংশ
           </div>
         </div>
 
         <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 sm:gap-3">
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 dark:border-emerald-400/20 dark:bg-emerald-400/10">
-            <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-200">Deposited</div>
+            <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-200">জমা হয়েছে</div>
             <div className="mt-1 break-words font-black text-emerald-900 dark:text-emerald-100">{money(deposited)}</div>
           </div>
 
           <div className="hidden rounded-2xl border border-rose-100 bg-rose-50 p-3 dark:border-rose-400/20 dark:bg-rose-400/10 sm:block">
-            <div className="text-xs font-semibold text-rose-700 dark:text-rose-200">Withdrawn</div>
+            <div className="text-xs font-semibold text-rose-700 dark:text-rose-200">উত্তোলন হয়েছে</div>
             <div className="mt-1 break-words font-black text-rose-900 dark:text-rose-100">{money(withdrawn)}</div>
           </div>
         </div>
@@ -314,6 +315,7 @@ function AccountCard({ account, totalBalance }) {
 }
 
 export default function Savings() {
+  const [hfMore, setHfMore] = useState(false);
   const [month, setMonth] = useState(monthNow());
   const [allAccounts, setAllAccounts] = useState([]);
   const [members, setMembers] = useState([]);
@@ -324,6 +326,9 @@ export default function Savings() {
   const [search, setSearch] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [depositSaving, setDepositSaving] = useState(false);
+  const depositInFlight = useRef(false);
+  const depositAttempt = useRef(null);
   const [form, setForm] = useState({
     paidByUserId: "",
     date: todayISO(),
@@ -471,6 +476,7 @@ export default function Savings() {
   }, [month]);
 
   function openDeposit() {
+    depositAttempt.current = null;
     const defaultUser = getId(members?.[0]) || "";
     const from = getSourceAccountsForUser(defaultUser)?.[0]?._id || "";
     const to = getSavingsAccountsForUser(defaultUser)?.[0]?._id || "";
@@ -488,6 +494,9 @@ export default function Savings() {
   }
 
   async function saveDeposit() {
+    if (depositInFlight.current) return;
+    depositInFlight.current = true;
+    setDepositSaving(true);
     try {
       if (!form.paidByUserId) {
         toast.error("Select user");
@@ -505,20 +514,35 @@ export default function Savings() {
         return;
       }
 
-      await api.post("/api/savings/deposit", {
+      const payload = {
         paidByUserId: form.paidByUserId,
         date: form.date,
         fromAccountId: form.fromAccountId,
         toAccountId: form.toAccountId,
         amount: amt,
         note: form.note,
+      };
+      const fingerprint = JSON.stringify(payload);
+      if (!depositAttempt.current || depositAttempt.current.fingerprint !== fingerprint) {
+        depositAttempt.current = { fingerprint, key: crypto.randomUUID() };
+      }
+      await api.post("/api/savings/deposit", payload, {
+        headers: { 'Idempotency-Key': depositAttempt.current.key },
       });
+      depositAttempt.current = null;
 
-      toast.success("Saved as Transfer ✅");
+      toast.success("Savings transfer recorded");
       setModalOpen(false);
-      await Promise.all([loadOverview(month), loadYearlySummary(month), loadAccounts()]);
+      try {
+        await Promise.all([loadOverview(month), loadYearlySummary(month), loadAccounts()]);
+      } catch {
+        toast.error('Transfer saved, but the summary could not refresh. Reload to see the latest balances.');
+      }
     } catch (e) {
-      toast.error(e?.response?.data?.message || "Save failed");
+      toast.error(e?.response?.data?.message || "Save failed. Retry the same form rather than creating another deposit.");
+    } finally {
+      depositInFlight.current = false;
+      setDepositSaving(false);
     }
   }
 
@@ -575,112 +599,37 @@ export default function Savings() {
 
   return (
     <AppLayout>
+      <div className={`hf-step3-page hf-step3-savings hf-v2-page hf-v2-savings ${hfMore ? "hf-step3-expanded" : ""}`}>
+        <HFPageLead title="সঞ্চয়" description="DPS ও সঞ্চয় অ্যাকাউন্টে জমানো টাকা" month={month} onMonthChange={setMonth}
+          metrics={[
+ {label:'মোট সঞ্চয়',value:totals.totalBalance,primary:true},
+ {label:'এই মাসে জমা',value:selectedMonthCashSaved}
+]}
+          onAdd={openDeposit} addLabel="টাকা জমা"
+          addDisabled={savingsAccounts.length === 0 || spendAccounts.length === 0}
+          onExtra={undefined} extraLabel=""
+          onRefresh={undefined}
+          more={hfMore} onToggleMore={() => setHfMore(v => !v)} />
+
       <main className="savings-page min-h-[calc(100vh-64px)] w-full overflow-x-hidden bg-slate-50 px-2 py-3 text-slate-950 transition-colors dark:bg-slate-950 dark:text-white sm:px-4 sm:py-4 lg:px-6 lg:py-6">
         <div className="mx-auto w-full space-y-4 sm:space-y-5">
           {/* Header */}
-          <section className="relative overflow-hidden rounded-[1.5rem] bg-gradient-to-br from-emerald-700 via-teal-700 to-sky-800 p-4 text-white shadow-xl dark:border dark:border-white/10 sm:rounded-3xl sm:p-6 lg:p-7">
-            <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-white/15 blur-2xl" />
-            <div className="absolute -bottom-24 left-1/2 h-64 w-64 rounded-full bg-lime-300/20 blur-3xl" />
-
-            <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div className="min-w-0">
-                <div className="mb-2 hidden w-fit items-center gap-2 rounded-full border border-white/25 bg-white/15 px-3 py-1 text-xs font-semibold backdrop-blur sm:inline-flex">
-                  <span className="h-2 w-2 rounded-full bg-lime-300" />
-                  Savings Transfer Center
-                </div>
-
-                <h2 className="text-2xl font-black tracking-tight sm:text-3xl lg:text-4xl">Savings</h2>
-                <p className="mt-2 max-w-2xl text-xs leading-5 text-emerald-50 sm:text-base sm:leading-6">
-                  Track savings transfers such as Bank → DPS without counting them as regular expenses.
-                </p>
-              </div>
-
-              <div className="grid w-full gap-2 sm:grid-cols-[1fr_auto] lg:w-auto lg:min-w-[420px]">
-                <label
-                  onClick={openNativePicker}
-                  className="cursor-pointer rounded-2xl border border-white/20 bg-white/10 p-2.5 backdrop-blur sm:p-3"
-                >
-                  <span className="mb-1 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-emerald-50 sm:text-xs">
-                    <Icon name="calendar" className="h-3.5 w-3.5" />
-                    Month
-                  </span>
-                  <input
-                    type="month"
-                    value={month}
-                    onChange={(e) => setMonth(e.target.value)}
-                    onClick={(e) => {
-                      e.currentTarget.focus();
-                      e.currentTarget.showPicker?.();
-                    }}
-                    className="w-full cursor-pointer bg-transparent text-sm font-bold text-white outline-none [color-scheme:dark] sm:text-base"
-                    aria-label="Select month"
-                  />
-                </label>
-
-                <button
-                  onClick={openDeposit}
-                  className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-xs font-black text-emerald-700 shadow-lg transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[58px] sm:px-5 sm:text-sm lg:hover:-translate-y-0.5"
-                  disabled={savingsAccounts.length === 0 || spendAccounts.length === 0}
-                  title={
-                    savingsAccounts.length === 0
-                      ? "Create a Savings account first (Settings → Accounts)"
-                      : spendAccounts.length === 0
-                        ? "Create at least one Bank/Cash account first"
-                        : ""
-                  }
-                >
-                  <Icon name="plus" className="h-4 w-4" />
-                  Add Deposit
-                </button>
-              </div>
-            </div>
-          </section>
+          <></>
 
           {loading ? (
-            <Loader text="Loading savings" subtext="Preparing your savings overview" />
+            <Loader text="সঞ্চয়ের তথ্য আসছে" subtext="সঞ্চয়ের হিসাব তৈরি হচ্ছে" />
           ) : (
             <>
               {/* Stats */}
-              <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <StatCard
-                  title="Total Savings Balance"
-                  value={money(totals.totalBalance)}
-                  sub={`${totalSavingsAccounts} savings/investment account${totalSavingsAccounts === 1 ? "" : "s"}`}
-                  accent="from-emerald-500 to-teal-600"
-                  icon="wallet"
-                />
-                <StatCard
-                  title={`Deposited in ${monthLabel(month)}`}
-                  value={money(totals.deposited)}
-                  sub="Money moved into savings accounts"
-                  accent="from-sky-500 to-cyan-600"
-                  icon="arrowUp"
-                />
-                <StatCard
-                  title={`Withdrawn in ${monthLabel(month)}`}
-                  value={money(totals.withdrawn)}
-                  sub="Money moved out from savings accounts"
-                  accent="from-rose-500 to-orange-500"
-                  icon="arrowDown"
-                  hideOnMobile
-                />
-                <StatCard
-                  title={`Net in ${monthLabel(month)}`}
-                  value={money(totals.net)}
-                  sub="Deposited − Withdrawn"
-                  accent={Number(totals.net || 0) >= 0 ? "from-lime-500 to-emerald-600" : "from-amber-500 to-rose-500"}
-                  icon={Number(totals.net || 0) >= 0 ? "+" : "−"}
-                  hideOnMobile
-                />
-              </section>
+              <></>
 
               {/* Account cards */}
               <section className="rounded-[1.5rem] border border-slate-200 bg-white/90 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:rounded-3xl sm:p-5">
                 <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <div className="text-lg font-black text-slate-950 dark:text-white">Savings Accounts</div>
+                    <div className="text-lg font-black text-slate-950 dark:text-white">সঞ্চয় অ্যাকাউন্ট</div>
                     <div className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm">
-                      Balance and monthly deposit summary for each savings account.
+                      মাসের জমা ও অ্যাকাউন্টে মোট কত আছে
                     </div>
                   </div>
 
@@ -690,7 +639,7 @@ export default function Savings() {
                       <input
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Search account, owner, type..."
+                        placeholder="অ্যাকাউন্ট বা সদস্য খুঁজুন…"
                         className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 px-9 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100 dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-emerald-400/50 dark:focus:ring-emerald-400/10"
                       />
                     </div>
@@ -701,7 +650,7 @@ export default function Savings() {
                       disabled={savingsAccounts.length === 0 || spendAccounts.length === 0}
                       className="hidden h-11 rounded-2xl bg-slate-950 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 sm:inline-flex sm:items-center sm:justify-center"
                     >
-                      + Deposit
+                      + জমা করুন
                     </button>
                   </div>
                 </div>
@@ -711,59 +660,59 @@ export default function Savings() {
                     <div className="mx-auto grid h-14 w-14 place-items-center rounded-3xl bg-emerald-100 text-2xl dark:bg-emerald-400/10">
                       <Icon name="wallet" className="h-7 w-7 text-emerald-700 dark:text-emerald-200" />
                     </div>
-                    <div className="mt-4 text-base font-black text-slate-950 dark:text-white">No savings account found</div>
+                    <div className="mt-4 text-base font-black text-slate-950 dark:text-white">সঞ্চয় অ্যাকাউন্ট নেই</div>
                     <div className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-                      Create one from <b>Settings → Accounts</b> and set the type as <b>savings</b> or <b>investment</b>.
+                      একটি অ্যাকাউন্ট তৈরি করুন: <b>সেটিংস → অ্যাকাউন্ট</b> এবং ধরন বাছুন <b>সঞ্চয়</b> or <b>বিনিয়োগ</b>.
                     </div>
                   </div>
                 ) : filteredList.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-400">
-                    No account matched your search.
+                    আপনার খোঁজার সঙ্গে কোনো অ্যাকাউন্ট মেলেনি।
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-                    {filteredList.map((a) => (
-                      <AccountCard
-                        key={a._id || a.id || a.name}
-                        account={a}
-                        totalBalance={totals.totalBalance}
-                      />
+                  <div className="hf-hishab-savings-list">
+                    {filteredList.map(a => (
+                      <div key={a._id || a.id || a.name} className="hf-hishab-savings-row">
+                        <div><h3>{safeText(a.name, 'সঞ্চয় অ্যাকাউন্ট')}</h3><p>{safeText(a.owner, '—')} · {accountTypeLabel(a.type)}</p></div>
+                        <div><span>এই মাসে জমা</span><b>{money(a.monthDeposited)}</b></div>
+                        <div><span>এখন মোট জমা আছে</span><strong>{money(a.currentBalance)}</strong></div>
+                      </div>
                     ))}
                   </div>
                 )}
               </section>
 
               {/* Desktop detailed table only */}
-              <section className="hidden overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.04] md:block">
+              <section className="hf-step3-advanced hidden overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.04] md:block">
                 <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-emerald-50 p-4 dark:border-white/10 dark:from-slate-900 dark:to-emerald-950/30 sm:p-5">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <div className="text-sm font-black text-slate-950 dark:text-white">Detailed Account Table</div>
+                      <div className="text-sm font-black text-slate-950 dark:text-white">অ্যাকাউন্টের বিস্তারিত</div>
                       <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        Desktop-only detailed balance and monthly movement.
+                        অ্যাকাউন্টের বিস্তারিত হিসাব।
                       </div>
                     </div>
                     <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-600 dark:border-white/10 dark:bg-white/10 dark:text-slate-300">
-                      {filteredList.length} shown
+                      {filteredList.length} দেখানো
                     </div>
                   </div>
                 </div>
 
                 {list.length === 0 ? (
                   <div className="p-4 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                    No savings accounts found. Create one from <b>Settings → Accounts</b> and set type as <b>savings</b> or <b>investment</b>.
+                    সঞ্চয় অ্যাকাউন্ট নেই; তৈরি করুন: <b>সেটিংস → অ্যাকাউন্ট</b> and set type as <b>সঞ্চয়</b> or <b>বিনিয়োগ</b>.
                   </div>
                 ) : (
                   <div className="overflow-x-auto savings-no-scrollbar">
                     <table className="w-full min-w-[760px] text-sm">
                       <thead className="bg-slate-50 dark:bg-slate-950/60">
                         <tr className="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                          <th className="p-4">Account</th>
-                          <th className="p-4">Type</th>
-                          <th className="p-4">Owner</th>
+                          <th className="p-4">অ্যাকাউন্ট</th>
+                          <th className="p-4">ধরন</th>
+                          <th className="p-4">মালিক</th>
                           <th className="p-4 text-right">Balance</th>
-                          <th className="p-4 text-right">Deposited</th>
-                          <th className="p-4 text-right">Withdrawn</th>
+                          <th className="p-4 text-right">জমা হয়েছে</th>
+                          <th className="p-4 text-right">উত্তোলন হয়েছে</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -791,11 +740,11 @@ export default function Savings() {
               </section>
 
               {/* Individual last 12 months cash savings */}
-              <section className="rounded-[1.5rem] border border-slate-200 bg-white/90 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:rounded-3xl sm:p-5">
+              <section className="hf-step3-advanced rounded-[1.5rem] border border-slate-200 bg-white/90 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:rounded-3xl sm:p-5">
                 <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <div className="text-lg font-black text-slate-950 dark:text-white">
-                      Individual Cash Savings History
+                      ব্যক্তিগত সঞ্চয়ের ইতিহাস
                     </div>
                     <div className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400 sm:text-sm">
                       Monthly cash saved = income − expense ± transfer adjustment. Negative months reduce the total saved amount.
@@ -804,7 +753,7 @@ export default function Savings() {
 
                   <div className="w-full lg:w-72">
                     <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
-                      View Member
+                      সদস্য বাছুন
                     </label>
                     <select
                       className={inputClass()}
@@ -812,7 +761,7 @@ export default function Savings() {
                       onChange={(e) => setSelectedYearlyMemberId(e.target.value)}
                     >
                       {yearlyMembers.length === 0 ? (
-                        <option value="">No member found</option>
+                        <option value="">সদস্য নেই</option>
                       ) : (
                         yearlyMembers.map((member) => (
                           <option key={member.id} value={member.id}>
@@ -826,20 +775,20 @@ export default function Savings() {
 
                 {!selectedYearlyMember ? (
                   <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-400">
-                    No cash savings history found yet.
+                    এখনও সঞ্চয়ের ইতিহাস নেই।
                   </div>
                 ) : (
                   <>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                       <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 dark:border-emerald-400/20 dark:bg-emerald-400/10">
                         <div className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-200">
-                          Total Cash Saved
+                          মোট জমানো টাকা
                         </div>
                         <div className="mt-2 text-2xl font-black text-emerald-950 dark:text-emerald-100">
                           {money(selectedYearlyTotal)}
                         </div>
                         <div className="mt-1 text-xs text-emerald-800 dark:text-emerald-100/80">
-                          Last 12 months • {selectedYearlyMember.name}
+                          শেষ ১২ মাস • {selectedYearlyMember.name}
                         </div>
                       </div>
 
@@ -859,7 +808,7 @@ export default function Savings() {
                               : "text-rose-700 dark:text-rose-200"
                           )}
                         >
-                          Selected Month Saved
+                          এই মাসে জমা
                         </div>
                         <div
                           className={cx(
@@ -885,25 +834,25 @@ export default function Savings() {
 
                       <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4 dark:border-violet-400/20 dark:bg-violet-400/10">
                         <div className="text-xs font-bold uppercase tracking-[0.16em] text-violet-700 dark:text-violet-200">
-                          Monthly Income
+                          মাসের আয়
                         </div>
                         <div className="mt-2 text-2xl font-black text-violet-950 dark:text-violet-100">
                           {money(selectedMonthIncome)}
                         </div>
                         <div className="mt-1 text-xs text-violet-800 dark:text-violet-100/80">
-                          Income share for this member
+                          এই সদস্যের আয়
                         </div>
                       </div>
 
                       <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 dark:border-amber-400/20 dark:bg-amber-400/10">
                         <div className="text-xs font-bold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-200">
-                          Monthly Expense
+                          মাসের খরচ
                         </div>
                         <div className="mt-2 text-2xl font-black text-amber-950 dark:text-amber-100">
                           {money(selectedMonthExpense)}
                         </div>
                         <div className="mt-1 text-xs text-amber-800 dark:text-amber-100/80">
-                          Transfer net: {money(selectedMonthTransferNet)}
+                          টাকা আদান-প্রদান: {money(selectedMonthTransferNet)}
                         </div>
                       </div>
                     </div>
@@ -913,12 +862,12 @@ export default function Savings() {
                         <table className="w-full min-w-[860px] text-sm">
                           <thead className="bg-slate-50 dark:bg-slate-950/60">
                             <tr className="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                              <th className="p-3">Month</th>
-                              <th className="p-3 text-right">Income</th>
-                              <th className="p-3 text-right">Expense</th>
+                              <th className="p-3">মাস</th>
+                              <th className="p-3 text-right">আয়</th>
+                              <th className="p-3 text-right">খরচ</th>
                               <th className="p-3 text-right">Transfer Net</th>
-                              <th className="p-3 text-right">Monthly Saved</th>
-                              <th className="p-3 text-right">Total Saved</th>
+                              <th className="p-3 text-right">মাসে জমা</th>
+                              <th className="p-3 text-right">মোট সঞ্চয়</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1003,18 +952,18 @@ export default function Savings() {
                   <div className="absolute -right-14 -top-14 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
                   <div className="relative">
                     <div className="mb-2 inline-flex rounded-full border border-white/25 bg-white/15 px-3 py-1 text-xs font-bold backdrop-blur">
-                      Transfer Entry
+                      টাকা জমা
                     </div>
-                    <h3 className="text-xl font-black">Add Savings Transfer</h3>
+                    <h3 className="text-xl font-black">সঞ্চয়ে টাকা জমা</h3>
                     <p className="mt-1 text-sm leading-6 text-emerald-50">
-                      This will create a <b>Transfer</b> transaction and move money into a savings or investment account.
+                      এটি একটি <b>টাকা আদান-প্রদান</b> লেনদেন হিসেবে সঞ্চয়ে টাকা জমা করবে।
                     </p>
                   </div>
                 </div>
 
                 <div className="p-4 sm:p-6">
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field label="User" className="sm:col-span-2">
+                    <Field label="সদস্য" className="sm:col-span-2">
                       <select
                         className={inputClass()}
                         value={form.paidByUserId}
@@ -1031,7 +980,7 @@ export default function Savings() {
                           }));
                         }}
                       >
-                        <option value="">Select user</option>
+                        <option value="">সদস্য বাছুন</option>
                         {members.map((m) => (
                           <option key={getId(m)} value={getId(m)}>
                             {m.name}
@@ -1040,7 +989,7 @@ export default function Savings() {
                       </select>
                     </Field>
 
-                    <Field label="Date">
+                    <Field label="তারিখ">
                       <input
                         type="date"
                         className={inputClass()}
@@ -1049,7 +998,7 @@ export default function Savings() {
                       />
                     </Field>
 
-                    <Field label="Amount">
+                    <Field label="টাকা">
                       <input
                         type="number"
                         min="0"
@@ -1061,16 +1010,16 @@ export default function Savings() {
                       />
                     </Field>
 
-                    <Field label="From Account" className="sm:col-span-2">
+                    <Field label="যে অ্যাকাউন্ট থেকে" className="sm:col-span-2">
                       <select
                         className={inputClass()}
                         value={form.fromAccountId}
                         onChange={(e) => setForm((p) => ({ ...p, fromAccountId: e.target.value }))}
                       >
-                        <option value="">Select source account</option>
+                        <option value="">টাকা আসবে যে অ্যাকাউন্ট থেকে</option>
                         {fromAccountOptions.length === 0 ? (
                           <option value="" disabled>
-                            No source account found
+                            টাকা পাঠানোর অ্যাকাউন্ট নেই
                           </option>
                         ) : (
                           fromAccountOptions.map((a) => (
@@ -1081,20 +1030,20 @@ export default function Savings() {
                         )}
                       </select>
                       <div className="mt-1.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                        This account balance will be reduced because money is being moved out.
+                        এই অ্যাকাউন্ট থেকে টাকা কমবে।
                       </div>
                     </Field>
 
-                    <Field label="To Savings / Investment" className="sm:col-span-2">
+                    <Field label="কোন সঞ্চয় অ্যাকাউন্টে" className="sm:col-span-2">
                       <select
                         className={inputClass()}
                         value={form.toAccountId}
                         onChange={(e) => setForm((p) => ({ ...p, toAccountId: e.target.value }))}
                       >
-                        <option value="">Select destination account</option>
+                        <option value="">টাকা জমবে যে অ্যাকাউন্টে</option>
                         {toAccountOptions.length === 0 ? (
                           <option value="" disabled>
-                            No savings account found
+                            সঞ্চয় অ্যাকাউন্ট নেই
                           </option>
                         ) : (
                           toAccountOptions.map((a) => (
@@ -1105,27 +1054,27 @@ export default function Savings() {
                         )}
                       </select>
                       <div className="mt-1.5 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                        This account balance will be increased as your saved amount.
+                        সঞ্চয় অ্যাকাউন্টে টাকা বাড়বে।
                       </div>
                     </Field>
 
-                    <Field label="Note" className="sm:col-span-2">
+                    <Field label="মন্তব্য" className="sm:col-span-2">
                       <input
                         className={inputClass()}
                         value={form.note}
                         onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))}
-                        placeholder="e.g., DPS deposit, emergency fund, monthly savings"
+                        placeholder="যেমন: মাসিক DPS জমা"
                       />
                     </Field>
                   </div>
 
                   <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 dark:border-emerald-400/20 dark:bg-emerald-400/10">
                     <div className="flex items-center justify-between gap-3 text-sm">
-                      <span className="font-semibold text-emerald-800 dark:text-emerald-100">Transfer amount</span>
+                      <span className="font-semibold text-emerald-800 dark:text-emerald-100">জমার পরিমাণ</span>
                       <span className="text-lg font-black text-emerald-950 dark:text-emerald-100">{money(form.amount)}</span>
                     </div>
                     <p className="mt-1 text-xs leading-5 text-emerald-800 dark:text-emerald-100/80">
-                      Savings deposits are recorded as transfers, not regular expenses.
+                      সঞ্চয় হলো টাকা স্থানান্তর, সাধারণ খরচ নয়।
                     </p>
                   </div>
 
@@ -1134,19 +1083,19 @@ export default function Savings() {
                       onClick={() => setModalOpen(false)}
                       className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15 sm:w-auto"
                     >
-                      Cancel
+                      বাতিল
                     </button>
                     <button
                       onClick={saveDeposit}
                       className="w-full rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2.5 text-sm font-black text-white shadow-lg transition hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 lg:hover:-translate-y-0.5 sm:w-auto"
                       disabled={
-                        !form.paidByUserId ||
+                        depositSaving || !form.paidByUserId ||
                         !form.fromAccountId ||
                         !form.toAccountId ||
                         !String(form.amount).trim()
                       }
                     >
-                      Save Transfer
+                      {depositSaving ? 'Saving…' : 'Save Transfer'}
                     </button>
                   </div>
                 </div>
@@ -1155,6 +1104,7 @@ export default function Savings() {
           )}
         </div>
       </main>
+          </div>
     </AppLayout>
   );
 }

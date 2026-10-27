@@ -5,7 +5,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Montserrat', 'sans-serif'],
+        sans: ['Hind Siliguri', 'Noto Sans Bengali', 'Inter', 'sans-serif'],
       },
     },
   },

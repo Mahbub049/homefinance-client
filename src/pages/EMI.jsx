@@ -1,3 +1,4 @@
+import HFPageLead from "../components/design/HFPageLead";
 import { useEffect, useMemo, useState } from "react";
 import AppLayout from "../components/layout/AppLayout";
 import api from "../services/api";
@@ -123,8 +124,20 @@ function splitLabel(value) {
   return "Equal";
 }
 
-function splitMonthlyAmount(plan, members) {
-  const total = Number(plan?.monthlyAmount || 0);
+function scheduledAmountForMonth(plan, selectedMonth) {
+  if (!monthInRange(selectedMonth, plan?.startMonth, plan?.endMonth)) return 0;
+  const [startYear, startM] = String(plan.startMonth).split('-').map(Number);
+  const [year, m] = String(selectedMonth).split('-').map(Number);
+  const index = (year - startYear) * 12 + m - startM;
+  const regular = Number(plan?.monthlyAmount || 0);
+  if (index === Number(plan?.months || 0) - 1) {
+    return Math.round((Number(plan?.totalPayable || 0) - regular * index) * 100) / 100;
+  }
+  return regular;
+}
+
+function splitMonthlyAmount(plan, members, selectedMonth) {
+  const total = scheduledAmountForMonth(plan, selectedMonth);
   const splitType = String(plan?.splitType || "equal").toLowerCase();
 
   if (!total || !Array.isArray(members) || members.length === 0) return [];
@@ -179,14 +192,19 @@ function splitMonthlyAmount(plan, members) {
 
     if (!validFixed.length) return [];
 
+    let allocated = 0;
+    const nominal = Number(plan?.monthlyAmount || 0);
     return validFixed.map((f, index) => {
       const person = members.find((m) => normalizeId(m.id || m._id) === f.userId);
-
+      const share = index === validFixed.length - 1
+        ? Math.round((total - allocated) * 100) / 100
+        : Math.round((total * f.amount / nominal) * 100) / 100;
+      allocated += share;
       return {
         key: `${f.userId}-${index}`,
         userId: f.userId,
         name: person?.name || "Unknown",
-        amount: Math.round(f.amount * 100) / 100,
+        amount: share,
       };
     });
   }
@@ -419,13 +437,13 @@ function LiabilitySection({ items, total }) {
       <div className="border-b border-slate-100 bg-gradient-to-r from-white to-emerald-50 p-4 dark:border-white/10 dark:from-white/[0.06] dark:to-emerald-400/10 sm:p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-base font-black text-slate-950 dark:text-white sm:text-lg">EMI Liability by Person</div>
+            <div className="text-base font-black text-slate-950 dark:text-white sm:text-lg">কার কত কিস্তি দিতে হবে</div>
             <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-400 sm:text-sm">
-              Split-aware monthly payable amount for the selected month.
+              এই মাসে কার কত টাকা কিস্তি দিতে হবে।
             </p>
           </div>
           <div className="hidden rounded-2xl bg-emerald-50 px-3 py-2 text-right text-xs font-black text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-400/10 dark:text-emerald-200 dark:ring-emerald-400/20 sm:block">
-            Total ৳ {money(total)}
+            সর্বমোট ৳ {money(total)}
           </div>
         </div>
       </div>
@@ -433,7 +451,7 @@ function LiabilitySection({ items, total }) {
       <div className="p-3 sm:p-5">
         {items.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-400">
-            No active EMI liability for this month.
+            এই মাসে কোনো চলমান কিস্তি নেই।
           </div>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -447,7 +465,7 @@ function LiabilitySection({ items, total }) {
                       <div className="break-words text-sm font-black text-slate-950 dark:text-white sm:text-base">
                         {item.name}
                       </div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">{share}% of this month</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">{share}এই মাসের অংশ</div>
                     </div>
                     <div className="shrink-0 text-base font-black text-emerald-700 dark:text-emerald-300 sm:text-xl">
                       ৳ {money(item.amount)}
@@ -473,137 +491,31 @@ function PlanCard({ plan, month, members, onGenerate, onStatus }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const progress = Math.min(100, Math.max(0, Number(plan?.stats?.progress || 0)));
   const canCreateBill = plan.status === "active" && month >= plan.startMonth && month <= plan.endMonth;
-  const splitItems = splitMonthlyAmount(plan, members);
-
-  return (
-    <article className="emi-plan-card overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm transition dark:border-white/10 dark:bg-white/[0.05] sm:rounded-3xl lg:hover:-translate-y-0.5 lg:hover:shadow-md">
-      <div className="bg-gradient-to-br from-slate-950 via-indigo-900 to-sky-800 p-4 text-white">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="break-words text-base font-black sm:text-lg">{plan.productName}</div>
-            <div className="mt-1 break-words text-xs text-slate-200">
-              {plan.brand || "No brand"} {plan.category ? `• ${plan.category}` : ""}
-            </div>
-          </div>
-          <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-black sm:text-xs ${statusClass(plan.status)}`}>
-            {plan.status || "-"}
-          </span>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:gap-3">
-          <div className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur">
-            <div className="text-[11px] text-slate-300 sm:text-xs">Monthly</div>
-            <div className="mt-1 text-lg font-black sm:text-xl">৳ {money(plan.monthlyAmount)}</div>
-          </div>
-          <div className="rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur">
-            <div className="text-[11px] text-slate-300 sm:text-xs">Progress</div>
-            <div className="mt-1 text-lg font-black sm:text-xl">{progress}%</div>
-          </div>
-        </div>
+  const splitItems = splitMonthlyAmount(plan, members, month);
+  const amount = monthInRange(month,plan.startMonth,plan.endMonth) ? scheduledAmountForMonth(plan,month) : plan.monthlyAmount;
+  return <article className="hf-v2-emi-row">
+    <div className="hf-v2-emi-row-main">
+      <div className="hf-v2-emi-product"><strong>{plan.productName}</strong><span>{[plan.brand,plan.category].filter(Boolean).join(' · ')}</span></div>
+      <div className="hf-v2-emi-amount"><small>মাসিক কিস্তি</small><strong>৳ {money(amount)}</strong></div>
+      <div className="hf-v2-emi-progress"><small>পরিশোধের অগ্রগতি</small><strong>{progress.toLocaleString('bn-BD')}%</strong><div className="hf-v2-progress"><i style={{width:`${progress}%`}}/></div></div>
+      <div className="hf-v2-emi-row-actions">
+        {canCreateBill && <button type="button" onClick={()=>onGenerate(plan._id,plan.productName)} className="hf-v2-btn hf-v2-btn--main">বিল তৈরি</button>}
+        <button type="button" className="hf-v2-btn hf-v2-btn--soft" aria-expanded={detailsOpen} onClick={()=>setDetailsOpen(v=>!v)}>{detailsOpen?'বন্ধ করুন':'বিস্তারিত'}</button>
       </div>
-
-      <div className="space-y-3 p-3 sm:p-4">
-        <div>
-          <div className="mb-1 flex justify-between gap-2 text-xs">
-            <span className="font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Payment Progress</span>
-            <span className="font-black text-slate-800 dark:text-slate-200">{progress}%</span>
-          </div>
-          <div className="h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-sky-500 via-indigo-500 to-violet-600"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          {Number(plan?.stats?.behindBy || 0) > 0 && (
-            <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200">
-              Behind: ৳ {money(plan.stats.behindBy)}
-            </div>
-          )}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setDetailsOpen((v) => !v)}
-          className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
-        >
-          {detailsOpen ? "Hide complete info" : "View complete info"}
-          <Icon name="chevron" className={cx("h-4 w-4 transition", detailsOpen && "rotate-180")} />
-        </button>
-
-        {detailsOpen && (
-          <div className="space-y-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-slate-950/40">
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-100 dark:bg-white/5 dark:ring-white/10">
-                <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Total</div>
-                <div className="mt-1 font-black text-slate-950 dark:text-white">৳ {money(plan.totalPayable)}</div>
-              </div>
-              <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-100 dark:bg-white/5 dark:ring-white/10">
-                <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Remaining</div>
-                <div className="mt-1 font-black text-slate-950 dark:text-white">৳ {money(plan?.stats?.remaining ?? 0)}</div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">{plan?.stats?.remainingMonths ?? "-"} mo left</div>
-              </div>
-              <div className="col-span-2 rounded-2xl bg-white p-3 ring-1 ring-slate-100 dark:bg-white/5 dark:ring-white/10">
-                <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Duration</div>
-                <div className="mt-1 font-black text-slate-950 dark:text-white">{plan.startMonth} → {plan.endMonth}</div>
-                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{plan.months} months • {splitLabel(plan?.splitType)} split</div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/[0.04]">
-              <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Who Pays Monthly
-              </div>
-              {!splitItems.length ? (
-                <div className="text-xs text-slate-500 dark:text-slate-400">Split info missing</div>
-              ) : (
-                <div className="space-y-2">
-                  {splitItems.map((item) => {
-                    const bar = percentage(item.amount, Number(plan?.monthlyAmount || 0));
-
-                    return (
-                      <div key={item.key} className="rounded-xl bg-slate-50 p-2.5 ring-1 ring-slate-100 dark:bg-slate-950/50 dark:ring-white/10">
-                        <div className="flex items-center justify-between gap-3 text-xs">
-                          <span className="truncate font-semibold text-slate-700 dark:text-slate-300">{item.name}</span>
-                          <span className="font-black text-slate-950 dark:text-white">৳ {money(item.amount)}</span>
-                        </div>
-                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
-                          <div
-                            className="h-full rounded-full bg-gradient-to-r from-sky-500 to-indigo-600"
-                            style={{ width: `${bar}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {canCreateBill && (
-            <ActionButton onClick={() => onGenerate(plan._id, plan.productName)} variant="primary" className="w-full">
-              Create Bill
-            </ActionButton>
-          )}
-
-          {plan.status === "active" ? (
-            <ActionButton onClick={() => onStatus(plan._id, "closed")} variant="soft" className="w-full">
-              Close Plan
-            </ActionButton>
-          ) : (
-            <ActionButton onClick={() => onStatus(plan._id, "active")} variant="soft" className="w-full">
-              Reopen Plan
-            </ActionButton>
-          )}
-        </div>
-      </div>
-    </article>
-  );
+    </div>
+    {Number(plan?.stats?.behindBy||0)>0 && <p className="hf-v2-inline-warning">রেকর্ড অনুযায়ী বকেয়া: ৳ {money(plan.stats.behindBy)}</p>}
+    {detailsOpen && <div className="hf-v2-emi-row-extra">
+      <div><span>মোট পরিশোধযোগ্য</span><strong>৳ {money(plan.totalPayable)}</strong></div>
+      <div><span>বাকি আছে</span><strong>৳ {money(plan?.stats?.remaining||0)}</strong></div>
+      <div><span>সময়</span><strong>{plan.startMonth} – {plan.endMonth}</strong></div>
+      <div className="hf-v2-emi-members"><span>এই মাসে কার কত ভাগ</span>{splitItems.map(it=><div key={it.key}><b>{it.name}</b><strong>৳ {money(it.amount)}</strong></div>)}</div>
+      <button type="button" className="hf-v2-btn hf-v2-btn--soft" onClick={()=>onStatus(plan._id,plan.status==='active'?'closed':'active')}>{plan.status==='active'?'পরিকল্পনা বন্ধ করুন':'আবার চালু করুন'}</button>
+    </div>}
+  </article>;
 }
 
 export default function EMI() {
+  const [hfMore, setHfMore] = useState(false);
   const me = getUser();
   const myId = normalizeId(me?.id);
   const [month, setMonth] = useState(monthNow());
@@ -615,6 +527,9 @@ export default function EMI() {
   const [expenseCats, setExpenseCats] = useState([]);
   const [plans, setPlans] = useState([]);
   const [installments, setInstallments] = useState([]);
+  const [dueSummary, setDueSummary] = useState(null);
+  const [integrityReport, setIntegrityReport] = useState(null);
+  const [integrityUnavailable, setIntegrityUnavailable] = useState(false);
 
   const monthOptions = [1, 3, 6, 9, 12, 18, 24, 36];
 
@@ -691,7 +606,6 @@ export default function EMI() {
         name.includes("saving");
 
       const belongsToSelectedPayer =
-        !selectedPayerOwner ||
         owner === selectedPayerOwner ||
         owner === "Joint";
 
@@ -771,8 +685,24 @@ export default function EMI() {
   }
 
   async function loadInstallments() {
+    // This GET is advisory only. It never creates, edits or repairs finance records.
+    api.get("/api/emi/integrity", { params: { month } })
+      .then((result) => {
+        setIntegrityReport(result.data.report || null);
+        setIntegrityUnavailable(false);
+      })
+      .catch(() => { setIntegrityReport(null); setIntegrityUnavailable(true); });
     const res = await api.get("/api/emi/installments", { params: { month } });
     setInstallments(res.data.items || []);
+    try {
+      const due = await api.get("/api/emi/due-summary", { params: { month } });
+      setDueSummary(due.data.summary || null);
+    } catch (error) {
+      setDueSummary(null);
+      if (error?.response?.status === 404) {
+        setMsg("EMI due reporting requires the Phase 2A backend update. Restart or redeploy the server.");
+      }
+    }
   }
 
   useEffect(() => {
@@ -871,6 +801,7 @@ export default function EMI() {
       await api.post("/api/emi/plans", payload);
       closeModal();
       await loadPlans();
+      await loadInstallments();
     } catch (e) {
       setMsg(e?.response?.data?.message || "Create plan failed");
     }
@@ -889,12 +820,14 @@ export default function EMI() {
     });
 
     plans.forEach((plan) => {
-      const isActive = String(plan?.status || "") === "active";
+      // "To pay" means an active obligation, not an archived/closed plan.
+      // Historical *payments* remain visible through installments and Ledger;
+      // a closed plan with missing payment evidence is flagged by EMI Integrity.
+      if (String(plan?.status || "active").toLowerCase() !== "active") return;
       const inThisMonth = monthInRange(month, plan?.startMonth, plan?.endMonth);
+      if (!inThisMonth) return;
 
-      if (!isActive || !inThisMonth) return;
-
-      const parts = splitMonthlyAmount(plan, members);
+      const parts = splitMonthlyAmount(plan, members, month);
 
       parts.forEach((part) => {
         const partUserId = normalizeId(part.userId || part.key);
@@ -1019,6 +952,7 @@ export default function EMI() {
     try {
       await api.put(`/api/emi/plans/${planId}/status`, { status });
       await loadPlans();
+      await loadInstallments();
     } catch (e) {
       setMsg(e?.response?.data?.message || "Status update failed");
     }
@@ -1096,86 +1030,142 @@ function openPayModalForInstallment(item) {
 
   return (
     <AppLayout>
+      <div className={`hf-step3-page hf-step3-emi hf-v2-page hf-v2-emi ${hfMore ? "hf-step3-expanded" : ""}`}>
+        <HFPageLead title="কিস্তি" description="কত টাকা দেওয়ার কথা এবং কোন কিস্তি পরিশোধ হয়েছে" month={month} onMonthChange={setMonth}
+          metrics={[
+ {label:'এই মাসে দেওয়ার কথা',value:monthlyCombinedTotal,primary:true},
+ {label:'চলমান কিস্তির পরিকল্পনা',value:activePlansThisMonth.length,kind:'count'}
+]}
+          onAdd={openModal} addLabel="নতুন কিস্তি"
+          addDisabled={false}
+          onExtra={undefined} extraLabel=""
+          onRefresh={undefined}
+          more={hfMore} onToggleMore={() => setHfMore(v => !v)} />
+
       <main className="emi-page min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 px-2 py-3 text-slate-950 transition-colors dark:bg-slate-950 dark:text-white sm:px-4 sm:py-4 lg:px-6 lg:py-6">
         <div className="mx-auto w-full space-y-4 sm:space-y-5">
-          <section className="relative overflow-hidden rounded-[1.5rem] bg-gradient-to-br from-slate-950 via-indigo-950 to-sky-800 p-4 text-white shadow-xl sm:rounded-3xl sm:p-6 lg:p-7">
-            <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-cyan-400/20 blur-2xl" />
-            <div className="absolute bottom-0 left-1/2 h-28 w-72 -translate-x-1/2 rounded-full bg-fuchsia-400/10 blur-3xl" />
+          <></>
 
-            <div className="relative flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-              <div className="max-w-3xl">
-                <div className="hidden w-fit items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-100 backdrop-blur sm:inline-flex">
-                  EMI Planner
+          <></>
+
+          {dueSummary?.excludedClosedPlans?.length > 0 && (
+            <section className="hf-step3-advanced rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sky-950 dark:border-sky-400/25 dark:bg-sky-400/10 dark:text-sky-100">
+              <div className="text-xs font-black uppercase tracking-wide">বন্ধ কিস্তির পরিকল্পনা চলতি মাসে ধরা হয়নি</div>
+              <div className="mt-1 text-sm font-semibold">
+                ৳ {money(dueSummary.excludedClosedThisMonth)} বন্ধ পরিকল্পনার টাকা চলতি মাসের বকেয়ায় যোগ হয়নি।
+              </div>
+              <p className="mt-1 text-xs">
+                Closing a plan does not erase historical paid installments. A closed plan with unrecorded payments or an outstanding balance still needs reconciliation; review EMI Record Integrity before trusting historical dues.
+              </p>
+              <details className="mt-2 text-xs">
+                <summary className="cursor-pointer font-bold">বন্ধ পরিকল্পনা দেখুন</summary>
+                <div className="mt-2 space-y-1">
+                  {dueSummary.excludedClosedPlans.map((item) => (
+                    <div key={item.planId} className="flex items-center justify-between gap-3">
+                      <span>{item.productName}</span>
+                      <b>৳ {money(item.scheduledThisMonth)} নির্ধারিত; ৳ {money(item.unverifiedUnpaidThrough)} টাকা দেওয়ার তথ্য নেই</b>
+                    </div>
+                  ))}
                 </div>
-                <h1 className="text-2xl font-black tracking-tight sm:mt-4 sm:text-4xl">
-                  EMI Management
-                </h1>
-                <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-200 sm:text-base sm:leading-6">
-                  Create EMI plans, generate bills, and track monthly liability for {monthLabel(month)}.
-                </p>
+              </details>
+            </section>
+          )}
+
+          {dueSummary && (
+            <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-100">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-black uppercase tracking-wide">এই মাস পর্যন্ত বাকি কিস্তি {monthLabel(month)}</div>
+                  <div className="mt-1 text-xl font-black">বাকি: ৳ {money(dueSummary.unpaidThrough)}</div>
+                  <div className="mt-1 text-xs font-medium">এর মধ্যে ৳ {money(dueSummary.overdue)} comes from earlier months. Includes bills not generated yet; pending payments are not cash expenses.</div>
+                </div>
+                <div className="text-right text-xs font-semibold">{dueSummary.unpaidCount} টি কিস্তি বাকি<div className="mt-1">এই মাসের কিস্তি: ৳ {money(dueSummary.dueThisMonth)}</div></div>
               </div>
+              {dueSummary.entries?.length > 0 && (
+                <details className="mt-3 rounded-xl border border-amber-200/70 bg-white/65 p-3 text-xs dark:border-white/10 dark:bg-slate-900/40">
+                  <summary className="cursor-pointer font-black">কোন মাসের বিল বাকি দেখুন</summary>
+                  <div className="mt-2 max-h-48 space-y-2 overflow-y-auto">
+                    {dueSummary.entries.map((item) => (
+                      <div key={`${item.planId}-${item.month}`} className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/50 py-1 dark:border-white/10">
+                        <span>{item.productName} · {item.month}{item.generated ? '' : ' · Bill not generated'}</span>
+                        <b>৳ {money(item.amount)}</b>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </section>
+          )}
 
-              <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto xl:min-w-[460px]">
-                <label
-                  onClick={openNativePicker}
-                  className="cursor-pointer rounded-2xl border border-white/15 bg-white/10 p-2.5 backdrop-blur sm:p-3"
-                >
-                  <span className="mb-1 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-300 sm:text-xs">
-                    <Icon name="calendar" className="h-3.5 w-3.5" />
-                    Selected Month
-                  </span>
-                  <input
-                    type="month"
-                    className="w-full cursor-pointer rounded-xl border border-white/20 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:ring-4 focus:ring-white/20 dark:bg-slate-950 dark:text-white [color-scheme:light] dark:[color-scheme:dark]"
-                    value={month}
-                    onChange={(e) => setMonth(e.target.value)}
-                    onClick={(e) => {
-                      e.currentTarget.focus();
-                      e.currentTarget.showPicker?.();
-                    }}
-                  />
-                </label>
-
-                <ActionButton onClick={openModal} variant="soft" className="min-h-[46px] rounded-2xl bg-white text-slate-950 hover:bg-sky-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 sm:min-h-[74px]">
-                  <Icon name="plus" className="h-4 w-4" />
-                  Add EMI Plan
-                </ActionButton>
+          {integrityReport && (
+            <section className={`hf-step3-advanced rounded-2xl border p-4 ${integrityReport.issueCount ? "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-100" : "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-400/25 dark:bg-emerald-400/10 dark:text-emerald-100"}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-xs font-black uppercase tracking-wide">কিস্তির আগের হিসাব যাচাই (শুধু দেখার জন্য)</div>
+                  <p className="mt-1 text-xs">আগের রেকর্ড যাচাই: {integrityReport.checked?.plans || 0} টি পরিকল্পনা ও {integrityReport.checked?.installments || 0} টি বিল। কোনো তথ্য বদলাবে না।</p>
+                </div>
+                <span className="rounded-full border border-current/20 px-3 py-1 text-sm font-black">{integrityReport.issueCount} টি সমস্যা</span>
               </div>
-            </div>
-          </section>
-
-          <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              label="Combined EMI To Pay"
-              value={`৳ ${money(monthlyCombinedTotal)}`}
-              helper={`Total active EMI liability in ${monthLabel(month)}`}
-              accent="from-emerald-400 to-teal-600"
-              icon="card"
-            />
-            <StatCard
-              label="Active Plans"
-              value={activePlansThisMonth.length}
-              helper="Plans active in selected month"
-              accent="from-sky-400 to-blue-600"
-              icon="chart"
-              hideOnMobile
-            />
-            <StatCard
-              label="Pending Bills"
-              value={`৳ ${money(installmentStats.pending)}`}
-              helper={`${installmentStats.pendingCount} pending installment(s)`}
-              accent="from-amber-400 to-orange-600"
-              icon="calendar"
-              hideOnMobile
-            />
-            <StatCard
-              label="Paid This Month"
-              value={`৳ ${money(installmentStats.paid)}`}
-              helper={`${installmentStats.paidCount} paid installment(s)`}
-              accent="from-violet-400 to-fuchsia-600"
-              icon="check"
-            />
-          </section>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-xl border border-rose-400/25 bg-rose-400/10 p-2"><div className="text-xl font-black">{integrityReport.severitySummary?.critical || 0}</div><div className="text-[11px] font-bold">জরুরি যাচাই</div></div>
+                <div className="rounded-xl border border-amber-400/25 bg-amber-400/10 p-2"><div className="text-xl font-black">{integrityReport.severitySummary?.warning || 0}</div><div className="text-[11px] font-bold">যাচাই করুন</div></div>
+                <div className="rounded-xl border border-sky-400/25 bg-sky-400/10 p-2"><div className="text-xl font-black">{integrityReport.severitySummary?.info || 0}</div><div className="text-[11px] font-bold">শুধু অবস্থা</div></div>
+              </div>
+              <p className="mt-3 text-xs font-medium">Important: finding count is not a count of unpaid EMI payments. One installment may have several missing links. Closing a plan does not prove payment, and missing app history does not prove debt. Compare old bank/card statements before making any changes.</p>
+              <details className="mt-3 rounded-xl border border-current/15 bg-white/40 p-3 dark:bg-slate-900/40" open>
+                <summary className="cursor-pointer text-xs font-black">পরিকল্পনা অনুযায়ী পরিশোধের তথ্য ({integrityReport.planSummaries?.length || 0})</summary>
+                <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-2">
+                  {(integrityReport.planSummaries || []).map((plan) => (
+                    <div key={plan.planId} className="rounded-xl border border-current/15 bg-white/70 p-3 dark:bg-slate-900/50">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0"><div className="text-sm font-black">{plan.productName}</div><div className="mt-0.5 text-[11px] font-semibold">{plan.status === "closed" ? "Closed/archived" : "Active"} · {plan.generatedCount} তৈরি · {plan.recordedPaidCount} পরিশোধ দেখানো</div></div>
+                        <span className={`rounded-full px-2 py-1 text-[11px] font-black ${plan.critical ? "bg-rose-500/15 text-rose-600 dark:text-rose-300" : plan.warning ? "bg-amber-500/15 text-amber-700 dark:text-amber-200" : "bg-sky-500/15 text-sky-700 dark:text-sky-200"}`}>{plan.issueCount ? `${plan.issueCount} finding(s)` : "No findings"}</span>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        <div>মোট কিস্তির টাকা <b className="block">৳ {money(plan.scheduledTotal)}</b></div>
+                        <div>পরিশোধিত কিস্তি <b className="block">৳ {money(plan.recordedPaidAmount)}</b></div>
+                        <div>অ্যাপে পাওয়া প্রকৃত পরিশোধ <b className="block">৳ {money(plan.verifiedLinkedAmount)}</b></div>
+                        <div>অ্যাপে পরিশোধ লেখা নেই <b className="block">৳ {money(plan.unresolvedScheduledBalance)}</b></div>
+                      </div>
+                      <p className="mt-2 text-[11px] opacity-80">“Not marked paid” and “linked cash verified” describe app records only—not an external bank/card statement.</p>
+                      {plan.issueCount > 0 && (
+                        <details className="mt-2 border-t border-current/10 pt-2 text-xs">
+                          <summary className="cursor-pointer font-bold">সমস্যা ও করণীয় দেখুন</summary>
+                          <div className="mt-2 max-h-64 space-y-2 overflow-y-auto">
+                            {(integrityReport.issues || []).filter((issue) => issue.planId === plan.planId).map((issue, index) => (
+                              <div key={`${issue.code}-${issue.ref}-${index}`} className="rounded-lg border border-current/10 p-2">
+                                <div className="font-black">{issue.label} · {issue.severity}</div>
+                                <div className="mt-1">{issue.detail}</div>
+                                <div className="mt-1 font-semibold">এরপর: {issue.suggestedAction}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </details>
+              <details className="mt-2 rounded-xl border border-current/15 bg-white/40 p-3 text-xs dark:bg-slate-900/40">
+                <summary className="cursor-pointer font-black">সব সমস্যা, মেলেনি এমন লেনদেনসহ ({integrityReport.issueCount})</summary>
+                <div className="mt-2 max-h-72 space-y-2 overflow-y-auto">
+                  {(integrityReport.issues || []).map((issue, index) => (
+                    <div key={`${issue.code}-${issue.ref}-${index}`} className="rounded-lg border border-current/10 p-2">
+                      <div className="font-bold">{issue.label} · {issue.severity}</div>
+                      <p>{issue.detail}</p><p className="mt-1 font-semibold">{issue.suggestedAction}</p>
+                    </div>
+                  ))}
+                  {integrityReport.truncated && <div>আরও সমস্যা থাকতে পারে; সংশোধনের আগে পূর্ণ রিপোর্ট দেখুন।</div>}
+                </div>
+              </details>
+              <div className="mt-3 rounded-xl border border-sky-400/25 bg-sky-500/10 p-3 text-xs font-medium">
+                <b>ক্রেডিট কার্ড সতর্কতা:</b> This project currently stores all payment accounts as cash, bank, wallet, savings or investment. Credit-card limits and card debt are not separate account types. Any account named “Credit Card” that is classified as bank may distort available cash. This scan flags EMI payments from such accounts but does not alter balances.
+              </div>
+            </section>
+          )}
+          {integrityUnavailable && (
+            <p className="text-xs text-amber-600 dark:text-amber-300">EMI integrity check unavailable. Confirm the Phase 2B backend is running; older records have not been verified.</p>
+          )}
 
           {msg && (
             <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-800 shadow-sm break-words dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-200">
@@ -1188,36 +1178,36 @@ function openPayModalForInstallment(item) {
           <section className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.05] sm:rounded-3xl">
             <div className="flex flex-col gap-3 border-b border-slate-100 bg-gradient-to-r from-white to-sky-50 p-4 dark:border-white/10 dark:from-white/[0.06] dark:to-sky-400/10 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <div className="text-base font-black text-slate-950 dark:text-white sm:text-lg">Monthly EMI Bills</div>
+                <div className="text-base font-black text-slate-950 dark:text-white sm:text-lg">এই মাসের কিস্তির বিল</div>
                 <p className="mt-1 hidden text-sm text-slate-600 dark:text-slate-400 sm:block">
-                  Generate pending installment rows for all active plans in {monthLabel(month)}. Pending rows do not affect Dashboard debt or spend until marked paid.
+                  চলমান কিস্তির বিল তৈরি করুন: {monthLabel(month)}. শুধু টাকা পরিশোধের পর ব্যাংক থেকে কাটা হবে।
                 </p>
                 <p className="mt-1 hidden text-xs text-slate-500 dark:text-slate-400 sm:block">
-                  Expense category used: <b>{emiExpenseCategoryId ? "EMI" : "Not selected"}</b>
+                  খরচের ধরন: <b>{emiExpenseCategoryId ? "EMI" : "Not selected"}</b>
                 </p>
               </div>
 
               <ActionButton onClick={generateMonth} variant="primary" className="w-full rounded-2xl sm:w-auto">
                 <Icon name="refresh" className="h-4 w-4" />
-                Create EMI Bills
+                এই মাসের বিল তৈরি করুন
               </ActionButton>
             </div>
 
             <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-3 sm:p-5">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-slate-950/40 sm:p-4">
                 <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:text-xs">
-                  Created Bills
+                  তৈরি হওয়া বিল
                 </div>
                 <div className="mt-2 text-2xl font-black text-slate-950 dark:text-white sm:text-3xl">{installments.length}</div>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-slate-950/40 sm:col-span-2 sm:p-4">
                 <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:text-xs">
-                  Collection Progress
+                  পরিশোধের অগ্রগতি
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-3">
                   <div className="text-2xl font-black text-slate-950 dark:text-white sm:text-3xl">{installmentStats.progress}%</div>
                   <div className="hidden text-sm text-slate-500 dark:text-slate-400 sm:block">
-                    Paid ৳ {money(installmentStats.paid)} / ৳ {money(installmentStats.total)}
+                    দেওয়া হয়েছে ৳ {money(installmentStats.paid)} / ৳ {money(installmentStats.total)}
                   </div>
                 </div>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
@@ -1229,7 +1219,7 @@ function openPayModalForInstallment(item) {
               </div>
               <div className="hidden rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-950/40 sm:block sm:col-span-3">
                 <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Next Due
+                  পরবর্তী বিল
                 </div>
                 <div className="mt-2 text-base font-black text-slate-950 break-words dark:text-white">
                   {nextDueInstallment?.planId?.productName || "No pending due"}
@@ -1244,13 +1234,13 @@ function openPayModalForInstallment(item) {
           <section className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.05] sm:rounded-3xl">
             <div className="flex flex-col gap-2 border-b border-slate-100 bg-gradient-to-r from-white via-indigo-50 to-sky-50 p-4 dark:border-white/10 dark:from-white/[0.06] dark:via-indigo-400/10 dark:to-sky-400/10 sm:flex-row sm:items-end sm:justify-between sm:p-5">
               <div>
-                <div className="text-base font-black text-slate-950 dark:text-white sm:text-lg">EMI Plans</div>
+                <div className="text-base font-black text-slate-950 dark:text-white sm:text-lg">চলমান কিস্তি</div>
                 <p className="mt-1 hidden text-sm text-slate-600 dark:text-slate-400 sm:block">
-                  Minimal cards with expandable details for product, split, progress, and bill creation.
+                  পণ্য অনুযায়ী কিস্তি ও পরিশোধ দেখুন।
                 </p>
               </div>
               <div className="w-fit rounded-full border border-indigo-100 bg-white px-3 py-1 text-xs font-bold text-indigo-700 dark:border-indigo-400/20 dark:bg-indigo-400/10 dark:text-indigo-200">
-                {plans.length} plan(s)
+                {plans.length} টি পরিকল্পনা
               </div>
             </div>
 
@@ -1260,19 +1250,19 @@ function openPayModalForInstallment(item) {
                   <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-slate-950 text-white dark:bg-white dark:text-slate-950">
                     <Icon name="card" className="h-5 w-5" />
                   </div>
-                  <div className="mt-3 text-base font-black text-slate-900 dark:text-white">No EMI plans yet</div>
+                  <div className="mt-3 text-base font-black text-slate-900 dark:text-white">এখনও কোনো কিস্তি যোগ হয়নি</div>
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Add your first EMI plan to calculate monthly payables automatically.
+                    মাসিক কিস্তির হিসাবের জন্য প্রথম পরিকল্পনা যোগ করুন।
                   </p>
                   <ActionButton onClick={openModal} variant="primary" className="mt-4">
                     <Icon name="plus" className="h-4 w-4" />
-                    Add EMI Plan
+                    নতুন কিস্তি
                   </ActionButton>
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-3 p-3 sm:gap-4 sm:p-4 xl:grid-cols-2 2xl:grid-cols-3">
-                {plans.map((p) => (
+              <div className="hf-v2-emi-list">
+                {plans.filter((p) => hfMore || (p.status === "active" && Number(p?.stats?.progress ?? 0) < 100)).map((p) => (
                   <PlanCard
                     key={p._id}
                     plan={p}
@@ -1289,20 +1279,20 @@ function openPayModalForInstallment(item) {
           <section className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.05] sm:rounded-3xl">
             <div className="flex flex-col gap-2 border-b border-slate-100 bg-gradient-to-r from-white to-amber-50 p-4 dark:border-white/10 dark:from-white/[0.06] dark:to-amber-400/10 sm:flex-row sm:items-end sm:justify-between sm:p-5">
               <div>
-                <div className="text-base font-black text-slate-950 dark:text-white sm:text-lg">Installments ({monthLabel(month)})</div>
+                <div className="text-base font-black text-slate-950 dark:text-white sm:text-lg">কিস্তিগুলো ({monthLabel(month)})</div>
                 <p className="mt-1 hidden text-sm text-slate-600 dark:text-slate-400 sm:block">
-                  Mark monthly installments paid or pending. Only paid installments deduct from the selected account and appear in Dashboard debt/spend.
+                  কিস্তি পরিশোধ করলে নির্ধারিত অ্যাকাউন্ট থেকে টাকা কাটা হবে।
                 </p>
               </div>
               <div className="w-fit rounded-full border border-amber-100 bg-white px-3 py-1 text-xs font-bold text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200">
-                Total generated: {installments.length}
+                মোট তৈরি: {installments.length}
               </div>
             </div>
 
             {installments.length === 0 ? (
               <div className="p-4 sm:p-6">
                 <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-slate-950/40 dark:text-slate-400 sm:p-8">
-                  No installments generated for this month. Use <b>Create EMI Bills</b> first.
+                  এই মাসের বিল তৈরি হয়নি। চাপুন: <b>এই মাসের বিল তৈরি করুন</b> আগে।
                 </div>
               </div>
             ) : (
@@ -1317,18 +1307,18 @@ function openPayModalForInstallment(item) {
                           {i?.planId?.productName || "-"}
                         </div>
                         <div className="mt-1 hidden text-xs text-slate-500 dark:text-slate-400 sm:block">
-                          Generated EMI installment for {monthLabel(month)}
+                          যার জন্য কিস্তি তৈরি হয়েছে {monthLabel(month)}
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 lg:contents">
                         <div className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100 dark:bg-slate-950/40 dark:ring-white/10 lg:bg-transparent lg:p-0 lg:ring-0">
-                          <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:text-xs">Amount</div>
+                          <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:text-xs">টাকা</div>
                           <div className="mt-1 text-base font-black text-slate-950 dark:text-white sm:text-lg">৳ {money(i.amount)}</div>
                         </div>
 
                         <div className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100 dark:bg-slate-950/40 dark:ring-white/10 lg:bg-transparent lg:p-0 lg:ring-0">
-                          <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:text-xs">Due Date</div>
+                          <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:text-xs">নির্ধারিত তারিখ</div>
                           <div className="mt-1 text-sm font-bold text-slate-700 dark:text-slate-200 sm:text-base">{safeDate(i.dueDate)}</div>
                         </div>
                       </div>
@@ -1342,17 +1332,19 @@ function openPayModalForInstallment(item) {
                       <div className="grid grid-cols-2 gap-2 lg:flex lg:justify-end">
                         {paid ? (
                           <ActionButton onClick={() => setInstallmentStatus(i._id, "pending")} variant="soft" className="w-full px-3">
-                            Pending
+                            বাকি
                           </ActionButton>
                         ) : (
                           <ActionButton onClick={() => openPayModalForInstallment(i)} variant="success" className="w-full px-3">
-                            Pay
+                            পরিশোধ করুন
                           </ActionButton>
                         )}
 
-                        <ActionButton onClick={() => deleteInstallment(i._id)} variant="danger" className="w-full px-3">
-                          Delete
-                        </ActionButton>
+                        {!paid && (
+                          <ActionButton onClick={() => deleteInstallment(i._id)} variant="danger" className="w-full px-3">
+                            মুছুন
+                          </ActionButton>
+                        )}
                       </div>
                     </div>
                   );
@@ -1364,8 +1356,8 @@ function openPayModalForInstallment(item) {
 
         <ConfirmModal
           open={confirmOpen}
-          title="Delete Installment"
-          message="Are you sure you want to delete this installment? If it is already paid, the related payment record may also be affected."
+          title="কিস্তির বিল মুছবেন?"
+          message="পরিশোধ হয়নি এমন বিলটি মুছবেন? পরিশোধিত বিল আগে কিস্তি অংশ থেকে বাতিল করতে হবে।"
           onCancel={() => {
             setConfirmOpen(false);
             setDeleteInstallmentId("");
@@ -1377,15 +1369,15 @@ function openPayModalForInstallment(item) {
           <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4">
             <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl border border-slate-200 bg-white text-slate-950 shadow-2xl dark:border-white/10 dark:bg-slate-950 dark:text-white sm:max-w-xl sm:rounded-3xl">
               <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-5 text-white">
-                <div className="text-xl font-black">Mark EMI as Paid</div>
+                <div className="text-xl font-black">কিস্তি পরিশোধ করুন</div>
                 <p className="mt-1 text-sm text-emerald-50">
-                  {selectedInstallment?.planId?.productName || "This installment"} will create an expense transaction and deduct the selected account.
+                  {selectedInstallment?.planId?.productName || "This installment"} টাকা দিলে নির্ধারিত অ্যাকাউন্ট থেকে কমবে।
                 </p>
               </div>
 
               <div className="space-y-4 p-4 sm:p-5">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="Who is paying" className="sm:col-span-2">
+                  <Field label="টাকা দেবেন" className="sm:col-span-2">
                     <select
                       className={inputClass()}
                       value={payForm.paidByUserId}
@@ -1393,7 +1385,7 @@ function openPayModalForInstallment(item) {
                         setPayForm((p) => ({ ...p, paidByUserId: e.target.value }))
                       }
                     >
-                      <option value="">Select member</option>
+                      <option value="">সদস্য বাছুন</option>
                       {members.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.name}
@@ -1402,7 +1394,7 @@ function openPayModalForInstallment(item) {
                     </select>
                   </Field>
 
-<Field label="From which account" className="sm:col-span-2">
+<Field label="কোন অ্যাকাউন্ট থেকে" className="sm:col-span-2">
   <select
     className={inputClass()}
     value={payForm.fromAccountId}
@@ -1410,11 +1402,11 @@ function openPayModalForInstallment(item) {
       setPayForm((p) => ({ ...p, fromAccountId: e.target.value }))
     }
   >
-    <option value="">Select account</option>
+    <option value="">অ্যাকাউন্ট বাছুন</option>
 
     {payableAccounts.length === 0 ? (
       <option value="" disabled>
-        No payable account found
+        পরিশোধের উপযুক্ত অ্যাকাউন্ট নেই
       </option>
     ) : (
       payableAccounts.map((a) => (
@@ -1426,7 +1418,7 @@ function openPayModalForInstallment(item) {
   </select>
 </Field>
 
-                  <Field label="Payment Date" className="sm:col-span-2">
+                  <Field label="পরিশোধের তারিখ" className="sm:col-span-2">
                     <input
                       type="date"
                       className={inputClass()}
@@ -1440,7 +1432,7 @@ function openPayModalForInstallment(item) {
 
                 <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 dark:border-emerald-400/20 dark:bg-emerald-400/10">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-bold text-emerald-700 dark:text-emerald-200">Payment Amount</span>
+                    <span className="text-sm font-bold text-emerald-700 dark:text-emerald-200">পরিশোধের টাকা</span>
                     <span className="text-2xl font-black text-emerald-800 dark:text-emerald-100">
                       ৳ {money(selectedInstallment?.amount || 0)}
                     </span>
@@ -1449,10 +1441,10 @@ function openPayModalForInstallment(item) {
 
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                   <ActionButton onClick={closePayModal} variant="soft">
-                    Cancel
+                    বাতিল
                   </ActionButton>
                   <ActionButton onClick={confirmMarkPaid} variant="success">
-                    Confirm Payment
+                    পরিশোধ নিশ্চিত করুন
                   </ActionButton>
                 </div>
               </div>
@@ -1464,7 +1456,7 @@ function openPayModalForInstallment(item) {
           <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4">
             <div className="emi-modal max-h-[94vh] w-full overflow-y-auto rounded-t-3xl border border-slate-200 bg-white text-slate-950 shadow-2xl dark:border-white/10 dark:bg-slate-950 dark:text-white sm:max-w-5xl sm:rounded-3xl">
               <div className="bg-gradient-to-br from-slate-950 via-indigo-950 to-sky-800 p-5 text-white sm:p-6">
-                <div className="text-xl font-black sm:text-2xl">Add EMI Plan</div>
+                <div className="text-xl font-black sm:text-2xl">নতুন কিস্তি</div>
                 <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-200 sm:text-sm">
                   Enter product, pricing, schedule, and split details. Monthly amount will be calculated automatically.
                 </p>
@@ -1474,25 +1466,25 @@ function openPayModalForInstallment(item) {
                 <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/[0.04] sm:p-4">
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-base font-black text-slate-950 dark:text-white">Product Details</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Basic purchase information</div>
+                      <div className="text-base font-black text-slate-950 dark:text-white">পণ্যের তথ্য</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">কেনাকাটার মৌলিক তথ্য</div>
                     </div>
                     <div className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200 dark:bg-white/10 dark:text-slate-300 dark:ring-white/10">
-                      Step 1
+                      ধাপ ১
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <Field label="Product Name" className="sm:col-span-2">
+                    <Field label="পণ্যের নাম" className="sm:col-span-2">
                       <input
                         className={inputClass()}
                         value={form.productName}
                         onChange={(e) => setForm({ ...form, productName: e.target.value })}
-                        placeholder="Example: Mobile phone"
+                        placeholder="যেমন: মোবাইল ফোন"
                       />
                     </Field>
 
-                    <Field label="Brand">
+                    <Field label="ব্র্যান্ড">
                       <input
                         className={inputClass()}
                         value={form.brand}
@@ -1501,13 +1493,13 @@ function openPayModalForInstallment(item) {
                       />
                     </Field>
 
-                    <Field label="Category">
+                    <Field label="খরচের ধরন">
                       <select
                         className={inputClass()}
                         value={form.category}
                         onChange={(e) => setForm({ ...form, category: e.target.value })}
                       >
-                        <option value="">Select category</option>
+                        <option value="">ধরন বাছুন</option>
                         {productCategoryOptions.map((cat) => (
                           <option key={cat} value={cat}>
                             {cat}
@@ -1516,7 +1508,7 @@ function openPayModalForInstallment(item) {
                       </select>
                     </Field>
 
-                    <Field label="Purchase Date">
+                    <Field label="কেনার তারিখ">
                       <input
                         type="date"
                         className={inputClass()}
@@ -1525,7 +1517,7 @@ function openPayModalForInstallment(item) {
                       />
                     </Field>
 
-                    <Field label="Start Month">
+                    <Field label="কিস্তি শুরুর মাস">
                       <input
                         type="month"
                         className={inputClass()}
@@ -1534,7 +1526,7 @@ function openPayModalForInstallment(item) {
                       />
                     </Field>
 
-                    <Field label="Months">
+                    <Field label="কত মাস">
                       <select
                         className={inputClass()}
                         value={form.months}
@@ -1553,16 +1545,16 @@ function openPayModalForInstallment(item) {
                 <div className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:p-4">
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-base font-black text-slate-950 dark:text-white">EMI Calculation</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Total payable is auto calculated</div>
+                      <div className="text-base font-black text-slate-950 dark:text-white">কিস্তির হিসাব</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">মোট কিস্তি নিজে থেকে হিসাব হবে</div>
                     </div>
                     <div className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-400/10 dark:text-indigo-200 dark:ring-indigo-400/20">
-                      Step 2
+                      ধাপ ২
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                    <Field label="Original Price">
+                    <Field label="মূল দাম">
                       <input
                         className={inputClass()}
                         value={form.originalPrice}
@@ -1571,7 +1563,7 @@ function openPayModalForInstallment(item) {
                       />
                     </Field>
 
-                    <Field label="EMI Charge (%)">
+                    <Field label="কিস্তির অতিরিক্ত চার্জ (%)">
                       <input
                         className={inputClass()}
                         value={form.emiCharge}
@@ -1579,16 +1571,16 @@ function openPayModalForInstallment(item) {
                         placeholder="Example: 0.9"
                       />
                       <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        Example: <b>0.9</b> means <b>0.9%</b> charge.
+                        Example: <b>0.9</b> অর্থ <b>0.9%</b> চার্জ।
                       </div>
                     </Field>
 
-                    <Field label="Total Payable">
+                    <Field label="মোট পরিশোধ">
                       <input
                         className={inputClass("bg-slate-50 font-black text-slate-950 dark:bg-slate-900 dark:text-white")}
                         value={form.totalPayable}
                         readOnly
-                        title="Auto calculated = Original Price + (Original Price × EMI Charge%)"
+                        title="মূল দামের সঙ্গে কিস্তির চার্জ যোগ হয়ে হিসাব হবে"
                       />
                     </Field>
 
@@ -1596,10 +1588,10 @@ function openPayModalForInstallment(item) {
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <div className="text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-200">
-                            Estimated Monthly EMI
+                            আনুমানিক মাসিক কিস্তি
                           </div>
                           <div className="mt-1 hidden text-sm text-emerald-700 dark:text-emerald-200 sm:block">
-                            Based on total payable and selected months.
+                            মোট টাকা ও মাসের সংখ্যা অনুযায়ী।
                           </div>
                         </div>
                         <div className="text-2xl font-black text-emerald-800 dark:text-emerald-100 sm:text-3xl">
@@ -1613,16 +1605,16 @@ function openPayModalForInstallment(item) {
                 <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/[0.04] sm:p-4">
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-base font-black text-slate-950 dark:text-white">Split Settings</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Decide who will carry this EMI liability</div>
+                      <div className="text-base font-black text-slate-950 dark:text-white">কার কতটা দিতে হবে</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">এই কিস্তি কার ভাগে পড়বে</div>
                     </div>
                     <div className="rounded-full bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700 ring-1 ring-violet-100 dark:bg-violet-400/10 dark:text-violet-200 dark:ring-violet-400/20">
-                      Step 3
+                      ধাপ ৩
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <Field label="Split Type" className="sm:col-span-2">
+                    <Field label="খরচ ভাগ হবে" className="sm:col-span-2">
                       <select
                         className={inputClass()}
                         value={form.splitType}
@@ -1638,15 +1630,15 @@ function openPayModalForInstallment(item) {
                           }));
                         }}
                       >
-                        <option value="equal">Equal</option>
-                        <option value="personal">Personal</option>
-                        <option value="ratio">Ratio</option>
-                        <option value="fixed">Fixed</option>
+                        <option value="equal">সমান</option>
+                        <option value="personal">ব্যক্তিগত</option>
+                        <option value="ratio">অনুপাত অনুযায়ী</option>
+                        <option value="fixed">নির্দিষ্ট</option>
                       </select>
                     </Field>
 
                     {form.splitType === "personal" && (
-                      <Field label="Personal For" className="sm:col-span-2">
+                      <Field label="কার জন্য" className="sm:col-span-2">
                         <select
                           className={inputClass()}
                           value={form.personalUserId}
@@ -1663,7 +1655,7 @@ function openPayModalForInstallment(item) {
 
                     {form.splitType === "ratio" && otherMember && (
                       <>
-                        <Field label="My %">
+                        <Field label="আমার শতাংশ">
                           <input
                             className={inputClass()}
                             value={form.ratioMe}
@@ -1680,14 +1672,14 @@ function openPayModalForInstallment(item) {
                         </Field>
 
                         <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-medium text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200 sm:col-span-2 lg:col-span-4">
-                          Ratio split should normally sum to 100.
+                          ভাগের মোট শতাংশ ১০০ হতে হবে।
                         </div>
                       </>
                     )}
 
                     {form.splitType === "fixed" && otherMember && (
                       <>
-                        <Field label="My Amount">
+                        <Field label="আমার ভাগ">
                           <input
                             className={inputClass()}
                             value={form.fixedMe}
@@ -1704,17 +1696,17 @@ function openPayModalForInstallment(item) {
                         </Field>
 
                         <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-medium text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200 sm:col-span-2 lg:col-span-4">
-                          Fixed amounts should match the monthly amount.
+                          Fixed amounts must total the regular monthly installment. The final installment is allocated proportionally if its amount differs.
                         </div>
                       </>
                     )}
 
-                    <Field label="Note" className="sm:col-span-2 lg:col-span-4">
+                    <Field label="মন্তব্য" className="sm:col-span-2 lg:col-span-4">
                       <input
                         className={inputClass()}
                         value={form.note}
                         onChange={(e) => setForm({ ...form, note: e.target.value })}
-                        placeholder="Optional note"
+                        placeholder="নোট (ইচ্ছা হলে)"
                       />
                     </Field>
                   </div>
@@ -1722,10 +1714,10 @@ function openPayModalForInstallment(item) {
 
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                   <ActionButton onClick={closeModal} variant="soft">
-                    Cancel
+                    বাতিল
                   </ActionButton>
                   <ActionButton onClick={createPlan} variant="primary">
-                    Save Plan
+                    পরিকল্পনা সংরক্ষণ
                   </ActionButton>
                 </div>
 
@@ -1739,6 +1731,7 @@ function openPayModalForInstallment(item) {
           </div>
         )}
       </main>
+          </div>
     </AppLayout>
   );
 }

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import HFPageLead from "../components/design/HFPageLead";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AppLayout from "../components/layout/AppLayout";
 import Loader from "../components/ui/Loader";
 import api from "../services/api";
@@ -17,10 +18,19 @@ function currentMonth() {
 
 function money(value) {
   const amount = Number(value || 0);
-  return `৳ ${amount.toLocaleString("en-BD", {
+  return `৳ ${amount.toLocaleString("bn-BD", {
     minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+// A new key belongs to each deliberate save operation. Reuse it if the network
+// response is lost so the backend can return the first result safely.
+function newRequestKey() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `hf-share-${crypto.randomUUID()}`;
+  }
+  return `hf-share-${Date.now()}-${Math.random().toString(36).slice(2).padEnd(16, "0")}`;
 }
 
 function round2(value) {
@@ -30,7 +40,7 @@ function round2(value) {
 function monthLabel(value) {
   const [year, month] = String(value || "").split("-").map(Number);
   if (!year || !month) return value || "Selected month";
-  return new Date(year, month - 1, 1).toLocaleDateString("en-US", {
+  return new Date(year, month - 1, 1).toLocaleDateString("bn-BD", {
     month: "long",
     year: "numeric",
   });
@@ -39,7 +49,7 @@ function monthLabel(value) {
 function dateLabel(value) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleDateString("en-GB", {
+  return d.toLocaleDateString("bn-BD", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -210,6 +220,7 @@ function Modal({ open, title, onClose, children, wide = false }) {
 }
 
 export default function SharedPurchases() {
+  const [hfMore, setHfMore] = useState(false);
   const storedUser = getUser();
   const myId = idOf(storedUser?._id || storedUser?.id);
 
@@ -221,6 +232,8 @@ export default function SharedPurchases() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const createRequestKey = useRef(null);
+  const paymentRequestKey = useRef(null);
   const [message, setMessage] = useState("");
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -387,6 +400,7 @@ export default function SharedPurchases() {
   }
 
   function openCreate() {
+    createRequestKey.current = newRequestKey();
     resetForm();
     setMessage("");
     setCreateOpen(true);
@@ -405,20 +419,21 @@ export default function SharedPurchases() {
     event.preventDefault();
     setMessage("");
 
-    if (!form.title.trim()) return setMessage("Purchase title is required");
-    if (total <= 0) return setMessage("Total amount must be greater than 0");
+    if (!form.title.trim()) return setMessage("কেনাকাটার নাম লিখুন");
+    if (total <= 0) return setMessage("মোট দাম শূন্যের বেশি হতে হবে");
     if (!form.payerUserId || !form.payerAccountId) {
-      return setMessage("Select the payer and payment account");
+      return setMessage("কে পুরো টাকা দিয়েছেন এবং কোন অ্যাকাউন্ট থেকে দিয়েছেন তা বাছুন");
     }
     if (form.purchaseType === "shared" && calculatedShares.length < 2) {
-      return setMessage("A shared purchase needs at least two members");
+      return setMessage("যৌথ কেনাকাটায় অন্তত দুজন সদস্য প্রয়োজন");
     }
     if (remaining !== 0) {
-      return setMessage(`Member shares must match the total. Remaining: ${money(remaining)}`);
+      return setMessage(`সবার ভাগ যোগ করলে মোট দামের সঙ্গে মিলতে হবে। পার্থক্য: ${money(remaining)}`);
     }
 
     setSaving(true);
     try {
+      if (!createRequestKey.current) createRequestKey.current = newRequestKey();
       await api.post("/api/shared-purchases", {
         title: form.title.trim(),
         totalAmount: total,
@@ -431,19 +446,21 @@ export default function SharedPurchases() {
         months: Number(form.months),
         shares: calculatedShares,
         note: form.note.trim(),
-      });
+      }, { headers: { 'Idempotency-Key': createRequestKey.current } });
 
+      createRequestKey.current = null;
       setCreateOpen(false);
       await loadPlans(month);
-      setMessage("Purchase added. The full amount changed the account balance, while monthly allocations were scheduled separately.");
+      setMessage("কেনাকাটা সংরক্ষিত হয়েছে। পুরো টাকা একবারই অ্যাকাউন্ট থেকে বের হয়েছে; মাসিক ভাগ আলাদাভাবে দেখানো হবে।");
     } catch (error) {
-      setMessage(error?.response?.data?.message || "Could not create purchase");
+      setMessage(error?.response?.data?.message || "কেনাকাটা সংরক্ষণ করা যায়নি");
     } finally {
       setSaving(false);
     }
   }
 
   function openPayment(plan, installment) {
+    paymentRequestKey.current = newRequestKey();
     const installmentUserId = idOf(installment?.userId);
     const payerUserId = idOf(plan?.payerUserId);
     const allowedFromAccounts = accounts.filter((account) =>
@@ -480,22 +497,30 @@ export default function SharedPurchases() {
 
   async function recordPayment(event) {
     event.preventDefault();
-    if (!selectedPlan?._id || !selectedInstallment?._id) return;
+    if (!selectedPlan?._id || !selectedInstallment?._id || saving) return;
     if (!payForm.fromAccountId || !payForm.toAccountId) {
-      return setMessage("Select both payment accounts");
+      return setMessage("টাকা দেওয়ার ও টাকা পাওয়ার অ্যাকাউন্ট বাছুন");
     }
 
     setSaving(true);
     try {
+      if (!paymentRequestKey.current) paymentRequestKey.current = newRequestKey();
       await api.post(
         `/api/shared-purchases/${selectedPlan._id}/installments/${selectedInstallment._id}/pay`,
-        payForm
+        {
+          ...payForm,
+          // Required by server-side payment integrity validation.
+          purchaseId: idOf(selectedPlan._id),
+          installmentId: idOf(selectedInstallment._id),
+        },
+        { headers: { 'Idempotency-Key': paymentRequestKey.current } }
       );
+      paymentRequestKey.current = null;
       setPayOpen(false);
       await loadPlans(month);
-      setMessage("Reimbursement recorded as an account transfer, not as regular income.");
+      setMessage("টাকা ফেরত দেওয়ার তথ্য সংরক্ষিত হয়েছে। এটি নতুন আয় বা খরচ নয়।");
     } catch (error) {
-      setMessage(error?.response?.data?.message || "Payment failed");
+      setMessage(error?.response?.data?.message || "টাকা ফেরত দেওয়ার তথ্য সংরক্ষণ করা যায়নি");
     } finally {
       setSaving(false);
     }
@@ -538,46 +563,21 @@ export default function SharedPurchases() {
 
   return (
     <AppLayout>
+      <div className={`hf-step3-page hf-step3-sharedpurchases hf-v2-page hf-v2-sharedpurchases ${hfMore ? "hf-step3-expanded" : ""}`}>
+        <HFPageLead title="ভাগ করে কেনাকাটা" description="বড় কেনাকাটার মাসিক ভাগ ও টাকা ফেরতের হিসাব" month={month} onMonthChange={setMonth}
+          metrics={[
+ {label:'এই মাসে ফেরত দিতে হবে',value:summary.monthDue,primary:true},
+ {label:'এই মাসে ফেরত পেয়েছেন',value:summary.monthReceived}
+]}
+          onAdd={openCreate} addLabel="নতুন কেনাকাটা"
+          addDisabled={false}
+          onExtra={undefined} extraLabel=""
+          onRefresh={undefined}
+          more={undefined} onToggleMore={undefined} />
+
       <div className="min-h-full bg-slate-50 px-1 py-2 text-slate-950 dark:bg-slate-950 dark:text-white sm:px-2 sm:py-3">
         <div className="mx-auto w-full space-y-5">
-          <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-slate-950 via-indigo-950 to-violet-800 p-5 text-white shadow-xl sm:p-7">
-            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-fuchsia-400/20 blur-3xl" />
-            <div className="absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-sky-400/15 blur-3xl" />
-            <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-3xl">
-                <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-indigo-100">
-                  Account balance ≠ monthly budget
-                </div>
-                <h1 className="mt-4 text-2xl font-black tracking-tight sm:text-4xl">
-                  Shared & Large Purchases
-                </h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-200 sm:text-base">
-                  Deduct the real purchase once from the payer account, distribute each member’s responsibility across months, and track reimbursements without counting them as income.
-                </p>
-              </div>
-
-              <div className="grid w-full gap-2 sm:grid-cols-[minmax(180px,1fr)_auto] lg:w-auto">
-                <label className="rounded-2xl border border-white/15 bg-white/10 px-3 py-2 backdrop-blur">
-                  <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-indigo-100">
-                    Viewing month
-                  </span>
-                  <input
-                    type="month"
-                    value={month}
-                    onChange={(event) => setMonth(event.target.value)}
-                    className="mt-1 w-full bg-transparent text-sm font-black text-white outline-none [color-scheme:dark]"
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={openCreate}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-indigo-800 shadow-lg transition hover:-translate-y-0.5 hover:bg-indigo-50"
-                >
-                  <Icon name="plus" /> Add Purchase
-                </button>
-              </div>
-            </div>
-          </section>
+          <></>
 
           {message ? (
             <div className="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-800 dark:border-indigo-400/20 dark:bg-indigo-400/10 dark:text-indigo-200">
@@ -585,36 +585,17 @@ export default function SharedPurchases() {
             </div>
           ) : null}
 
-          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              label="Outstanding"
-              value={money(summary.totalOutstanding)}
-              helper="Still owed to upfront payers"
-              icon="users"
-              tone="amber"
-            />
-            <StatCard
-              label={`${monthLabel(month)} Allocation`}
-              value={money(summary.monthAllocation)}
-              helper="Budget impact only; no second account deduction"
-              icon="calendar"
-              tone="indigo"
-            />
-            <StatCard
-              label="Due This Month"
-              value={money(summary.monthDue)}
-              helper="Reimbursements not recorded yet"
-              icon="arrow"
-              tone="sky"
-            />
-            <StatCard
-              label="Received This Month"
-              value={money(summary.monthReceived)}
-              helper="Transfers received, excluded from income"
-              icon="check"
-              tone="emerald"
-            />
-          </section>
+          <></>
+
+          <></>
+          {Number(summary.invalidPaymentRecords || 0) > 0 ? (
+            <div className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-sm font-semibold text-rose-800 dark:border-rose-400/30 dark:bg-rose-400/10 dark:text-rose-200">
+              {summary.invalidPaymentRecords} টি পরিশোধের সঙ্গে আসল টাকা পাঠানোর রেকর্ড মেলেনি। দেনা-পাওনার হিসাব ব্যবহারের আগে যাচাই করুন।
+            </div>
+          ) : null}
+          <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">
+            মাসিক ভাগ ও আসল ব্যাংক লেনদেন আলাদা করে হিসাব করা হয়।
+          </p>
 
           {loading ? (
             <div className="rounded-[28px] border border-slate-200 bg-white p-10 dark:border-white/10 dark:bg-slate-900/70">
@@ -625,30 +606,47 @@ export default function SharedPurchases() {
               <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-indigo-50 text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-200">
                 <Icon name="card" className="h-8 w-8" />
               </div>
-              <h2 className="mt-4 text-xl font-black">No large purchases yet</h2>
+              <h2 className="mt-4 text-xl font-black">এখনও বড় কেনাকাটা নেই</h2>
               <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-                Add a personal or shared purchase. Its full amount will change the real account balance immediately, while the monthly budget receives only scheduled portions.
+                কেনাকাটার পুরো টাকা যিনি দিয়েছেন, তাঁর অ্যাকাউন্ট থেকে একবারই কাটা হবে। মাসের হিসাবের জন্য নির্ধারিত ভাগ আলাদা দেখাবে।
               </p>
               <button
                 type="button"
                 onClick={openCreate}
                 className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-indigo-500/20"
               >
-                <Icon name="plus" /> Add First Purchase
+                <Icon name="plus" /> প্রথম কেনাকাটা যোগ করুন
               </button>
             </section>
           ) : (
             <section className="space-y-4">
               {plans.map((plan) => {
-                const payerName = nameOf(plan.payerUserId, "Payer");
+                const payerName = nameOf(plan.payerUserId, "টাকা দিয়েছেন");
                 const stats = plan.stats || {};
                 const rows = plan.monthInstallments || [];
+                const overdueRows = plan.overdueInstallments || [];
 
                 return (
-                  <article
-                    key={plan._id}
-                    className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900/70"
-                  >
+                  <article key={plan._id} className="hf-hishab-purchase-row">
+                    <div className="hf-hishab-purchase-row-main">
+                      <div><h2>{plan.title}</h2><p>পুরো টাকা দিয়েছেন {payerName} · {plan.months} মাসে ভাগ · {plan.purchaseType === 'personal' ? 'ব্যক্তিগত' : 'যৌথ'}</p></div>
+                      <div className="hf-hishab-purchase-number"><span>মোট দাম</span><strong>{money(plan.totalAmount)}</strong></div>
+                      <div className="hf-hishab-purchase-number"><span>ফেরত পাওয়া</span><strong>{money(stats.paidAmount)}</strong></div>
+                      <div className="hf-hishab-purchase-number"><span>ফেরত বাকি</span><strong>{money(stats.outstanding)}</strong></div>
+                      <div className="hf-hishab-plan-context">
+                        <span>নির্ধারিত মেয়াদ: {plan.months} মাস ({monthLabel(plan.startMonth)} – {monthLabel(plan.endMonth)})</span>
+                        <strong>আগের মাসগুলোর ভাগ: {money(plan.allocationHistory?.previousAmount)} ({plan.allocationHistory?.previousMonths?.length || 0} মাস)</strong>
+                        <small>এটি মাসিক হিসাবের ভাগ, নতুন ব্যাংক কর্তন নয়।</small>
+                      </div>
+                      {rows.some(item => item.paymentRequired && item.status !== 'paid') && (
+                        <button type="button" className="hf-v2-btn hf-v2-btn--main hf-hishab-purchase-pay"
+                          onClick={() => openPayment(plan, rows.find(item => item.paymentRequired && item.status !== 'paid'))}>
+                          টাকা দিয়েছেন
+                        </button>
+                      )}
+                    </div>
+                    <details className="hf-hishab-purchase-more" >
+                      <summary>এই মাসের ভাগ, আগের মাস ও পরিশোধের বিস্তারিত</summary>
                     <div className="p-4 sm:p-6">
                       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                         <div className="min-w-0">
@@ -663,21 +661,21 @@ export default function SharedPurchases() {
                                   : "bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-200"
                               }`}
                             >
-                              {plan.status}
+                              {plan.status === 'completed' ? 'শেষ হয়েছে' : 'চলছে'}
                             </span>
                             <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-slate-600 dark:bg-white/10 dark:text-slate-300">
-                              {plan.purchaseType === "personal" ? "Personal" : "Shared"}
+                              {plan.purchaseType === "personal" ? "ব্যক্তিগত" : "যৌথ"}
                             </span>
                           </div>
                           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                            Paid upfront by <strong>{payerName}</strong> from {plan.payerAccountId?.name || "account"} on {dateLabel(plan.purchaseDate)}.
+                            পুরো টাকা দিয়েছেন <strong>{payerName}</strong> যে অ্যাকাউন্ট থেকে {plan.payerAccountId?.name || "account"} তারিখ {dateLabel(plan.purchaseDate)}.
                           </p>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2">
                           <div className="rounded-2xl bg-slate-950 px-4 py-3 text-white dark:bg-white dark:text-slate-950">
                             <p className="text-[10px] font-black uppercase tracking-[0.14em] opacity-60">
-                              Purchase total
+                              মোট দাম
                             </p>
                             <p className="mt-1 text-lg font-black">{money(plan.totalAmount)}</p>
                           </div>
@@ -685,44 +683,22 @@ export default function SharedPurchases() {
                             type="button"
                             onClick={() => removePlan(plan)}
                             className="grid h-12 w-12 place-items-center rounded-2xl border border-rose-200 bg-rose-50 text-rose-700 transition hover:bg-rose-100 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200"
-                            title="Delete purchase"
+                            title="কেনাকাটা মুছুন"
                           >
                             <Icon name="trash" />
                           </button>
                         </div>
                       </div>
 
-                      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <div className="rounded-2xl bg-slate-50 p-4 dark:bg-white/[0.05]">
-                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Schedule</p>
-                          <p className="mt-2 font-black">{plan.months} months</p>
-                          <p className="mt-1 text-xs text-slate-500">{monthLabel(plan.startMonth)} → {monthLabel(plan.endMonth)}</p>
-                        </div>
-                        <div className="rounded-2xl bg-slate-50 p-4 dark:bg-white/[0.05]">
-                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Receivable</p>
-                          <p className="mt-2 font-black">{money(stats.receivableTotal)}</p>
-                          <p className="mt-1 text-xs text-slate-500">Other members’ total responsibility</p>
-                        </div>
-                        <div className="rounded-2xl bg-slate-50 p-4 dark:bg-white/[0.05]">
-                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Received</p>
-                          <p className="mt-2 font-black text-emerald-600 dark:text-emerald-300">{money(stats.paidAmount)}</p>
-                          <p className="mt-1 text-xs text-slate-500">{stats.paidCount || 0} of {stats.paymentCount || 0} repayments</p>
-                        </div>
-                        <div className="rounded-2xl bg-slate-50 p-4 dark:bg-white/[0.05]">
-                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Outstanding</p>
-                          <p className="mt-2 font-black text-amber-600 dark:text-amber-300">{money(stats.outstanding)}</p>
-                          <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
-                            <div
-                              className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-emerald-500"
-                              style={{ width: `${Math.min(100, Number(stats.progress || 0))}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
+                      <div className="hf-v2-shared-facts">
+  <div><span>কত মাস ধরে</span><strong>{plan.months} মাস</strong><small>{monthLabel(plan.startMonth)} — {monthLabel(plan.endMonth)}</small></div>
+  <div><span>টাকা ফেরত পেয়েছেন</span><strong>{money(stats.paidAmount)}</strong></div>
+  <div><span>এখনও পাওনা (ভবিষ্যতের ভাগসহ)</span><strong>{money(stats.outstanding)}</strong></div>
+</div>
 
                       <div className="mt-5">
                         <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                          Member responsibility
+                          কার কত ভাগ
                         </p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           {(plan.shares || []).map((share) => (
@@ -733,7 +709,7 @@ export default function SharedPurchases() {
                               <strong>{nameOf(share.userId)}</strong>
                               <span className="mx-2 text-slate-300 dark:text-slate-600">•</span>
                               {money(share.shareAmount)}
-                              <span className="ml-2 text-xs text-slate-500">≈ {money(share.monthlyAmount)}/month</span>
+                              <span className="ml-2 text-xs text-slate-500">≈ {money(share.monthlyAmount)}/মাস</span>
                             </div>
                           ))}
                         </div>
@@ -743,22 +719,23 @@ export default function SharedPurchases() {
                     <div className="border-t border-slate-200 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-slate-950/45 sm:p-6">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <h3 className="font-black">{monthLabel(month)} schedule</h3>
+                          <h3 className="font-black">{monthLabel(month)} হিসাব</h3>
                           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            The upfront payer’s own allocation affects the monthly budget. Another member’s portion is added to debt/spend only after Record Payment is completed.
+                            প্রত্যেকের মাসিক ভাগ নির্ধারিত থাকবে। টাকা ফেরতের লেনদেন নতুন খরচ তৈরি করে না।
                           </p>
                         </div>
                       </div>
 
                       {rows.length === 0 ? (
                         <div className="mt-4 rounded-2xl border border-dashed border-slate-300 px-4 py-5 text-center text-sm text-slate-500 dark:border-white/15 dark:text-slate-400">
-                          This purchase has no allocation in the selected month.
+                          এই মাসে কোনো ভাগ নেই।
                         </div>
                       ) : (
                         <div className="mt-4 grid gap-3 xl:grid-cols-2">
                           {rows.map((installment) => {
                             const member = installment.userId || memberMap.get(idOf(installment.userId));
-                            const paid = installment.status === "paid";
+                            const paid = installment.status === "paid" && installment.paymentVerified;
+                            const recordNeedsReview = installment.status === "paid" && !installment.paymentVerified;
                             const allocationOnly = !installment.paymentRequired;
 
                             return (
@@ -778,11 +755,11 @@ export default function SharedPurchases() {
                                             : "bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-200"
                                       }`}
                                     >
-                                      {allocationOnly ? "Budget allocated" : paid ? "Reimbursed" : "Payment due"}
+                                      {allocationOnly ? "নির্ধারিত ভাগ" : recordNeedsReview ? "যাচাই প্রয়োজন" : paid ? (installment.paidAsOfMonth ? "ফেরত দিয়েছেন" : "পরে ফেরত দিয়েছেন") : "দেওয়া বাকি"}
                                     </span>
                                   </div>
                                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                    {money(installment.amount)} · due {dateLabel(installment.dueDate)}
+                                    {money(installment.amount)} · বাকি {dateLabel(installment.dueDate)}
                                   </p>
                                   {paid && installment.fromAccountId ? (
                                     <p className="mt-1 text-xs text-slate-500">
@@ -791,23 +768,23 @@ export default function SharedPurchases() {
                                   ) : null}
                                 </div>
 
-                                {!allocationOnly && !paid ? (
+                                {!allocationOnly && installment.status !== "paid" ? (
                                   <button
                                     type="button"
                                     onClick={() => openPayment(plan, installment)}
                                     className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-indigo-500/15"
                                   >
-                                    <Icon name="arrow" /> Record Payment
+                                    <Icon name="arrow" /> টাকা দিয়েছেন
                                   </button>
                                 ) : null}
 
-                                {!allocationOnly && paid ? (
+                                {!allocationOnly && installment.status === "paid" ? (
                                   <button
                                     type="button"
                                     onClick={() => undoPayment(plan, installment)}
                                     className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
                                   >
-                                    <Icon name="undo" /> Undo
+                                    <Icon name="undo" /> বাতিল করুন
                                   </button>
                                 ) : null}
                               </div>
@@ -815,7 +792,27 @@ export default function SharedPurchases() {
                           })}
                         </div>
                       )}
+                      {overdueRows.length > 0 ? (
+                        <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-400/20 dark:bg-amber-400/10">
+                          <p className="text-sm font-black text-amber-800 dark:text-amber-200">আগের মাসের বকেয়া</p>
+                          <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">পুরোনো বকেয়া এই মাসের নতুন খরচ নয়।</p>
+                          <div className="mt-3 space-y-2">
+                            {overdueRows.map((installment) => (
+                              <div key={installment._id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white/90 p-3 dark:bg-slate-950/50">
+                                <div>
+                                  <p className="text-sm font-black">{nameOf(installment.userId)} · {monthLabel(installment.month)}</p>
+                                  <p className="text-xs text-slate-500">{money(installment.amount)} · {installment.paymentVerified ? "পরে পরিশোধ" : installment.needsPaymentReview ? "পরিশোধ যাচাই প্রয়োজন" : "বাকি"}</p>
+                                </div>
+                                {installment.status !== "paid" ? (
+                                  <button type="button" onClick={() => openPayment(plan, installment)} className="rounded-xl bg-indigo-600 px-3 py-2 text-xs font-black text-white">টাকা দিয়েছেন</button>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
+                    </details>
                   </article>
                 );
               })}
@@ -824,10 +821,10 @@ export default function SharedPurchases() {
         </div>
       </div>
 
-      <Modal open={createOpen} title="Add Shared or Large Purchase" onClose={() => setCreateOpen(false)} wide>
+      <Modal open={createOpen} title="নতুন বড় কেনাকাটা" onClose={() => setCreateOpen(false)} wide>
         <form onSubmit={createPurchase} className="space-y-5 p-4 sm:p-6">
           <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 text-sm leading-6 text-indigo-800 dark:border-indigo-400/20 dark:bg-indigo-400/10 dark:text-indigo-200">
-            The full amount will be deducted once from the selected payer account. The payer’s own share is allocated monthly; other members’ portions affect monthly debt/spend only when their payments are recorded.
+            পুরো দাম প্রথমে যিনি দিয়েছেন তাঁর অ্যাকাউন্ট থেকে একবারই কাটা হবে। এরপর নির্ধারিত মাস অনুযায়ী দুজনের ভাগ দেখানো হবে। টাকা ফেরত দিলে সেটি সদস্যদের অ্যাকাউন্টের মধ্যে স্থানান্তর হবে।
           </div>
 
           {message ? (
@@ -837,7 +834,7 @@ export default function SharedPurchases() {
           ) : null}
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Purchase title">
+            <Field label="কেনাকাটার নাম">
               <input
                 className={inputClass}
                 value={form.title}
@@ -845,7 +842,7 @@ export default function SharedPurchases() {
                 placeholder="Air Conditioner"
               />
             </Field>
-            <Field label="Total amount">
+            <Field label="মোট দাম">
               <input
                 className={inputClass}
                 type="number"
@@ -856,7 +853,7 @@ export default function SharedPurchases() {
                 placeholder="74000"
               />
             </Field>
-            <Field label="Purchase date">
+            <Field label="কেনার তারিখ">
               <input
                 className={inputClass}
                 type="date"
@@ -864,7 +861,7 @@ export default function SharedPurchases() {
                 onChange={(event) => setForm((previous) => ({ ...previous, purchaseDate: event.target.value }))}
               />
             </Field>
-            <Field label="Monthly allocation starts">
+            <Field label="মাসিক হিসাব শুরু">
               <input
                 className={inputClass}
                 type="month"
@@ -872,7 +869,7 @@ export default function SharedPurchases() {
                 onChange={(event) => setForm((previous) => ({ ...previous, startMonth: event.target.value }))}
               />
             </Field>
-            <Field label="Distribute over months">
+            <Field label="কত মাসে ভাগ করবেন">
               <input
                 className={inputClass}
                 type="number"
@@ -882,13 +879,13 @@ export default function SharedPurchases() {
                 onChange={(event) => setForm((previous) => ({ ...previous, months: event.target.value }))}
               />
             </Field>
-            <Field label="Expense category">
+            <Field label="খরচের ধরন">
               <select
                 className={inputClass}
                 value={form.categoryId}
                 onChange={(event) => setForm((previous) => ({ ...previous, categoryId: event.target.value }))}
               >
-                <option value="">Use/Create Large Purchase</option>
+                <option value="">বড় কেনাকাটার তথ্য</option>
                 {categories.map((category) => (
                   <option key={category._id} value={category._id}>
                     {category.name}
@@ -899,7 +896,7 @@ export default function SharedPurchases() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Paid in full by">
+            <Field label="পুরো টাকা দিয়েছেন">
               <select
                 className={inputClass}
                 value={form.payerUserId}
@@ -926,13 +923,13 @@ export default function SharedPurchases() {
                 ))}
               </select>
             </Field>
-            <Field label="Deduct full amount from account">
+            <Field label="কোন অ্যাকাউন্ট থেকে পুরো টাকা গেছে">
               <select
                 className={inputClass}
                 value={form.payerAccountId}
                 onChange={(event) => setForm((previous) => ({ ...previous, payerAccountId: event.target.value }))}
               >
-                <option value="">Select account</option>
+                <option value="">অ্যাকাউন্ট বাছুন</option>
                 {payerAccounts.map((account) => (
                   <option key={account._id} value={account._id}>
                     {account.name} · {account.owner}
@@ -943,7 +940,7 @@ export default function SharedPurchases() {
           </div>
 
           <div>
-            <p className={labelClass}>Purchase responsibility</p>
+            <p className={labelClass}>কেনাকাটার দায়</p>
             <div className="grid gap-2 sm:grid-cols-2">
               <button
                 type="button"
@@ -954,9 +951,9 @@ export default function SharedPurchases() {
                     : "border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.04]"
                 }`}
               >
-                <strong className="block">Personal purchase</strong>
+                <strong className="block">ব্যক্তিগত কেনাকাটা</strong>
                 <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">
-                  The payer bears the full amount, distributed across the selected months.
+                  যিনি কিনেছেন, পুরো খরচ তাঁর; মাসে ভাগ করে দেখানো হবে।
                 </span>
               </button>
               <button
@@ -968,9 +965,9 @@ export default function SharedPurchases() {
                     : "border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.04]"
                 }`}
               >
-                <strong className="block">Shared purchase</strong>
+                <strong className="block">যৌথ কেনাকাটা</strong>
                 <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">
-                  Split responsibility and collect non-payer shares through scheduled transfers.
+                  দুজনের ভাগ ঠিক করে নির্ধারিত মাসে টাকা ফেরত দিন।
                 </span>
               </button>
             </div>
@@ -980,9 +977,9 @@ export default function SharedPurchases() {
             <div className="rounded-[24px] border border-slate-200 p-4 dark:border-white/10 sm:p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h3 className="font-black">Member split</h3>
+                  <h3 className="font-black">সদস্যভিত্তিক ভাগ</h3>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    The payer must remain included because part of the purchase belongs to them.
+                    যিনি টাকা দিয়েছেন, তাঁর ভাগও রাখতে হবে।
                   </p>
                 </div>
                 <div className="inline-flex rounded-2xl bg-slate-100 p-1 dark:bg-white/10">
@@ -993,7 +990,7 @@ export default function SharedPurchases() {
                       form.splitMode === "equal" ? "bg-white shadow dark:bg-slate-800" : "text-slate-500"
                     }`}
                   >
-                    Equal
+                    সমান
                   </button>
                   <button
                     type="button"
@@ -1002,7 +999,7 @@ export default function SharedPurchases() {
                       form.splitMode === "custom" ? "bg-white shadow dark:bg-slate-800" : "text-slate-500"
                     }`}
                   >
-                    Custom
+                    নিজের মতো
                   </button>
                 </div>
               </div>
@@ -1041,7 +1038,7 @@ export default function SharedPurchases() {
                         )}
                       </div>
                       <p className="mt-2 text-xs text-slate-500">
-                        Approx. {money(Number(calculated?.shareAmount || 0) / Number(form.months || 1))} per month
+                        প্রায় {money(Number(calculated?.shareAmount || 0) / Number(form.months || 1))} প্রতি মাসে
                       </p>
                     </div>
                   );
@@ -1049,20 +1046,20 @@ export default function SharedPurchases() {
               </div>
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm text-white dark:bg-white dark:text-slate-950">
-                <span className="font-bold">Allocated {money(allocated)} of {money(total)}</span>
+                <span className="font-bold">ভাগ করা হয়েছে {money(allocated)} এর মধ্যে {money(total)}</span>
                 <span className={`font-black ${remaining === 0 ? "text-emerald-300 dark:text-emerald-700" : "text-amber-300 dark:text-amber-700"}`}>
-                  {remaining === 0 ? "Balanced" : `Remaining ${money(remaining)}`}
+                  {remaining === 0 ? "ভাগ মিলেছে" : `অবশিষ্ট ${money(remaining)}`}
                 </span>
               </div>
             </div>
           ) : null}
 
-          <Field label="Note (optional)">
+          <Field label="নোট (ইচ্ছা হলে)">
             <textarea
               className={`${inputClass} min-h-24 resize-y`}
               value={form.note}
               onChange={(event) => setForm((previous) => ({ ...previous, note: event.target.value }))}
-              placeholder="Warranty, model, agreement, or repayment note"
+              placeholder="ওয়ারেন্টি, মডেল বা টাকা ফেরতের শর্ত"
             />
           </Field>
 
@@ -1072,26 +1069,26 @@ export default function SharedPurchases() {
               onClick={() => setCreateOpen(false)}
               className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-700 dark:border-white/10 dark:text-slate-200"
             >
-              Cancel
+              বাতিল
             </button>
             <button
               type="submit"
               disabled={saving}
               className="rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-indigo-500/20 disabled:opacity-60"
             >
-              {saving ? "Saving…" : "Create Purchase Schedule"}
+              {saving ? "সংরক্ষণ হচ্ছে…" : "কেনাকাটা সংরক্ষণ করুন"}
             </button>
           </div>
         </form>
       </Modal>
 
-      <Modal open={payOpen} title="Record Member Reimbursement" onClose={() => setPayOpen(false)}>
+      <Modal open={payOpen} title="ফেরত দেওয়া টাকা যোগ করুন" onClose={() => setPayOpen(false)}>
         <form onSubmit={recordPayment} className="space-y-4 p-4 sm:p-6">
           <div className="rounded-2xl bg-slate-50 p-4 dark:bg-white/[0.05]">
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Payment</p>
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">পরিশোধ</p>
             <p className="mt-2 text-lg font-black">{selectedPlan?.title}</p>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              {nameOf(selectedInstallment?.userId)} pays {money(selectedInstallment?.amount)} to {nameOf(selectedPlan?.payerUserId, "payer")}.
+              {nameOf(selectedInstallment?.userId)} → {nameOf(selectedPlan?.payerUserId, "যিনি পুরো টাকা দিয়েছেন")} : {money(selectedInstallment?.amount)} ফেরত দেবেন।
             </p>
           </div>
 
@@ -1101,13 +1098,13 @@ export default function SharedPurchases() {
             </div>
           ) : null}
 
-          <Field label="Pay from account">
+          <Field label="যে অ্যাকাউন্ট থেকে দেবেন">
             <select
               className={inputClass}
               value={payForm.fromAccountId}
               onChange={(event) => setPayForm((previous) => ({ ...previous, fromAccountId: event.target.value }))}
             >
-              <option value="">Select member account</option>
+              <option value="">যে অ্যাকাউন্ট থেকে যাবে</option>
               {reimbursementFromAccounts.map((account) => (
                 <option key={account._id} value={account._id}>
                   {account.name} · {account.owner}
@@ -1116,13 +1113,13 @@ export default function SharedPurchases() {
             </select>
           </Field>
 
-          <Field label="Receive into payer account">
+          <Field label="যে অ্যাকাউন্টে টাকা যাবে">
             <select
               className={inputClass}
               value={payForm.toAccountId}
               onChange={(event) => setPayForm((previous) => ({ ...previous, toAccountId: event.target.value }))}
             >
-              <option value="">Select receiving account</option>
+              <option value="">টাকা যে অ্যাকাউন্টে আসবে</option>
               {reimbursementToAccounts.map((account) => (
                 <option key={account._id} value={account._id}>
                   {account.name} · {account.owner}
@@ -1131,7 +1128,7 @@ export default function SharedPurchases() {
             </select>
           </Field>
 
-          <Field label="Payment date">
+          <Field label="পরিশোধের তারিখ">
             <input
               className={inputClass}
               type="date"
@@ -1140,17 +1137,17 @@ export default function SharedPurchases() {
             />
           </Field>
 
-          <Field label="Note (optional)">
+          <Field label="নোট (ইচ্ছা হলে)">
             <input
               className={inputClass}
               value={payForm.note}
               onChange={(event) => setPayForm((previous) => ({ ...previous, note: event.target.value }))}
-              placeholder="Cash, bank transfer, partial agreement…"
+              placeholder="নগদ, ব্যাংক বা অন্যান্য তথ্য…"
             />
           </Field>
 
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs leading-5 text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
-            This creates an account-to-account transfer. It increases the payer’s account balance but is not counted as salary or regular income.
+            এতে একটি অ্যাকাউন্ট থেকে অন্যটিতে টাকা যাবে। নতুন আয় বা খরচ যোগ হবে না।
           </div>
 
           <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
@@ -1159,18 +1156,19 @@ export default function SharedPurchases() {
               onClick={() => setPayOpen(false)}
               className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-black dark:border-white/10"
             >
-              Cancel
+              বাতিল
             </button>
             <button
               type="submit"
               disabled={saving}
               className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60"
             >
-              {saving ? "Recording…" : "Record Reimbursement"}
+              {saving ? "সংরক্ষণ হচ্ছে…" : "টাকা ফেরত দেওয়া হয়েছে"}
             </button>
           </div>
         </form>
       </Modal>
+          </div>
     </AppLayout>
   );
 }
