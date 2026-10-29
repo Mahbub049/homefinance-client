@@ -13,7 +13,8 @@ function monthNow() {
 }
 
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function toNum(v) {
@@ -571,10 +572,14 @@ export default function EMI() {
   const [payModalOpen, setPayModalOpen] = useState(false);
   const [selectedInstallment, setSelectedInstallment] = useState(null);
   const [payForm, setPayForm] = useState({
+    paymentMode: "single",
     paidByUserId: myId || "",
     fromAccountId: "",
     paidDate: today(),
+    paymentParts: [],
   });
+  const [paySubmitting, setPaySubmitting] = useState(false);
+  const [payError, setPayError] = useState("");
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteInstallmentId, setDeleteInstallmentId] = useState("");
@@ -618,30 +623,29 @@ export default function EMI() {
     });
   }, [accounts, selectedPayerOwner]);
 
-  useEffect(() => {
-  if (!payModalOpen) return;
+  const eligibleAccountsFor = (memberId) => {
+    const payer = members.find((m) => normalizeId(m.id || m._id) === normalizeId(memberId));
+    const selectedOwner = ownerFromMemberName(payer?.name);
+    return accounts.filter((account) => {
+      const type = String(account.type || "").toLowerCase();
+      const owner = String(account.owner || "").trim();
+      const name = String(account.name || "").toLowerCase();
+      return account.isActive !== false && ["cash", "bank", "wallet"].includes(type)
+        && !name.includes("saving") && (owner === "Joint" || (selectedOwner && owner === selectedOwner));
+    });
+  };
 
-  if (payableAccounts.length === 0) {
-    if (payForm.fromAccountId) {
-      setPayForm((prev) => ({
-        ...prev,
-        fromAccountId: "",
-      }));
-    }
-    return;
-  }
-
-  const selectedAccountStillValid = payableAccounts.some(
-    (account) => normalizeId(account._id) === normalizeId(payForm.fromAccountId)
+  const splitPaidCents = (payForm.paymentParts || []).reduce(
+    (sum, part) => sum + Math.round(Number(part.amount || 0) * 100), 0
   );
+  const installmentCents = Math.round(Number(selectedInstallment?.amount || 0) * 100);
 
-  if (!selectedAccountStillValid) {
-    setPayForm((prev) => ({
-      ...prev,
-      fromAccountId: payableAccounts[0]._id,
-    }));
-  }
-}, [payModalOpen, payableAccounts, payForm.fromAccountId]);
+  useEffect(() => {
+    if (!payModalOpen || payForm.paymentMode !== "single") return;
+    const exists = payableAccounts.some((account) => normalizeId(account._id) === normalizeId(payForm.fromAccountId));
+    if (!exists) setPayForm((prev) => ({ ...prev, fromAccountId: payableAccounts[0]?._id || "" }));
+  }, [payModalOpen, payForm.paymentMode, payForm.fromAccountId, payableAccounts]);
+
 
   function calcTotalPayable(originalPrice, emiChargePercent) {
     const op = toNum(originalPrice);
@@ -959,40 +963,78 @@ export default function EMI() {
   }
 
 function openPayModalForInstallment(item) {
+  const activeMembers = members.filter((member) => normalizeId(member.id || member._id));
+  const totalCents = Math.round(Number(item?.amount || 0) * 100);
+  const firstCents = Math.floor(totalCents / Math.max(1, activeMembers.length));
+  const parts = activeMembers.map((member, index) => {
+    const userId = normalizeId(member.id || member._id);
+    const amountCents = index === activeMembers.length - 1
+      ? totalCents - firstCents * (activeMembers.length - 1) : firstCents;
+    return { userId, accountId: "", amount: (amountCents / 100).toFixed(2) };
+  });
   setSelectedInstallment(item);
+  setPayError("");
   setPayForm({
-    paidByUserId: myId || members[0]?.id || "",
+    paymentMode: "single",
+    paidByUserId: myId || normalizeId(activeMembers[0]?.id || activeMembers[0]?._id),
     fromAccountId: "",
-    paidDate: item?.dueDate
-      ? new Date(item.dueDate).toISOString().slice(0, 10)
-      : today(),
+    // Payment date must be today, not the installment's scheduled due date.
+    paidDate: today(),
+    paymentParts: parts,
   });
   setPayModalOpen(true);
 }
 
   function closePayModal() {
+    if (paySubmitting) return;
     setPayModalOpen(false);
     setSelectedInstallment(null);
   }
 
-  async function confirmMarkPaid() {
-    if (!selectedInstallment?._id) return;
-    if (!payForm.paidByUserId) return setMsg("Select who is paying");
-    if (!payForm.fromAccountId) return setMsg("Select which account is paying");
+  function updateEmiSplitPart(index, patch) {
+    setPayForm((prev) => ({
+      ...prev,
+      paymentParts: prev.paymentParts.map((part, i) => i === index ? { ...part, ...patch } : part),
+    }));
+  }
 
+  async function confirmMarkPaid() {
+    if (!selectedInstallment?._id || paySubmitting) return;
+    const splitMode = payForm.paymentMode === "split";
+    const parts = payForm.paymentParts || [];
+    if (!payForm.paidDate) return setPayError("পরিশোধের তারিখ দিন।");
+    if (splitMode) {
+      if (parts.length < 2) return setPayError("ভাগ করে পরিশোধের জন্য অন্তত দুজন সদস্য প্রয়োজন।");
+      if (parts.some((p) => !p.userId || !p.accountId || !Number.isFinite(Number(p.amount)) || Number(p.amount) <= 0))
+        return setPayError("প্রত্যেকের টাকার পরিমাণ ও অ্যাকাউন্ট বেছে নিন।");
+      if (splitPaidCents !== installmentCents)
+        return setPayError("দুজনের দেওয়া টাকার যোগফল সম্পূর্ণ কিস্তির সমান হতে হবে।");
+    } else {
+      if (!payForm.paidByUserId) return setPayError("কে টাকা দিচ্ছেন, বেছে নিন।");
+      if (!payForm.fromAccountId) return setPayError("কোন অ্যাকাউন্ট থেকে দিচ্ছেন, বেছে নিন।");
+    }
+    setPaySubmitting(true);
+    setPayError("");
+    setMsg("");
     try {
       await api.put(`/api/emi/installments/${selectedInstallment._id}/status`, {
         status: "paid",
-        paidByUserId: payForm.paidByUserId,
-        fromAccountId: payForm.fromAccountId,
+        paymentMode: splitMode ? "split" : "single",
+        paidByUserId: splitMode ? null : payForm.paidByUserId,
+        fromAccountId: splitMode ? null : payForm.fromAccountId,
+        paymentParts: splitMode ? parts.map((p) => ({
+          userId: p.userId, accountId: p.accountId, amount: Number(p.amount),
+        })) : undefined,
         paidDate: payForm.paidDate,
       });
-      closePayModal();
-      await loadInstallments();
-      await loadPlans();
-      setMsg("EMI marked paid and deducted from selected account");
+      setPayModalOpen(false);
+      setSelectedInstallment(null);
+      await Promise.all([loadInstallments(), loadPlans()]);
+      setMsg("কিস্তি পরিশোধ হয়েছে। নির্বাচিত অ্যাকাউন্ট থেকে টাকা কাটা হয়েছে।");
     } catch (e) {
-      setMsg(e?.response?.data?.message || "Update failed");
+      setPayError(e?.response?.data?.message || "পরিশোধ সংরক্ষণ করা যায়নি।");
+    } finally {
+      setPaySubmitting(false);
     }
   }
 
@@ -1376,57 +1418,68 @@ function openPayModalForInstallment(item) {
               </div>
 
               <div className="space-y-4 p-4 sm:p-5">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="টাকা দেবেন" className="sm:col-span-2">
-                    <select
-                      className={inputClass()}
-                      value={payForm.paidByUserId}
-                      onChange={(e) =>
-                        setPayForm((p) => ({ ...p, paidByUserId: e.target.value }))
-                      }
-                    >
-                      <option value="">সদস্য বাছুন</option>
-                      {members.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-
-<Field label="কোন অ্যাকাউন্ট থেকে" className="sm:col-span-2">
-  <select
-    className={inputClass()}
-    value={payForm.fromAccountId}
-    onChange={(e) =>
-      setPayForm((p) => ({ ...p, fromAccountId: e.target.value }))
-    }
-  >
-    <option value="">অ্যাকাউন্ট বাছুন</option>
-
-    {payableAccounts.length === 0 ? (
-      <option value="" disabled>
-        পরিশোধের উপযুক্ত অ্যাকাউন্ট নেই
-      </option>
-    ) : (
-      payableAccounts.map((a) => (
-        <option key={a._id} value={a._id}>
-          {a.name}
-        </option>
-      ))
-    )}
-  </select>
-</Field>
-
-                  <Field label="পরিশোধের তারিখ" className="sm:col-span-2">
-                    <input
-                      type="date"
-                      className={inputClass()}
-                      value={payForm.paidDate}
-                      onChange={(e) =>
-                        setPayForm((p) => ({ ...p, paidDate: e.target.value }))
-                      }
-                    />
+                <div className="grid gap-3">
+                  <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1.5 dark:border-white/10 dark:bg-white/5" role="group" aria-label="পরিশোধের ধরন">
+                    <button type="button" aria-pressed={payForm.paymentMode === "single"}
+                      onClick={() => setPayForm((p) => ({ ...p, paymentMode: "single" }))}
+                      className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold ${payForm.paymentMode === "single" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-700 dark:text-slate-200"}`}>
+                      একজন পরিশোধ করবেন
+                    </button>
+                    <button type="button" disabled={members.length < 2} aria-pressed={payForm.paymentMode === "split"}
+                      onClick={() => setPayForm((p) => ({ ...p, paymentMode: "split" }))}
+                      className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold disabled:opacity-50 ${payForm.paymentMode === "split" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-700 dark:text-slate-200"}`}>
+                      দুজন মিলে পরিশোধ
+                    </button>
+                  </div>
+                  {payForm.paymentMode === "single" ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field label="টাকা দেবেন">
+                        <select className={inputClass()} value={payForm.paidByUserId}
+                          onChange={(e) => setPayForm((p) => ({ ...p, paidByUserId: e.target.value, fromAccountId: "" }))}>
+                          <option value="">সদস্য বাছুন</option>
+                          {members.map((m) => <option key={normalizeId(m.id || m._id)} value={normalizeId(m.id || m._id)}>{m.name}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="কোন অ্যাকাউন্ট থেকে">
+                        <select className={inputClass()} value={payForm.fromAccountId}
+                          onChange={(e) => setPayForm((p) => ({ ...p, fromAccountId: e.target.value }))}>
+                          <option value="">অ্যাকাউন্ট বাছুন</option>
+                          {payableAccounts.map((a) => <option key={a._id} value={a._id}>{a.name}</option>)}
+                        </select>
+                      </Field>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-xs text-slate-600 dark:text-slate-300">কে কোন অ্যাকাউন্ট থেকে কত টাকা দিচ্ছেন, লিখুন। এটি কিস্তির নির্ধারিত খরচের ভাগ পরিবর্তন করবে না।</p>
+                      {(payForm.paymentParts || []).map((part, index) => {
+                        const member = members.find((m) => normalizeId(m.id || m._id) === part.userId);
+                        const options = eligibleAccountsFor(part.userId);
+                        return <div key={part.userId || index} className="rounded-xl border border-slate-200 p-3 dark:border-white/10">
+                          <div className="mb-2 text-sm font-bold">{member?.name || `সদস্য ${index + 1}`}</div>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <Field label="অ্যাকাউন্ট থেকে">
+                              <select className={inputClass()} value={part.accountId}
+                                onChange={(e) => updateEmiSplitPart(index, { accountId: e.target.value })}>
+                                <option value="">অ্যাকাউন্ট বাছুন</option>
+                                {options.map((a) => <option key={a._id} value={a._id}>{a.name}</option>)}
+                              </select>
+                            </Field>
+                            <Field label="টাকা (৳)">
+                              <input className={inputClass()} type="number" min="0.01" step="0.01"
+                                value={part.amount} onChange={(e) => updateEmiSplitPart(index, { amount: e.target.value })} />
+                            </Field>
+                          </div>
+                        </div>;
+                      })}
+                      <div className={`rounded-xl px-3 py-2 text-xs font-bold ${splitPaidCents === installmentCents ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-200" : "bg-amber-500/10 text-amber-700 dark:text-amber-200"}`}>
+                        মোট দিচ্ছেন ৳ {money(splitPaidCents / 100)} / ৳ {money(installmentCents / 100)}
+                        {splitPaidCents !== installmentCents && " — মোট কিস্তির টাকার সঙ্গে মিলতে হবে"}
+                      </div>
+                    </div>
+                  )}
+                  <Field label="পরিশোধের তারিখ (আজকের তারিখ স্বয়ংক্রিয়ভাবে নির্বাচিত)">
+                    <input type="date" className={inputClass()} value={payForm.paidDate}
+                      onChange={(e) => setPayForm((p) => ({ ...p, paidDate: e.target.value }))} />
                   </Field>
                 </div>
 
@@ -1439,12 +1492,13 @@ function openPayModalForInstallment(item) {
                   </div>
                 </div>
 
+                {payError && <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 dark:border-rose-400/30 dark:bg-rose-400/10 dark:text-rose-200">{payError}</div>}
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                  <ActionButton onClick={closePayModal} variant="soft">
+                  <ActionButton onClick={closePayModal} variant="soft" disabled={paySubmitting}>
                     বাতিল
                   </ActionButton>
-                  <ActionButton onClick={confirmMarkPaid} variant="success">
-                    পরিশোধ নিশ্চিত করুন
+                  <ActionButton onClick={confirmMarkPaid} variant="success" disabled={paySubmitting || (payForm.paymentMode === "split" && splitPaidCents !== installmentCents)}>
+                    {paySubmitting ? "সংরক্ষণ হচ্ছে…" : "পরিশোধ নিশ্চিত করুন"}
                   </ActionButton>
                 </div>
               </div>

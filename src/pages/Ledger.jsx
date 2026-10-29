@@ -266,8 +266,11 @@ function PillButton({ active, children, onClick, tone = "slate" }) {
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
+      data-selected={active ? "true" : "false"}
+      data-tone={tone}
       className={cn(
-        "whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-200 sm:rounded-2xl sm:px-4 sm:py-2.5 sm:text-sm",
+        "hf-ledger-filter whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-200 sm:rounded-2xl sm:px-4 sm:py-2.5 sm:text-sm",
         active
           ? activeMap[tone]
           : "border border-slate-200 bg-white/80 text-slate-700 hover:-translate-y-0.5 hover:bg-white hover:shadow-md dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
@@ -1756,16 +1759,16 @@ export default function Ledger() {
         <div className="relative p-3 sm:p-5 lg:p-3">
           <></>
 
-          <section className="mt-4 grid gap-3 sm:mt-5 lg:grid-cols-[1fr_auto] lg:items-center">
+          <section className="hf-ledger-search-panel mt-4 grid gap-3 sm:mt-5 lg:grid-cols-[1fr_auto] lg:items-center">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <div className="sm:col-span-1 lg:col-span-2">
                 <FieldLabel>খুঁজুন</FieldLabel>
-                <div className="relative">
+                <div className="hf-ledger-search relative">
                   <Icon name="search" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <FieldInput
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
-                    className="pl-11"
+                    className="hf-ledger-search-input !pl-11"
                     placeholder="ধরন, নোট বা অ্যাকাউন্ট খুঁজুন…"
                   />
                 </div>
@@ -1790,7 +1793,7 @@ export default function Ledger() {
             </div>
           ) : null}
 
-          <section className="ledger-no-scrollbar mt-4 flex touch-pan-x gap-2 overflow-x-auto pb-1 sm:mt-5">
+          <section className="hf-ledger-filter-bar ledger-no-scrollbar mt-4 flex touch-pan-x gap-2 overflow-x-auto pb-1 sm:mt-5">
             <PillButton active={activeTab === "all"} onClick={() => setActiveTab("all")}>
               সব <span className="ml-1 opacity-70">{tabCount.all}</span>
             </PillButton>
@@ -1854,6 +1857,7 @@ export default function Ledger() {
                     <button
                       key={d}
                       type="button"
+                      data-active-day={day === d ? "true" : "false"}
                       onClick={() => setDay(d)}
                       className={cn(
                         "whitespace-nowrap rounded-xl px-3 py-2 text-[11px] font-bold transition sm:rounded-2xl sm:text-xs",
