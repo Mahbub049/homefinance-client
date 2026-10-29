@@ -1,0 +1,40 @@
+/* Hishab Nikash navigation: matching structure across desktop and mobile. */
+.hf-refined-sidebar { --hf-nav-gap: 4px; }
+.hf-refined-brand-row { display:flex; align-items:center; gap:11px; padding:13px 12px; min-height:68px; border-bottom:1px solid var(--hf-line); }
+.hf-refined-brand-copy { flex:1; min-width:0; overflow:hidden; }
+.hf-refined-brand-copy .hf-shell-title,
+.hf-refined-brand-copy .hf-shell-subtitle { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hf-refined-brand-control { width:32px; height:32px; flex:none; display:grid; place-items:center; border-radius:10px; border:1px solid var(--hf-line); background:var(--hf-surface-alt); color:var(--hf-muted); transition:color .15s,background .15s; }
+.hf-refined-brand-control:hover,
+.hf-refined-brand-control:focus-visible { background:var(--hf-primary-soft); color:var(--hf-primary); }
+.hf-refined-brand-expand { display:grid; place-items:center; width:48px; height:48px; border:0; border-radius:13px; margin-inline:auto; }
+.hf-refined-brand-expand:hover,
+.hf-refined-brand-expand:focus-visible { background:var(--hf-primary-soft); outline-offset:1px; }
+.hf-refined-sidebar.is-collapsed .hf-refined-brand-row { padding:10px 8px; justify-content:center; }
+.hf-refined-nav { padding:9px 10px 22px; }
+.hf-refined-section + .hf-refined-section { margin-top:11px; }
+.hf-refined-section-label,
+.hf-refined-section-toggle { min-height:34px; width:100%; padding:10px 9px 5px; line-height:1.4; }
+.hf-refined-section-name { font-size:11px; color:var(--hf-muted); font-weight:750; letter-spacing:.01em; }
+.hf-refined-section-toggle { display:flex; justify-content:space-between; align-items:center; text-align:left; border-radius:9px; }
+.hf-refined-section-toggle:hover,
+.hf-refined-section-toggle:focus-visible { background:var(--hf-surface-alt); }
+.hf-refined-section-arrow { color:var(--hf-muted); transition:transform .18s ease; transform:rotate(-90deg); }
+.hf-refined-section-arrow.is-open { transform:rotate(0deg); }
+.hf-refined-section-links { display:grid; gap:var(--hf-nav-gap); }
+.hf-refined-nav-link { min-width:0; padding:9px 11px; min-height:42px; }
+.hf-refined-nav-link.is-rail { justify-content:center; padding:8px 6px; }
+.hf-refined-sidebar.is-collapsed .hf-refined-nav { padding-inline:12px; }
+.hf-refined-rail-divider { border-top:1px solid var(--hf-line); margin:9px 6px 13px; }
+.hf-refined-section.is-rail:first-child .hf-refined-rail-divider { margin-top:3px; }
+.hf-refined-settings { border-top:1px solid var(--hf-line); padding:10px 12px 13px; flex-shrink:0; }
+.hf-refined-sidebar .hf-nav-active { font-weight:800; }
+@media (max-width: 767px) {
+  .hf-refined-nav { padding:10px 12px 26px; }
+  .hf-refined-brand-row { padding:12px 14px; }
+  .hf-refined-section + .hf-refined-section { margin-top:9px; }
+  .hf-refined-section-label,.hf-refined-section-toggle { min-height:33px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hf-refined-section-arrow { transition:none; }
+}
