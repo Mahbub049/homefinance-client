@@ -11,6 +11,7 @@ const paths = {
   savings: <><path d="M4 10a8 8 0 0 1 16 0v7a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M8 5V3m8 2V3M8 12h8m-4-4v8"/></>,
   carry: <><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M7 2v4m10-4v4M3 10h18m-12 5h6m-3-3 3 3-3 3"/></>,
   reports: <><path d="M4 20V5m0 15h16M9 17v-5m5 5V7m5 10v-7"/></>,
+  checklist: <><rect x="4" y="3" width="16" height="18" rx="3"/><path d="m8 9 2 2 3-3m1 2h3m-9 6 2 2 3-3m1 2h3"/></>,
   planned: <><path d="M4 5h16v16H4zM8 3v4m8-4v4M7 11h10m-8 4 2 2 4-4"/></>,
   individual: <><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></>,
   settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a8 8 0 0 0 .1-2l2-1.5-2-3.5-2.4.7a8 8 0 0 0-1.7-1L15.1 5H8.9l-.3 2.7a8 8 0 0 0-1.7 1L4.5 8l-2 3.5L4.5 13a8 8 0 0 0 .1 2l-2.1 1.5 2 3.5 2.4-.7a8 8 0 0 0 1.7 1l.3 2.7h6.2l.3-2.7a8 8 0 0 0 1.7-1l2.4.7 2-3.5z" transform="translate(0 -2) scale(1 1.02)"/></>,

@@ -17,14 +17,14 @@ const work = [
 const monthly = [
   { to: '/carry-forward', label: 'মাস শেষে হিসাব', icon: 'carry' },
   { to: '/year-overview', label: 'বছরের হিসাব', icon: 'reports' },
-];
-const extra = [
-  { to: '/planned-purchases', label: 'ভবিষ্যতের কেনাকাটা', icon: 'planned' },
   { to: '/individual-summary', label: 'ব্যক্তিগত হিসাব', icon: 'individual' },
-  { to: '/settings', label: 'সেটিংস', icon: 'settings' },
+];
+const planning = [
+  { to: '/shopping-list', label: 'বাজারের তালিকা', icon: 'checklist' },
+  { to: '/planned-purchases', label: 'ভবিষ্যতের কেনাকাটা', icon: 'planned' },
 ];
 // Tax Center is intentionally hidden from navigation; its route and data remain intact.
-const isExtraRoute = (path) => extra.some((item) => item.to === path);
+const isPlanningRoute = (path) => planning.some((item) => item.to === path);
 
 function NavItem({ item, collapsed, onNavigate }) {
   return <NavLink to={item.to} onClick={onNavigate} title={collapsed ? item.label : undefined} aria-label={item.label}
@@ -49,8 +49,8 @@ export default function Sidebar({ collapsed = false, onToggleCollapse, drawerOpe
   const location = useLocation();
   const mobile = typeof onCloseDrawer === 'function';
   const compact = collapsed && !mobile;
-  const [moreOpen, setMoreOpen] = useState(() => isExtraRoute(location.pathname));
-  useEffect(() => { if (isExtraRoute(location.pathname)) setMoreOpen(true); }, [location.pathname]);
+  const [moreOpen, setMoreOpen] = useState(() => isPlanningRoute(location.pathname));
+  useEffect(() => { if (isPlanningRoute(location.pathname)) setMoreOpen(true); }, [location.pathname]);
 
   const handleExtra = () => {
     if (compact) { onToggleCollapse?.(); setMoreOpen(true); }
@@ -69,13 +69,14 @@ export default function Sidebar({ collapsed = false, onToggleCollapse, drawerOpe
       <NavGroup heading="খরচ ও সঞ্চয়" items={work} collapsed={compact} onNavigate={mobile?onCloseDrawer:undefined}/>
       <NavGroup heading="হিসাব" items={monthly} collapsed={compact} onNavigate={mobile?onCloseDrawer:undefined}/>
       <div className="mt-2">
-        <button type="button" className="hf-nav-group-toggle" onClick={handleExtra} title="আরও" aria-label="আরও পেজ" aria-expanded={moreOpen && !compact}>
-          <span className="flex items-center gap-3"><HFIcon name="more" size={19}/>{!compact && 'আরও'}</span>
+        <button type="button" className="hf-nav-group-toggle" onClick={handleExtra} title="পরিকল্পনা" aria-label="পরিকল্পনার পেজ" aria-expanded={moreOpen && !compact}>
+          <span className="flex items-center gap-3"><HFIcon name="more" size={19}/>{!compact && 'পরিকল্পনা'}</span>
           {!compact && <HFIcon name="down" size={15} className="hf-nav-group-chevron" data-open={moreOpen}/>}
         </button>
-        {!compact && moreOpen && <div className="space-y-1 pl-2">{extra.map(item => <NavItem key={item.to} item={item} onNavigate={mobile?onCloseDrawer:undefined}/>)}</div>}
+        {!compact && moreOpen && <div className="space-y-1 pl-2">{planning.map(item => <NavItem key={item.to} item={item} onNavigate={mobile?onCloseDrawer:undefined}/>)}</div>}
       </div>
     </nav>
+    <div className="px-3 pb-3 pt-3 border-t" style={{borderColor:'var(--hf-line)'}}><NavItem item={{to:'/settings',label:'সেটিংস',icon:'settings'}} collapsed={compact} onNavigate={mobile?onCloseDrawer:undefined}/></div>
   </aside>;
 
   if (!mobile) return content;

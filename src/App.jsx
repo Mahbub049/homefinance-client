@@ -18,6 +18,7 @@ import YearOverview from "./pages/YearOverview";
 import PlannedPurchases from "./pages/PlannedPurchases";
 import TaxCenter from "./pages/TaxCenter";
 import SharedPurchases from "./pages/SharedPurchases";
+import GroceryChecklist from "./pages/GroceryChecklist";
 
 export default function App() {
   return (
@@ -154,6 +155,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <YearOverview />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/shopping-list"
+          element={
+            <ProtectedRoute>
+              <GroceryChecklist />
             </ProtectedRoute>
           }
         />

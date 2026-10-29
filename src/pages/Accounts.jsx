@@ -3,17 +3,17 @@ import api from "../services/api";
 import Loader from "../components/ui/Loader";
 
 const TYPES = [
-  { value: "cash", label: "Cash" },
-  { value: "bank", label: "Bank" },
-  { value: "wallet", label: "Wallet" },
-  { value: "savings", label: "Savings" },
-  { value: "investment", label: "Investment" },
+  { value: "cash", label: "নগদ" },
+  { value: "bank", label: "ব্যাংক" },
+  { value: "wallet", label: "মোবাইল ওয়ালেট" },
+  { value: "savings", label: "সঞ্চয়" },
+  { value: "investment", label: "বিনিয়োগ" },
 ];
 
 const OWNERS = [
   { value: "Mahbub", label: "Mahbub" },
   { value: "Mirza", label: "Mirza" },
-  { value: "Joint", label: "Joint" },
+  { value: "Joint", label: "যৌথ" },
 ];
 
 const hiddenScrollbarClass =
@@ -27,7 +27,7 @@ const labelClass =
 
 function bdt(n) {
   const value = Number(n || 0);
-  return `৳ ${value.toLocaleString("en-BD", {
+  return `৳ ${value.toLocaleString("bn-BD", {
     minimumFractionDigits: value % 1 === 0 ? 0 : 2,
     maximumFractionDigits: 2,
   })}`;
@@ -227,7 +227,7 @@ export default function Accounts() {
       const res = await api.get("/api/accounts");
       setItems(res.data.items || []);
     } catch (e) {
-      setMsg(e?.response?.data?.message || "Failed to load accounts");
+      setMsg(e?.response?.data?.message || "অ্যাকাউন্ট আনা যায়নি");
     } finally {
       setLoading(false);
     }
@@ -288,7 +288,7 @@ export default function Accounts() {
     setMsg("");
 
     try {
-      if (!form.name.trim()) return setMsg("Account name is required");
+      if (!form.name.trim()) return setMsg("অ্যাকাউন্টের নাম লিখুন");
 
       const payload = {
         ...form,
@@ -305,7 +305,7 @@ export default function Accounts() {
       reset();
       await load();
     } catch (e2) {
-      setMsg(e2?.response?.data?.message || "Save failed");
+      setMsg(e2?.response?.data?.message || "সংরক্ষণ করা যায়নি");
     }
   }
 
@@ -323,14 +323,14 @@ export default function Accounts() {
   }
 
   async function remove(id) {
-    const ok = confirm("Delete this account?");
+    const ok = confirm("অ্যাকাউন্টটি মুছে ফেলবেন?");
     if (!ok) return;
 
     try {
       await api.delete(`/api/accounts/${id}`);
       await load();
     } catch (e) {
-      setMsg(e?.response?.data?.message || "Delete failed");
+      setMsg(e?.response?.data?.message || "অ্যাকাউন্ট মুছে ফেলা যায়নি");
     }
   }
 
@@ -338,25 +338,25 @@ export default function Accounts() {
     <div className={`space-y-5 ${hiddenScrollbarClass}`}>
       <div className="hidden gap-3 md:grid md:grid-cols-3">
         <StatCard
-          title="Active Accounts"
+          title="সক্রিয় অ্যাকাউন্ট"
           value={`${activeCount}/${items.length}`}
-          sub="Currently usable accounts"
+          sub="ব্যবহারের উপযোগী অ্যাকাউন্ট"
           icon="check"
           tone="emerald"
         />
 
         <StatCard
-          title="Bank Accounts"
+          title="ব্যাংক অ্যাকাউন্ট"
           value={bankCount}
-          sub="Bank type accounts"
+          sub="ব্যাংক ধরনের অ্যাকাউন্ট"
           icon="bank"
           tone="sky"
         />
 
         <StatCard
-          title="Opening Total"
+          title="শুরুর মোট টাকা"
           value={bdt(totalOpening)}
-          sub="Total initial balance"
+          sub="সব অ্যাকাউন্টের শুরুর অঙ্ক"
           icon="wallet"
           tone="violet"
         />
@@ -374,17 +374,16 @@ export default function Accounts() {
             <IconBox name="account" tone={editing ? "amber" : "emerald"} />
             <div>
               <h3 className="text-lg font-black text-slate-950 dark:text-white">
-                {editing ? "Edit Account" : "Add Account"}
+                {editing ? "অ্যাকাউন্ট সম্পাদনা" : "অ্যাকাউন্ট যোগ করুন"}
               </h3>
               <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
-                Create bank, cash, wallet, savings, or investment accounts for
-                transaction tracking.
+                টাকা সংরক্ষণ ও লেনদেনের জন্য ব্যাংক, নগদ বা সঞ্চয় অ্যাকাউন্ট যোগ করুন।
               </p>
             </div>
           </div>
 
           <form onSubmit={save} className="space-y-4">
-            <Field label="Account Name">
+            <Field label="অ্যাকাউন্টের নাম">
               <input
                 className={fieldClass}
                 value={form.name}
@@ -394,7 +393,7 @@ export default function Accounts() {
             </Field>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Type">
+              <Field label="ধরন">
                 <select
                   className={fieldClass}
                   value={form.type}
@@ -410,7 +409,7 @@ export default function Accounts() {
                 </select>
               </Field>
 
-              <Field label="Owner">
+              <Field label="মালিক">
                 <select
                   className={fieldClass}
                   value={form.owner}
@@ -427,7 +426,7 @@ export default function Accounts() {
               </Field>
             </div>
 
-            <Field label="Opening Balance">
+            <Field label="শুরুর টাকা">
               <input
                 type="number"
                 step="0.01"
@@ -450,11 +449,10 @@ export default function Accounts() {
               />
               <span>
                 <span className="block text-sm font-black text-slate-800 dark:text-slate-100">
-                  Active account
+                  সক্রিয় অ্যাকাউন্ট
                 </span>
                 <span className="text-xs text-slate-500 dark:text-slate-400">
-                  Inactive accounts stay saved but can be hidden from regular
-                  selection flows.
+                  নিষ্ক্রিয় অ্যাকাউন্টের তথ্য সংরক্ষিত থাকে, কিন্তু নতুন লেনদেনে লুকানো থাকতে পারে।
                 </span>
               </span>
             </label>
@@ -476,7 +474,7 @@ export default function Accounts() {
                 className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-[0_14px_30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800 active:translate-y-0 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 sm:w-auto"
               >
                 <Icon name={editing ? "edit" : "plus"} className="h-4 w-4" />
-                {editing ? "Update Account" : "Save Account"}
+                {editing ? "আপডেট করুন" : "সংরক্ষণ করুন"}
               </button>
             </div>
           </form>
@@ -489,16 +487,16 @@ export default function Accounts() {
                 <IconBox name="wallet" tone="sky" />
                 <div>
                   <h3 className="text-lg font-black text-slate-950 dark:text-white">
-                    All Accounts
+                    সব অ্যাকাউন্ট
                   </h3>
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Showing {filteredItems.length} of {items.length} account(s).
+                    মোট {items.length}টির মধ্যে {filteredItems.length}টি দেখানো হচ্ছে।
                   </p>
                 </div>
               </div>
 
               <div className="hidden w-fit rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200 md:inline-flex">
-                Active: {activeCount}/{items.length}
+                সক্রিয়: {activeCount}/{items.length}
               </div>
             </div>
 
@@ -511,7 +509,7 @@ export default function Accounts() {
                   className={`${fieldClass} pl-10`}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search account, type, owner..."
+                  placeholder="নাম, ধরন বা মালিক দিয়ে খুঁজুন..."
                 />
               </div>
 
@@ -520,7 +518,7 @@ export default function Accounts() {
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
               >
-                <option value="">All types</option>
+                <option value="">সব ধরন</option>
                 {TYPES.map((type) => (
                   <option key={type.value} value={type.value}>
                     {type.label}
@@ -533,7 +531,7 @@ export default function Accounts() {
                 value={ownerFilter}
                 onChange={(e) => setOwnerFilter(e.target.value)}
               >
-                <option value="">All owners</option>
+                <option value="">সব মালিক</option>
                 {OWNERS.map((owner) => (
                   <option key={owner.value} value={owner.value}>
                     {owner.label}
@@ -544,17 +542,17 @@ export default function Accounts() {
           </div>
 
           {loading ? (
-            <Loader text="Loading accounts" subtext="Fetching balances and members" />
+            <Loader text="অ্যাকাউন্ট লোড হচ্ছে" subtext="তথ্য আনা হচ্ছে" />
           ) : filteredItems.length === 0 ? (
             <div className="p-8 text-center sm:p-10">
               <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-slate-100 text-slate-600 ring-1 ring-slate-200 dark:bg-white/10 dark:text-slate-200 dark:ring-white/10">
                 <Icon name="empty" className="h-7 w-7" />
               </div>
               <h4 className="mt-4 text-lg font-black text-slate-950 dark:text-white">
-                No accounts found
+                কোনো অ্যাকাউন্ট পাওয়া যায়নি
               </h4>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Add a new account or change your search/filter.
+                নতুন অ্যাকাউন্ট যোগ করুন অথবা ফিল্টার পরিবর্তন করুন।
               </p>
             </div>
           ) : (
@@ -565,11 +563,11 @@ export default function Accounts() {
                 <table className="w-full min-w-[760px] text-sm">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/50 dark:text-slate-400">
                     <tr className="text-left">
-                      <th className="p-4 font-black">Account</th>
-                      <th className="p-4 font-black">Type</th>
-                      <th className="p-4 font-black">Owner</th>
-                      <th className="p-4 text-right font-black">Opening</th>
-                      <th className="p-4 text-right font-black">Actions</th>
+                      <th className="p-4 font-black">অ্যাকাউন্ট</th>
+                      <th className="p-4 font-black">ধরন</th>
+                      <th className="p-4 font-black">মালিক</th>
+                      <th className="p-4 text-right font-black">শুরুর টাকা</th>
+                      <th className="p-4 text-right font-black">কাজ</th>
                     </tr>
                   </thead>
 
@@ -612,8 +610,8 @@ export default function Accounts() {
                                     }`}
                                 >
                                   {account.isActive !== false
-                                    ? "Active"
-                                    : "Inactive"}
+                                    ? "সক্রিয়"
+                                    : "নিষ্ক্রিয়"}
                                 </span>
                               </div>
                             </div>
@@ -640,7 +638,7 @@ export default function Accounts() {
                               className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
                             >
                               <Icon name="edit" className="h-3.5 w-3.5" />
-                              Edit
+                              সম্পাদনা
                             </button>
 
                             <button
@@ -649,7 +647,7 @@ export default function Accounts() {
                               className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-black text-rose-600 transition hover:bg-rose-50 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200 dark:hover:bg-rose-400/15"
                             >
                               <Icon name="trash" className="h-3.5 w-3.5" />
-                              Delete
+                              মুছুন
                             </button>
                           </div>
                         </td>
@@ -681,7 +679,7 @@ export default function Accounts() {
                                 : "text-slate-400 dark:text-slate-500"
                             }
                           >
-                            {account.isActive !== false ? "Active" : "Inactive"}
+                            {account.isActive !== false ? "সক্রিয়" : "নিষ্ক্রিয়"}
                           </span>
                         </div>
                       </div>
@@ -692,7 +690,7 @@ export default function Accounts() {
                     <div className="mt-4 grid grid-cols-2 gap-2">
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-white/10 dark:bg-white/[0.04]">
                         <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
-                          Opening
+                          শুরুর টাকা
                         </p>
                         <p className="mt-1 text-base font-black text-slate-950 dark:text-white">
                           {bdt(account.openingBalance)}
@@ -701,7 +699,7 @@ export default function Accounts() {
 
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-white/10 dark:bg-white/[0.04]">
                         <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
-                          Type
+                          ধরন
                         </p>
                         <p className="mt-1 text-base font-black text-slate-950 dark:text-white">
                           {typeLabel(account.type)}
@@ -716,7 +714,7 @@ export default function Accounts() {
                         className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-black text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
                       >
                         <Icon name="edit" className="h-3.5 w-3.5" />
-                        Edit
+                        সম্পাদনা
                       </button>
 
                       <button
@@ -725,7 +723,7 @@ export default function Accounts() {
                         className="inline-flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-white px-3 py-2.5 text-xs font-black text-rose-600 transition hover:bg-rose-50 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200 dark:hover:bg-rose-400/15"
                       >
                         <Icon name="trash" className="h-3.5 w-3.5" />
-                        Delete
+                        মুছুন
                       </button>
                     </div>
                   </article>
