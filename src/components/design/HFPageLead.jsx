@@ -18,7 +18,7 @@ function Value({item}) {
   if(n === undefined || n === null || !Number.isFinite(Number(n))) return <strong className="hf-v2-number">—</strong>;
   return <strong className="hf-v2-number">{item.kind === 'count' ? Number(n).toLocaleString('bn-BD') : formatTaka(n)}</strong>;
 }
-export default function HFPageLead({title,description,month,onMonthChange,metrics=[],onAdd,addLabel,onExtra,extraLabel,onRefresh,more,onToggleMore,addDisabled=false}) {
+export default function HFPageLead({title,description,month,onMonthChange,metrics=[],onAdd,addLabel,onExtra,extraLabel,extraBefore,onRefresh,more,onToggleMore,addDisabled=false}) {
  const [showHelp,setShowHelp] = useState(false);
  const [explain,setExplain] = useState(false);
  const primary = metrics.find(x=>x.primary) || metrics[0];
@@ -28,6 +28,7 @@ export default function HFPageLead({title,description,month,onMonthChange,metric
    <div className="hf-v2-actions">
     {month && onMonthChange && <label className="hf-v2-month"><HFIcon name="calendar" size={16}/><span>{formatBanglaMonth(month)}</span><input aria-label="মাস পরিবর্তন" type="month" value={month} onChange={e=>onMonthChange(e.target.value)}/></label>}
     {onRefresh && <button className="hf-v2-btn hf-v2-btn--icon" type="button" aria-label="তথ্য নতুন করে আনুন" onClick={onRefresh}><HFIcon name="refresh" size={17}/></button>}
+    {extraBefore && <div className="hn-pagelead-extra-before">{extraBefore}</div>}
     {onExtra && <button className="hf-v2-btn hf-v2-btn--soft" type="button" onClick={onExtra}><HFIcon name="download" size={16}/>{extraLabel}</button>}
     {onAdd && <button className="hf-v2-btn hf-v2-btn--main" type="button" disabled={addDisabled} onClick={onAdd}><HFIcon name="plus" size={16}/>{addLabel}</button>}
     <button className="hf-v2-btn hf-v2-btn--icon" type="button" title="ব্যবহারের নিয়ম" aria-expanded={showHelp} onClick={()=>setShowHelp(x=>!x)}><HFIcon name="info" size={17}/></button>

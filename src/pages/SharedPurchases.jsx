@@ -238,6 +238,8 @@ export default function SharedPurchases() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  const [editPurchase, setEditPurchase] = useState(null);
+  const [editPurchaseForm, setEditPurchaseForm] = useState({ title: "", note: "" });
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [selectedInstallment, setSelectedInstallment] = useState(null);
 
@@ -541,6 +543,22 @@ export default function SharedPurchases() {
     }
   }
 
+  async function updatePurchaseInfo(event) {
+    event.preventDefault();
+    if (!editPurchase || !editPurchaseForm.title.trim() || saving) return;
+    try {
+      setSaving(true);
+      await api.put(`/api/shared-purchases/${editPurchase._id}/details`, {
+        title: editPurchaseForm.title.trim(), note: editPurchaseForm.note,
+      });
+      setEditPurchase(null);
+      await loadPlans(month);
+      setMessage('কেনাকাটার তথ্য পরিবর্তন হয়েছে। মূল্য ও কিস্তির ইতিহাস অপরিবর্তিত রয়েছে।');
+    } catch (error) {
+      setMessage(error?.response?.data?.message || 'পরিবর্তন সংরক্ষণ করা যায়নি।');
+    } finally {setSaving(false);}
+  }
+
   async function removePlan(plan) {
     const confirmed = window.confirm(
       `Delete “${plan.title}”? This will reverse its upfront account deduction, reimbursements, and all monthly allocations.`
@@ -638,6 +656,10 @@ export default function SharedPurchases() {
                         <strong>আগের মাসগুলোর ভাগ: {money(plan.allocationHistory?.previousAmount)} ({plan.allocationHistory?.previousMonths?.length || 0} মাস)</strong>
                         <small>এটি মাসিক হিসাবের ভাগ, নতুন ব্যাংক কর্তন নয়।</small>
                       </div>
+                      <button type="button" className="hf-v2-btn hf-v2-btn--soft hf-hishab-purchase-edit"
+                        onClick={()=>{setEditPurchase(plan);setEditPurchaseForm({title:plan.title || '',note:plan.note || ''});}}>
+                        সম্পাদনা
+                      </button>
                       {rows.some(item => item.paymentRequired && item.status !== 'paid') && (
                         <button type="button" className="hf-v2-btn hf-v2-btn--main hf-hishab-purchase-pay"
                           onClick={() => openPayment(plan, rows.find(item => item.paymentRequired && item.status !== 'paid'))}>
@@ -821,6 +843,14 @@ export default function SharedPurchases() {
         </div>
       </div>
 
+      <Modal open={!!editPurchase} title="কেনাকাটার তথ্য সম্পাদনা" onClose={()=>setEditPurchase(null)}>
+        <form className="hn-shared-edit-form" onSubmit={updatePurchaseInfo}>
+          <p>পুরোনো হিসাব সুরক্ষিত রাখতে শুধু নাম ও মন্তব্য পরিবর্তন করা যাবে। দাম, মাস, ভাগ বা পরিশোধ এখানে পরিবর্তন হবে না।</p>
+          <label>কেনাকাটার নাম<input required maxLength={160} value={editPurchaseForm.title} onChange={e=>setEditPurchaseForm(f=>({...f,title:e.target.value}))}/></label>
+          <label>মন্তব্য<textarea rows={3} maxLength={1000} value={editPurchaseForm.note} onChange={e=>setEditPurchaseForm(f=>({...f,note:e.target.value}))}/></label>
+          <div className="hn-form-actions"><button type="button" onClick={()=>setEditPurchase(null)}>বাতিল</button><button type="submit" disabled={saving}>{saving?'সংরক্ষণ হচ্ছে…':'পরিবর্তন সংরক্ষণ'}</button></div>
+        </form>
+      </Modal>
       <Modal open={createOpen} title="নতুন বড় কেনাকাটা" onClose={() => setCreateOpen(false)} wide>
         <form onSubmit={createPurchase} className="space-y-5 p-4 sm:p-6">
           <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 text-sm leading-6 text-indigo-800 dark:border-indigo-400/20 dark:bg-indigo-400/10 dark:text-indigo-200">

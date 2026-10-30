@@ -1071,7 +1071,7 @@ export default function Fixed() {
                       </div>
                       <div className="hf-hishab-fixed-money"><small>সাধারণ পরিমাণ</small><b>{t.isVariable ? 'মাসে লিখবেন' : money(t.defaultAmount)}</b></div>
                       <div className="hf-hishab-fixed-actions">
-                        <SoftButton dark={dark} primary onClick={() => openPaymentModalForTemplate(t)}>এই মাসে যোগ করুন</SoftButton>
+                        <span className="hn-fixed-post-action"><SoftButton dark={dark} primary onClick={() => openPaymentModalForTemplate(t)}>এই মাসে যোগ করুন</SoftButton></span>
                         <SoftButton dark={dark} onClick={() => openEditTemplateModal(t)}>সম্পাদনা</SoftButton>
                         <SoftButton dark={dark} danger onClick={() => deleteTemplate(t._id)}>মুছুন</SoftButton>
                       </div>
@@ -1139,7 +1139,7 @@ export default function Fixed() {
                   <SoftButton dark={dark} onClick={closeTemplateModal}>বন্ধ করুন</SoftButton>
                 </div>
 
-                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <div className="hn-fixed-template-fields mt-5 grid gap-4 md:grid-cols-2">
                   <div className="md:col-span-2">
                     <Field dark={dark} label="নিয়মের নাম" hint="Example: House Rent / Electricity Bill">
                       <input
@@ -1264,7 +1264,7 @@ export default function Fixed() {
                 <div className="mt-6 flex justify-end gap-2">
                   <SoftButton dark={dark} onClick={closeTemplateModal}>বাতিল</SoftButton>
                   <SoftButton dark={dark} primary onClick={saveTemplate}>
-                    {templateMode === "edit" ? "Update Template" : "Save Template"}
+                    {templateMode === "edit" ? "পরিবর্তন সংরক্ষণ" : "নিয়ম সংরক্ষণ"}
                   </SoftButton>
                 </div>
               </div>
@@ -1380,7 +1380,7 @@ export default function Fixed() {
                 <div className="mt-6 flex justify-end gap-2">
                   <SoftButton dark={dark} onClick={closePaymentModal}>বাতিল</SoftButton>
                   <SoftButton dark={dark} primary onClick={submitPaymentModal}>
-                    {paymentMode === "edit" ? "Update Payment" : "Confirm Payment"}
+                    {paymentMode === "edit" ? "পরিবর্তন সংরক্ষণ" : "পরিশোধ নিশ্চিত করুন"}
                   </SoftButton>
                 </div>
               </div>

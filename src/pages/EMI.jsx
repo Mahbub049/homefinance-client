@@ -491,7 +491,7 @@ function LiabilitySection({ items, total }) {
   );
 }
 
-function PlanCard({ plan, month, members, onGenerate, onStatus, onEdit, onResume }) {
+function PlanCard({ plan, month, members, onGenerate, onStatus, onEdit, onResume, onDelete }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const progress = Math.min(100, Math.max(0, Number(plan?.stats?.progress || 0)));
   const canCreateBill = plan.status === "active" && scheduledAmountForMonth(plan,month)>0;
@@ -504,6 +504,9 @@ function PlanCard({ plan, month, members, onGenerate, onStatus, onEdit, onResume
       <div className="hf-v2-emi-progress"><small>পরিশোধের অগ্রগতি</small><strong>{progress.toLocaleString('bn-BD')}%</strong><div className="hf-v2-progress"><i style={{width:`${progress}%`}}/></div></div>
       <div className="hf-v2-emi-row-actions">
         {canCreateBill && <button type="button" onClick={()=>onGenerate(plan._id,plan.productName)} className="hf-v2-btn hf-v2-btn--main">বিল তৈরি</button>}
+        <button type="button" className="hf-v2-btn hf-v2-btn--soft" onClick={()=>onEdit(plan)}>সম্পাদনা</button>
+        <button type="button" className="hf-v2-btn hf-v2-btn--soft" onClick={()=>plan.status==='active'?onStatus(plan._id,'paused'):onResume(plan)}>{plan.status==='active'?'বিরতি দিন':'আবার চালু করুন'}</button>
+        <button type="button" className="hf-v2-btn hf-v2-btn--danger" onClick={()=>onDelete(plan)}>মুছুন</button>
         <button type="button" className="hf-v2-btn hf-v2-btn--soft" aria-expanded={detailsOpen} onClick={()=>setDetailsOpen(v=>!v)}>{detailsOpen?'বন্ধ করুন':'বিস্তারিত'}</button>
       </div>
     </div>
@@ -513,10 +516,6 @@ function PlanCard({ plan, month, members, onGenerate, onStatus, onEdit, onResume
       <div><span>বাকি আছে</span><strong>৳ {money(plan?.stats?.remaining||0)}</strong></div>
       <div><span>সময়</span><strong>{plan.startMonth} – {plan.endMonth}</strong></div>
       <div className="hf-v2-emi-members"><span>এই মাসে কার কত ভাগ</span>{splitItems.map(it=><div key={it.key}><b>{it.name}</b><strong>৳ {money(it.amount)}</strong></div>)}</div>
-      <div className="hn-emi-plan-actions">
-        <button type="button" className="hf-v2-btn hf-v2-btn--soft" onClick={()=>onEdit(plan)}>সম্পাদনা</button>
-        <button type="button" className="hf-v2-btn hf-v2-btn--soft" onClick={()=>plan.status==='active'?onStatus(plan._id,'paused'):onResume(plan)}>{plan.status==='active'?'বিরতি দিন':'আবার চালু করুন'}</button>
-      </div>
     </div>}
   </article>;
 }
@@ -526,6 +525,7 @@ export default function EMI() {
   const [emiTab,setEmiTab]=useState('plans');
   const [editingPlanId,setEditingPlanId]=useState('');
   const [resumePlan,setResumePlan]=useState(null);
+  const [deletePlan,setDeletePlan]=useState(null);
   const [resumeMode,setResumeMode]=useState('from-now');
   const [resumeMonth,setResumeMonth]=useState(monthNow());
   const me = getUser();
@@ -778,6 +778,19 @@ export default function EMI() {
       setResumePlan(null);await loadPlans();await loadInstallments();
       setMsg('কিস্তি আবার চালু হয়েছে; আগের পরিশোধিত তথ্য অপরিবর্তিত রয়েছে।');
     } catch(e){setMsg(e?.response?.data?.message||'কিস্তি চালু করা যায়নি।');}
+  }
+
+  async function confirmDeletePlan() {
+    if (!deletePlan) return;
+    try {
+      await api.delete(`/api/emi/plans/${deletePlan._id}`);
+      setMsg('কিস্তির পরিকল্পনা মুছে ফেলা হয়েছে।');
+      setDeletePlan(null);
+      await Promise.all([loadPlans(), loadInstallments()]);
+    } catch (e) {
+      setMsg(e?.response?.data?.message || 'পরিকল্পনা মুছতে পারিনি।');
+      setDeletePlan(null);
+    }
   }
 
   function closeModal() {
@@ -1349,6 +1362,7 @@ function openPayModalForInstallment(item) {
                     onGenerate={generateSinglePlan}
                     onStatus={setStatus}
                     onEdit={editPlan}
+                    onDelete={setDeletePlan}
                     onResume={p=>{setResumePlan(p);setResumeMode('from-now');setResumeMonth(monthNow());}}
                   />
                 ))}
@@ -1544,6 +1558,14 @@ function openPayModalForInstallment(item) {
           </div>
         )}
 
+        {deletePlan && <div className="hn-modal-backdrop" role="presentation">
+          <div className="hn-modal hn-danger-confirm" role="alertdialog" aria-modal="true" aria-labelledby="hn-delete-emi-title">
+            <header><div><span className="hn-kicker">পরিকল্পনা মুছুন</span><h2 id="hn-delete-emi-title">{deletePlan.productName} মুছবেন?</h2></div><button type="button" aria-label="বন্ধ করুন" onClick={()=>setDeletePlan(null)}>×</button></header>
+            <div className="hn-confirm-body"><p>এটি স্থায়ীভাবে মুছে যাবে। কোনো বিল বা পরিশোধের ইতিহাস থাকলে নিরাপত্তার জন্য মুছতে দেওয়া হবে না। প্রথমে সংশ্লিষ্ট বিলের অবস্থা যাচাই করুন।</p>
+              <div className="hn-form-actions"><button type="button" onClick={()=>setDeletePlan(null)}>বাতিল</button><button type="button" className="hn-danger-button" onClick={confirmDeletePlan}>হ্যাঁ, মুছুন</button></div>
+            </div>
+          </div>
+        </div>}
         {resumePlan && <div className="hn-modal-backdrop" role="presentation"><div className="hn-modal hn-emi-resume-dialog" role="dialog" aria-modal="true" aria-label="কিস্তি আবার চালু করুন">
           <header><div><span className="hn-kicker">কিস্তির সময়সূচি</span><h2>{resumePlan.productName} আবার চালু করুন</h2></div><button type="button" onClick={()=>setResumePlan(null)} aria-label="বন্ধ করুন">×</button></header>
           <div className="hn-resume-body"><label><input type="radio" name="resume-method" checked={resumeMode==='from-now'} onChange={()=>setResumeMode('from-now')}/> <span><b>এখন থেকে অবশিষ্ট কিস্তি</b><small>পুরোনো পরিশোধিত মাস আগের মতো থাকবে। বাকি মাসগুলো নির্বাচিত মাস থেকে পরপর বসবে।</small></span></label>

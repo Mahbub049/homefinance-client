@@ -328,6 +328,7 @@ export default function Savings() {
   const [search, setSearch] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
+  const savingsManageRef = useRef(null);
   const [depositSaving, setDepositSaving] = useState(false);
   const depositInFlight = useRef(false);
   const depositAttempt = useRef(null);
@@ -678,13 +679,14 @@ export default function Savings() {
                         <div><h3>{safeText(a.name, 'সঞ্চয় অ্যাকাউন্ট')}</h3><p>{safeText(a.owner, '—')} · {accountTypeLabel(a.type)}</p></div>
                         <div><span>এই মাসে জমা</span><b>{money(a.monthDeposited)}</b></div>
                         <div><span>এখন মোট জমা আছে</span><strong>{money(a.currentBalance)}</strong></div>
+                        <button type="button" className="hn-account-inline-edit" aria-label={`${a.name} সম্পাদনা করুন`} onClick={()=>savingsManageRef.current?.editAccount(a)}>সম্পাদনা</button>
                       </div>
                     ))}
                   </div>
                 )}
               </section>
 
-              <SavingsManage members={members} accounts={allAccounts} onChanged={async()=>{await Promise.all([loadOverview(month),loadYearlySummary(month),loadAccounts()]);}} />
+              <SavingsManage ref={savingsManageRef} members={members} accounts={allAccounts} onChanged={async()=>{await Promise.all([loadOverview(month),loadYearlySummary(month),loadAccounts()]);}} />
 
               {/* Desktop detailed table only */}
               <section className="hf-step3-advanced hidden overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.04] md:block">
@@ -966,8 +968,8 @@ export default function Savings() {
                 </div>
 
                 <div className="p-4 sm:p-6">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field label="সদস্য" className="sm:col-span-2">
+                  <div className="hn-savings-deposit-grid grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <Field label="সদস্য" className="lg:col-span-1">
                       <select
                         className={inputClass()}
                         value={form.paidByUserId}
@@ -1014,7 +1016,7 @@ export default function Savings() {
                       />
                     </Field>
 
-                    <Field label="যে অ্যাকাউন্ট থেকে" className="sm:col-span-2">
+                    <Field label="যে অ্যাকাউন্ট থেকে" className="lg:col-span-1">
                       <select
                         className={inputClass()}
                         value={form.fromAccountId}
@@ -1038,7 +1040,7 @@ export default function Savings() {
                       </div>
                     </Field>
 
-                    <Field label="কোন সঞ্চয় অ্যাকাউন্টে" className="sm:col-span-2">
+                    <Field label="কোন সঞ্চয় অ্যাকাউন্টে" className="lg:col-span-1">
                       <select
                         className={inputClass()}
                         value={form.toAccountId}
@@ -1062,7 +1064,7 @@ export default function Savings() {
                       </div>
                     </Field>
 
-                    <Field label="মন্তব্য" className="sm:col-span-2">
+                    <Field label="মন্তব্য" className="lg:col-span-1">
                       <input
                         className={inputClass()}
                         value={form.note}

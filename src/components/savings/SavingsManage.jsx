@@ -1,11 +1,11 @@
-import {useCallback,useEffect,useMemo,useState} from 'react';
+import {forwardRef,useImperativeHandle,useCallback,useEffect,useMemo,useState} from 'react';
 import api from '../../services/api';
 import {getUser} from '../../services/authStorage';
 import toast from 'react-hot-toast';
 const id=v=>String(v?._id||v?.id||v||'');
 const monthNow=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`};
 const taka=v=>`৳ ${Number(v||0).toLocaleString('bn-BD',{maximumFractionDigits:2})}`;
-export default function SavingsManage({members=[],accounts=[],onChanged}) {
+const SavingsManage = forwardRef(function SavingsManage({members=[],accounts=[],onChanged}, ref) {
   const me=getUser();
   const current=members.find(m=>id(m)===id(me?.id||me?._id));
   const sourceAccounts=accounts.filter(a=>a.isActive!==false&&['bank','cash','wallet'].includes(a.type));
@@ -14,6 +14,7 @@ export default function SavingsManage({members=[],accounts=[],onChanged}) {
   const [deposits,setDeposits]=useState([]);
   const [expanded,setExpanded]=useState('');
   const [editAccount,setEditAccount]=useState(null);
+  useImperativeHandle(ref,()=>({editAccount:(a)=>setEditAccount({_id:a._id,name:a.name,isActive:a.isActive!==false})}),[]);
   const [busy,setBusy]=useState(false);
   const [form,setForm]=useState({paidByUserId:'',fromAccountId:'',toAccountId:'',amount:'',dayOfMonth:'10',startMonth:monthNow(),endMonth:'',note:''});
   const refresh=useCallback(async()=>{
@@ -61,9 +62,8 @@ export default function SavingsManage({members=[],accounts=[],onChanged}) {
   return <section className="hn-savings-manage">
     <div className="hn-savings-manage-head"><div><h2>সঞ্চয় পরিচালনা</h2><p>অ্যাকাউন্ট, মাসিক জমার নিয়ম ও আগের জমা—সব এক জায়গায়</p></div></div>
     <div className="hn-savings-manage-tabs" role="group" aria-label="সঞ্চয় পরিচালনার অংশ">
-      {['accounts','auto','history'].map((key,i)=><button key={key} type="button" className={expanded===key?'active':''} onClick={()=>setExpanded(expanded===key?'':key)}>{['অ্যাকাউন্ট সম্পাদনা','মাসিক স্বয়ংক্রিয় জমা','জমার ইতিহাস'][i]}</button>)}
+      {['auto','history'].map((key,i)=><button key={key} type="button" className={expanded===key?'active':''} onClick={()=>setExpanded(expanded===key?'':key)}>{['মাসিক স্বয়ংক্রিয় জমা','জমার ইতিহাস'][i]}</button>)}
     </div>
-    {expanded==='accounts'&&<div className="hn-manage-list">{targetAccounts.map(a=><div key={a._id} className="hn-manage-row"><div><b>{a.name}</b><small>{a.owner==='Mahbub'?'Mahbub':a.owner==='Mirza'?'Mim':'যৌথ'} · {a.type==='savings'?'সঞ্চয়':'বিনিয়োগ'}</small></div><button type="button" onClick={()=>setEditAccount({_id:a._id,name:a.name,isActive:a.isActive!==false})}>সম্পাদনা</button></div>)}</div>}
     {expanded==='auto'&&<><div className="hn-manage-intro"><p>এটি ব্যাংক থেকে টাকা পাঠাবে না; নির্ধারিত দিনে অ্যাপে জমার হিসাব স্বয়ংক্রিয়ভাবে যোগ করবে। অ্যাকাউন্টের প্রকৃত লেনদেন মিলিয়ে নেবেন।</p><button type="button" onClick={startRule}>+ নতুন নিয়ম</button></div><div className="hn-manage-list">{rules.map(r=><div className="hn-manage-row" key={r._id}><div><b>{taka(r.amount)} · প্রতি মাসের {Number(r.dayOfMonth).toLocaleString('bn-BD')} তারিখ</b><small>{accounts.find(a=>id(a)===id(r.fromAccountId))?.name||'অ্যাকাউন্ট'} → {accounts.find(a=>id(a)===id(r.toAccountId))?.name||'সঞ্চয়'} · {memberName(r.paidByUserId)} · {r.active?'চালু':'বন্ধ'}</small></div><button type="button" disabled={busy} onClick={()=>toggle(r)}>{r.active?'বিরতি দিন':'চালু করুন'}</button></div>)}{!rules.length&&<p className="hn-manage-empty">এখনো কোনো মাসিক নিয়ম নেই।</p>}</div></>}
     {expanded==='history'&&<div className="hn-manage-list">{deposits.map(row=><div className="hn-manage-row" key={row._id}><div><b>{taka(row.amount)}</b><small>{new Date(row.date).toLocaleDateString('bn-BD')} · {row.fromAccountId?.name||'—'} → {row.toAccountId?.name||'—'} {row.sourceType==='savings_auto'?'· স্বয়ংক্রিয় হিসাব':''}</small></div>{allowedUndo(row)&&<button type="button" disabled={busy} onClick={()=>undoDeposit(row)}>এন্ট্রি বাতিল</button>}</div>)}{!deposits.length&&<p className="hn-manage-empty">কোনো জমার ইতিহাস নেই।</p>}</div>}
     {expanded==='new'&&<form className="hn-manage-form" onSubmit={createRule}>
@@ -80,4 +80,5 @@ export default function SavingsManage({members=[],accounts=[],onChanged}) {
     </form>}
     {editAccount&&<div className="hn-modal-backdrop" role="presentation"><form className="hn-modal hn-manage-form" onSubmit={saveAccount} role="dialog" aria-modal="true" aria-label="সঞ্চয় অ্যাকাউন্ট সম্পাদনা"><h3>অ্যাকাউন্ট সম্পাদনা</h3><label>অ্যাকাউন্টের নাম<input required value={editAccount.name} onChange={e=>setEditAccount(a=>({...a,name:e.target.value}))}/></label><label className="hn-inline-check"><input type="checkbox" checked={editAccount.isActive} onChange={e=>setEditAccount(a=>({...a,isActive:e.target.checked}))}/> অ্যাকাউন্ট চালু আছে</label><p>পুরোনো লেনদেন থাকলে মালিক, ধরন বা opening balance পরিবর্তন করা যাবে না।</p><div className="hn-form-actions"><button type="button" onClick={()=>setEditAccount(null)}>বাতিল</button><button type="submit" disabled={busy}>সংরক্ষণ</button></div></form></div>}
   </section>;
-}
+});
+export default SavingsManage;

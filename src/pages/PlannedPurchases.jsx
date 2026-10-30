@@ -116,7 +116,7 @@ export default function PlannedPurchases() {
             <div className="hn-plan-ident"><span className={`hn-priority-dot ${item.priority || 'medium'}`}/><div className="hn-plan-copy"><h2>{item.productName}</h2><p>{[item.brand, item.category].filter(Boolean).join(' · ') || 'কেনাকাটার পরিকল্পনা'}</p></div></div>
             <div className="hn-plan-price"><small>আনুমানিক দাম</small><strong>{currency(item.expectedPrice)}</strong></div>
             <span className={`hn-priority-pill ${item.priority || 'medium'}`}>{priorityNames[item.priority] || 'মাঝারি'}</span>
-            <div className="hn-row-actions">
+            <div className="hn-row-actions" role="group" aria-label={`${item.productName} পরিবর্তন`}>
               <button type="button" className="hn-btn hn-btn-light" onClick={() => setDetailId(detailId === item._id ? null : item._id)}>{detailId === item._id ? 'বন্ধ' : 'বিস্তারিত'}</button>
               {tab === 'planned' ? <><button type="button" className="hn-btn hn-btn-light" onClick={() => edit(item)}>সম্পাদনা</button><button type="button" className="hn-btn hn-btn-primary" disabled={busy} onClick={() => act(item, 'bought')}>কেনা হয়েছে</button></> : <button type="button" className="hn-btn hn-btn-light" disabled={busy} onClick={() => act(item, 'planned')}>ফিরিয়ে আনুন</button>}
               <button type="button" className="hn-icon-danger" disabled={busy} onClick={() => act(item, 'delete')} aria-label={`${item.productName} মুছুন`} title="মুছুন">×</button>

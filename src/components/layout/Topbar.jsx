@@ -40,11 +40,10 @@ export default function Topbar({ onOpenDrawer }) {
   return <header className="hf-shell-topbar sticky top-0 z-30 border-b backdrop-blur-lg">
     <div className="hf-shell-topbar-inner flex min-h-[68px] items-center justify-between gap-2 px-3 sm:px-5">
       <div className="flex min-w-0 items-center gap-3">
-        
+        {onOpenDrawer && <button type="button" className="hf-toolbar-button md:hidden" onClick={onOpenDrawer} aria-label="নেভিগেশন মেনু খুলুন"><HFIcon name="menu" size={19}/></button>}
         <div className="min-w-0"><div className="hf-shell-title truncate text-[15px] sm:text-[17px]">{title}</div><div className="hf-shell-subtitle hidden truncate sm:block">{subtitle}</div></div>
       </div>
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-        {onOpenDrawer && <button type="button" className="hf-toolbar-button md:hidden" onClick={onOpenDrawer} aria-label="নেভিগেশন মেনু খুলুন"><HFIcon name="menu" size={19}/></button>}
         <button type="button" className="hf-toolbar-button" title={isDark?'লাইট মোড':'ডার্ক মোড'} onClick={switchTheme} aria-label={isDark?'লাইট মোড চালু করুন':'ডার্ক মোড চালু করুন'} aria-pressed={isDark}>
           <HFIcon name={isDark?'sun':'moon'} size={16}/><span className="hidden sm:inline">{isDark?'লাইট':'ডার্ক'}</span>
         </button>
