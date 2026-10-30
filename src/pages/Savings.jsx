@@ -4,6 +4,8 @@ import AppLayout from "../components/layout/AppLayout";
 import api from "../services/api";
 import toast from "react-hot-toast";
 import Loader from "../components/ui/Loader";
+import SavingsManage from "../components/savings/SavingsManage";
+import {getUser} from "../services/authStorage";
 
 function monthNow() {
   const d = new Date();
@@ -477,7 +479,7 @@ export default function Savings() {
 
   function openDeposit() {
     depositAttempt.current = null;
-    const defaultUser = getId(members?.[0]) || "";
+    const defaultUser = getId(members.find(m => getId(m) === getId(getUser()?.id || getUser()?._id))) || getId(members?.[0]) || "";
     const from = getSourceAccountsForUser(defaultUser)?.[0]?._id || "";
     const to = getSavingsAccountsForUser(defaultUser)?.[0]?._id || "";
 
@@ -531,7 +533,7 @@ export default function Savings() {
       });
       depositAttempt.current = null;
 
-      toast.success("Savings transfer recorded");
+      toast.success('সঞ্চয় জমার হিসাব সংরক্ষিত হয়েছে।');
       setModalOpen(false);
       try {
         await Promise.all([loadOverview(month), loadYearlySummary(month), loadAccounts()]);
@@ -681,6 +683,8 @@ export default function Savings() {
                   </div>
                 )}
               </section>
+
+              <SavingsManage members={members} accounts={allAccounts} onChanged={async()=>{await Promise.all([loadOverview(month),loadYearlySummary(month),loadAccounts()]);}} />
 
               {/* Desktop detailed table only */}
               <section className="hf-step3-advanced hidden overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.04] md:block">
@@ -946,7 +950,7 @@ export default function Savings() {
 
           {/* Deposit modal */}
           {modalOpen && (
-            <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+            <div className="hn-finance-modal-overlay fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4">
               <div className="savings-modal max-h-[92vh] w-full overflow-y-auto rounded-t-3xl border border-slate-200 bg-white text-slate-950 shadow-2xl dark:border-white/10 dark:bg-slate-950 dark:text-white sm:max-w-2xl sm:rounded-3xl">
                 <div className="relative overflow-hidden rounded-t-3xl bg-gradient-to-br from-emerald-600 via-teal-600 to-sky-700 p-5 text-white sm:p-6">
                   <div className="absolute -right-14 -top-14 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
@@ -1095,7 +1099,7 @@ export default function Savings() {
                         !String(form.amount).trim()
                       }
                     >
-                      {depositSaving ? 'Saving…' : 'Save Transfer'}
+                      {depositSaving ? 'সংরক্ষণ হচ্ছে…' : 'জমা নিশ্চিত করুন'}
                     </button>
                   </div>
                 </div>

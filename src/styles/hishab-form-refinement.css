@@ -1,0 +1,44 @@
+/* Consistent Bangla forms and modal ergonomics, including older module forms. */
+:root { --hn-dialog-radius: 22px; --hn-dialog-space: clamp(14px,2.5vw,24px); }
+.app-modal-overlay, .hn-modal-backdrop, .hf-modal-backdrop {padding:clamp(12px,3vh,26px)!important;align-items:center!important;overflow-y:auto;}
+.app-modal-panel, .hn-modal, .emi-modal, .savings-modal,
+.fixed-modal, .grocery-modal, .shared-modal {border-radius:var(--hn-dialog-radius)!important;min-width:0;max-width:min(96vw,840px);max-height:calc(100dvh - 28px);margin:auto;box-shadow:0 26px 80px rgba(0,0,0,.25)!important;}
+.app-modal-panel, .ledger-modal-panel {height:auto!important;max-height:calc(100dvh - 28px)!important;}
+.ledger-modal-panel>div:first-child {background:var(--hf-surface,#111b2a)!important;}
+.ledger-modal-panel .ledger-modal-scroll {padding:var(--hn-dialog-space)!important;min-height:0;overscroll-behavior:contain;}
+.ledger-modal-panel .ledger-modal-scroll>div {border-radius:18px!important;box-shadow:none!important;}
+.ledger-modal-panel .ledger-modal-scroll select, .ledger-modal-panel .ledger-modal-scroll input,
+.hn-modal input, .hn-modal select, .hn-modal textarea {min-height:44px;min-width:0;width:100%;font-size:14px;}
+.ledger-modal-panel>div:last-child, .hn-modal footer {flex-shrink:0;position:sticky;bottom:0;z-index:2;padding:12px var(--hn-dialog-space)!important;backdrop-filter:blur(16px);border-top:1px solid var(--hf-line,rgba(145,164,188,.23));}
+.ledger-modal-panel button, .hn-modal button, .emi-modal button, .savings-modal button {min-height:40px;white-space:normal;}
+.hn-modal {width:min(620px,100%)!important;overflow-y:auto;}
+.hn-modal-backdrop {z-index:90!important;}
+.hn-plan-form {padding:var(--hn-dialog-space)!important;gap:12px!important;grid-template-columns:repeat(2,minmax(0,1fr));}
+.hn-plan-form>label {min-width:0;}
+.hn-plan-form footer {display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px;}
+.hn-plan-form footer>button {flex:0 0 auto;}
+.hn-plan-row {grid-template-columns:minmax(220px,2fr) minmax(105px,.85fr) minmax(80px,.75fr) minmax(240px,1.5fr)!important;gap:12px!important;align-items:center;}
+.hn-plan-ident,.hn-plan-copy,.hn-plan-price {min-width:0;overflow-wrap:anywhere;}
+.hn-row-actions {display:flex!important;gap:6px!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-end!important;min-width:0;}
+.hn-row-actions .hn-btn {min-width:0;padding:8px 12px!important;line-height:1.2!important;white-space:nowrap!important;font-size:12px!important;}
+.hn-row-actions .hn-icon-danger {flex:0 0 35px;}
+.hn-page {width:100%!important;max-width:none!important;padding-inline:clamp(10px,1.25vw,22px)!important;}
+.hn-year-page .hn-page, .hn-year-page,.hn-year-list {max-width:none!important;}
+.hn-modal header {padding:16px var(--hn-dialog-space)!important;}
+@media(max-width:1050px){.hn-plan-row{grid-template-columns:minmax(0,1fr) minmax(90px,.4fr)!important;}.hn-plan-row>.hn-priority-pill{justify-self:start}.hn-row-actions{grid-column:1 / -1;justify-content:flex-start!important;}}
+@media(max-width:600px){.app-modal-overlay,.hn-modal-backdrop{padding:8px!important}.app-modal-panel,.hn-modal,.emi-modal,.savings-modal{border-radius:18px!important;max-height:calc(100dvh - 16px)!important}.hn-plan-form{grid-template-columns:minmax(0,1fr)!important}.hn-plan-form .hn-full{grid-column:auto!important}.hn-page{padding-inline:10px!important}.hn-plan-row{grid-template-columns:minmax(0,1fr)!important}.hn-row-actions{grid-column:auto;justify-content:flex-start!important}.ledger-modal-panel .ledger-modal-scroll{padding:12px!important}}
+.hn-savings-manage{border:1px solid var(--hf-line,rgba(148,163,184,.25));background:var(--hf-surface,#132033);color:inherit;border-radius:20px;padding:clamp(14px,2vw,24px)}
+.hn-savings-manage-head h2{font-size:19px;font-weight:800;margin:0}.hn-savings-manage-head p{font-size:13px;opacity:.72;margin:4px 0 0}
+.hn-savings-manage-tabs{display:flex;gap:6px;overflow-x:auto;margin:16px 0}.hn-savings-manage-tabs button{border:1px solid var(--hf-line,rgba(148,163,184,.25));border-radius:12px;padding:10px 13px;white-space:nowrap;font-weight:700;font-size:13px}.hn-savings-manage-tabs button.active{background:rgba(20,184,166,.15);color:#2dd4bf;border-color:#14b8a6}
+.hn-manage-list{display:grid;gap:6px}.hn-manage-row{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--hf-line,rgba(148,163,184,.15))}.hn-manage-row>div{min-width:0}.hn-manage-row small{display:block;font-size:12px;opacity:.72;overflow-wrap:anywhere}.hn-manage-row button,.hn-manage-intro button{flex-shrink:0;padding:9px 13px;border:1px solid rgba(20,184,166,.5);border-radius:10px;font-weight:700;font-size:13px}.hn-manage-intro{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:14px}.hn-manage-intro p{font-size:13px;line-height:1.6;opacity:.77;max-width:670px}.hn-manage-empty{padding:24px;text-align:center;opacity:.65}.hn-manage-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:16px;border:1px solid var(--hf-line,rgba(148,163,184,.25));border-radius:16px}.hn-manage-form h3,.hn-manage-form>p,.hn-form-actions{grid-column:1 / -1}.hn-manage-form h3{font-size:19px;font-weight:800}.hn-manage-form label{display:grid;gap:6px;font-size:13px;font-weight:650}.hn-manage-form input,.hn-manage-form select{width:100%;min-width:0;min-height:44px;padding:8px 12px;border:1px solid var(--hf-line,rgba(148,163,184,.25));background:var(--hf-input,#0a1222);border-radius:11px;color:inherit}.hn-manage-form .hn-inline-check{display:flex;align-items:center;gap:10px}.hn-inline-check input{width:auto!important;min-height:unset!important}.hn-form-actions{display:flex;gap:10px;justify-content:flex-end}.hn-form-actions button{border-radius:11px;padding:10px 16px;font-weight:750;background:rgba(20,184,166,.15)}.hn-form-actions button[type=submit]{background:#0d9488;color:#fff}.hn-manage-form.hn-modal{max-width:520px}
+@media(max-width:600px){.hn-manage-form{grid-template-columns:1fr}.hn-manage-intro{align-items:stretch;flex-direction:column}.hn-manage-row{align-items:flex-start}.hn-savings-manage-tabs button{padding:8px 10px}}
+.hn-emi-tabs{display:flex;gap:8px;overflow-x:auto;padding:10px clamp(10px,1.25vw,22px);margin:0 0 6px}.hn-emi-tabs button{padding:11px 17px;border-radius:12px;border:1px solid var(--hf-line,rgba(148,163,184,.22));font-size:14px;font-weight:800;white-space:nowrap}.hn-emi-tabs button.active{color:#fff;background:#0d9488;border-color:#0d9488}
+.hn-emi-view-plans .hn-emi-bills-section,.hn-emi-view-plans .hn-emi-installments-section{display:none}
+.hn-emi-view-bills .hn-emi-plans-section{display:none}
+.hn-emi-view-archived .hn-emi-bills-section,.hn-emi-view-archived .hn-emi-installments-section{display:none}
+.hn-emi-plan-actions{display:flex;flex-wrap:wrap;gap:8px}.hn-emi-resume-dialog{width:min(570px,95vw)!important}.hn-resume-body{padding:20px;display:grid;gap:14px}.hn-resume-body>label{display:flex;align-items:flex-start;gap:12px;border:1px solid var(--hf-line,rgba(148,163,184,.24));padding:12px;border-radius:13px;cursor:pointer}.hn-resume-body>label input{margin-top:4px;accent-color:#0d9488}.hn-resume-body small{display:block;opacity:.7;line-height:1.55;margin-top:4px}.hn-resume-month{display:grid;gap:6px}.hn-resume-month input{min-height:44px;border:1px solid var(--hf-line,rgba(148,163,184,.24));border-radius:12px;background:var(--hf-input,#071222);color:inherit;padding:10px}.hn-resume-body p{font-size:12px;opacity:.7}
+.hn-emi-installments-section .grid.lg\\:grid-cols-\\[1\\.2fr_0\\.7fr_0\\.7fr_0\\.7fr_auto\\]{gap:14px}
+.hn-finance-modal-overlay,.app-modal-overlay--center{padding:clamp(9px,3vw,28px)!important;align-items:center!important;overflow-y:auto!important;overscroll-behavior:contain}
+.hn-finance-modal-panel,.app-modal-overlay--center>.app-modal-panel,.grocery-modal-scroll{max-height:calc(100dvh - 24px)!important;border-radius:20px!important;max-width:min(940px,100%)!important;box-shadow:0 24px 70px rgba(0,0,0,.22)!important}
+.hn-finance-modal-panel>div:last-child,.grocery-modal-scroll>div:last-child{padding-bottom:max(16px,env(safe-area-inset-bottom))}
+@media(max-width:600px){.hn-finance-modal-overlay,.app-modal-overlay--center{padding:8px!important}.hn-finance-modal-panel,.app-modal-overlay--center>.app-modal-panel,.grocery-modal-scroll{border-radius:16px!important;max-height:calc(100dvh - 16px)!important}}

@@ -587,7 +587,7 @@ export default function Fixed() {
     setMsg("");
     setTemplateMode("create");
     setEditingTemplateId(null);
-    setTemplateForm(blankTemplateForm(members?.[0]?.id || ""));
+    setTemplateForm(blankTemplateForm(me?.id || me?._id || members?.[0]?.id || ""));
     setTemplateOpen(true);
   }
 
@@ -602,7 +602,7 @@ export default function Fixed() {
       isVariable: !!template?.isVariable,
       defaultAmount: template?.isVariable ? "" : String(template?.defaultAmount || ""),
       defaultSplitType: template?.defaultSplitType || "equal",
-      personalUserId: getId(template?.personalUserId) || members?.[0]?.id || "",
+      personalUserId: getId(template?.personalUserId) || me?.id || me?._id || members?.[0]?.id || "",
       ratioMe: findByUserId(template?.ratios || [], me?.id, "ratio", 50),
       ratioOther: otherMember ? findByUserId(template?.ratios || [], otherMember.id, "ratio", 50) : 50,
       fixedMe: findByUserId(template?.fixed || [], me?.id, "amount", ""),
@@ -708,7 +708,7 @@ export default function Fixed() {
     setSelectedTemplate(template);
     setSelectedInstance(null);
 
-    const defaultPayer = members?.[0]?.id || "";
+    const defaultPayer = me?.id || me?._id || members?.[0]?.id || "";
     const availableAccounts = getPaymentAccountsForUser(defaultPayer);
 
     setPaymentForm({
@@ -728,7 +728,7 @@ export default function Fixed() {
     setSelectedTemplate(instance.templateId || null);
     setSelectedInstance(instance);
 
-    const defaultPayer = members?.[0]?.id || "";
+    const defaultPayer = me?.id || me?._id || members?.[0]?.id || "";
     const availableAccounts = getPaymentAccountsForUser(defaultPayer);
 
     setPaymentForm({
@@ -750,7 +750,7 @@ export default function Fixed() {
     setSelectedTemplate(instance.templateId || null);
     setSelectedInstance(instance);
 
-    const defaultPayer = getId(instance?.paidByUserId) || members?.[0]?.id || "";
+    const defaultPayer = getId(instance?.paidByUserId) || me?.id || me?._id || members?.[0]?.id || "";
     const availableAccounts = getPaymentAccountsForUser(defaultPayer);
 
     const existingAccountId = getId(instance?.fromAccountId);
@@ -1121,7 +1121,7 @@ export default function Fixed() {
           />
 
           {templateOpen && (
-            <div className="app-modal-overlay--center">
+            <div className="app-modal-overlay--center hn-finance-modal-overlay">
               <div
                 className={classNames(
                   "app-modal-panel max-w-3xl rounded-[2rem] p-5",
@@ -1272,7 +1272,7 @@ export default function Fixed() {
           )}
 
           {paymentOpen && (
-            <div className="app-modal-overlay--center">
+            <div className="app-modal-overlay--center hn-finance-modal-overlay">
               <div
                 className={classNames(
                   "app-modal-panel max-w-2xl rounded-[2rem] p-5",

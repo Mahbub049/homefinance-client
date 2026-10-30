@@ -9,6 +9,7 @@ import AppLayout from "../components/layout/AppLayout";
 import api from "../services/api";
 import { getUser } from "../services/authStorage";
 import ConfirmModal from "../components/ui/ConfirmModal";
+import {preferredMemberId} from "../utils/preferredMember";
 import Loader from "../components/ui/Loader";
 
 
@@ -717,7 +718,7 @@ export default function Ledger() {
   }, [accounts, form.txType, form.receivedByUserId, memberById]);
 
   function getDefaultForm(next = {}) {
-    const defaultUser = getId(members?.[0]) || "";
+    const defaultUser = preferredMemberId(members,me);
     const txType = next.txType || "expense";
 
     const paymentMode = next.paymentMode === "split" ? "split" : "single";
@@ -752,7 +753,7 @@ export default function Ledger() {
 
     return {
       txType,
-      date: next.date || new Date().toISOString().slice(0, 10),
+      date: next.date || dayNow(),
       categoryId: next.categoryId || "",
       amount: next.amount === 0 || next.amount ? String(next.amount) : "",
       note: next.note || "",
@@ -1269,10 +1270,10 @@ export default function Ledger() {
       const userTitle = memberFilter === 'all' ? 'সব সদস্য' : members.find(m => getId(m) === memberFilter)?.name || 'সব সদস্য';
       const printedAt = new Date().toLocaleString('bn-BD');
       const html = `<!doctype html><html lang="bn"><head><meta charset="utf-8"><title>হিসাব নিকাশ - আয়-খরচ - ${escapeHtml(month)}</title><style>
-       @page{size:A4 landscape;margin:13mm}*{box-sizing:border-box}body{font-family:'Hind Siliguri','Noto Sans Bengali','Nirmala UI','Vrinda',system-ui,sans-serif;color:#162632;margin:0;font-size:11px;line-height:1.7}
+       @page{size:A4 landscape;margin:17mm 18mm}*{box-sizing:border-box}body{padding:16px 20px;max-width:1440px;margin:0 auto!important;font-family:'Hind Siliguri','Noto Sans Bengali','Nirmala UI','Vrinda',system-ui,sans-serif;color:#162632;margin:0;font-size:11px;line-height:1.7}
        header{border-bottom:2px solid #008675;padding:0 0 13px;margin-bottom:13px;display:flex;justify-content:space-between;align-items:flex-end;gap:18px}h1{margin:0;font-size:23px;line-height:1.3}small,.muted{color:#617583}h2{font-size:13px;margin:0 0 7px}.logo{color:#008675;font-weight:800}table{width:100%;border-collapse:collapse;table-layout:fixed}th{text-align:left;background:#e8f5f1;color:#125b51;font-size:10px}td,th{padding:6px 7px;vertical-align:top;border-bottom:1px solid #dce6e7;overflow-wrap:anywhere}tr:nth-child(even) td{background:#f7fafb}.money{text-align:right;white-space:nowrap;font-weight:700}th:nth-child(1){width:4%}th:nth-child(2){width:10%}th:nth-child(3){width:9%}th:nth-child(4){width:14%}th:nth-child(5){width:13%}th:nth-child(6){width:21%}th:nth-child(7){width:12%}th:nth-child(8){width:17%}
-       .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 16px}.stat{background:#f3f8f7;border:1px solid #dce9e7;border-radius:7px;padding:9px 11px}.stat span{display:block;color:#617583}.stat strong{font-size:16px}.actions{position:sticky;top:0;background:white;padding:10px 0;border-bottom:1px solid #ddd;margin-bottom:14px;display:flex;gap:10px}.actions button{border:0;border-radius:6px;background:#008675;color:white;padding:10px 16px;font:inherit;font-weight:700;cursor:pointer}.actions p{margin:0;align-self:center;color:#64748b}thead{display:table-header-group}tr{break-inside:avoid}footer{margin-top:12px;color:#71818f;font-size:9px} @media print{.actions{display:none}}
-      </style></head><body><div class="actions"><button onclick="window.print()">PDF হিসেবে সংরক্ষণ / প্রিন্ট</button><p>Print → Destination: Save as PDF নির্বাচন করুন</p></div>
+       .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 16px}.stat{background:#f3f8f7;border:1px solid #dce9e7;border-radius:7px;padding:9px 11px}.stat span{display:block;color:#617583}.stat strong{font-size:16px}.actions{position:sticky;top:0;background:white;padding:10px 0;border-bottom:1px solid #ddd;margin-bottom:14px;display:flex;gap:10px}.actions button{border:0;border-radius:6px;background:#008675;color:white;padding:10px 16px;font:inherit;font-weight:700;cursor:pointer}.actions p{margin:0;align-self:center;color:#64748b}thead{display:table-header-group}tr{break-inside:avoid}@media print{body{padding:0!important;max-width:none!important}table{width:100%}thead{display:table-header-group}}footer{margin-top:12px;color:#71818f;font-size:9px} @media print{.actions{display:none}}
+      </style></head><body><div class="actions"><button onclick="window.print()">PDF হিসেবে সংরক্ষণ / প্রিন্ট</button><p>প্রিন্ট অপশনে PDF হিসেবে সংরক্ষণ করুন</p></div>
       <header><div><div class="logo">হিসাব নিকাশ</div><h1>আয়-খরচের বিবরণী</h1><div class="muted">${escapeHtml(monthText)} · ${escapeHtml(userTitle)} · ${escapeHtml(activeTab === 'all' ? 'সব লেনদেন' : typeLabel(activeTab))}</div></div><div class="muted">তৈরি হয়েছে: ${escapeHtml(printedAt)}<br/>মোট এন্ট্রি: ${list.length.toLocaleString('bn-BD')}</div></header>
       <div class="stats"><div class="stat"><span>মাসের আয়</span><strong>${escapeHtml(taka(list.filter(x=>x.txType==='income').reduce((n,x)=>n+Number(x.amount||0),0)))}</strong></div><div class="stat"><span>মাসের খরচ</span><strong>${escapeHtml(taka(list.filter(x=>x.txType==='expense').reduce((n,x)=>n+Number(x.amount||0),0)))}</strong></div><div class="stat"><span>টাকা আদান-প্রদান</span><strong>${escapeHtml(taka(list.filter(x=>x.txType==='transfer').reduce((n,x)=>n+Number(x.amount||0),0)))}</strong></div></div>
       <h2>লেনদেনের তালিকা</h2><table><thead><tr><th>নং</th><th>তারিখ</th><th>ধরন</th><th>সদস্য</th><th>খাত</th><th>অ্যাকাউন্ট</th><th>টাকা</th><th>নোট</th></tr></thead><tbody>${rowsHtml || '<tr><td colspan="8">এই সময়ে কোনো লেনদেন নেই।</td></tr>'}</tbody></table><footer>ব্যক্তিগত রেকর্ডের ভিত্তিতে তৈরি। ব্যাংকের বিবরণীর বিকল্প নয়।</footer></body></html>`;
@@ -2035,20 +2036,20 @@ export default function Ledger() {
             <div className="app-modal-panel ledger-modal-panel flex h-[100dvh] w-full max-w-3xl flex-col overflow-hidden rounded-none border border-white/70 bg-white p-0 shadow-2xl dark:border-white/10 dark:bg-slate-950 sm:h-auto sm:max-h-[92vh] sm:rounded-[30px]">
               {/* Modal Header */}
               <div className="relative shrink-0 overflow-hidden border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 sm:px-6 sm:py-4">
-                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-fuchsia-500 via-violet-500 to-indigo-500" />
+                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-teal-500 via-emerald-500 to-cyan-500" />
 
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="mb-1 hidden rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-violet-700 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-200 sm:inline-flex">
-                      {isEditing ? "Update ledger" : "New ledger"}
+                    <div className="mb-1 hidden rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-violet-700 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-200 sm:inline-flex">
+                      {isEditing ? "হিসাব সম্পাদনা" : "নতুন হিসাব"}
                     </div>
 
                     <h3 className="pt-1 text-lg font-black text-slate-950 dark:text-white sm:pt-0 sm:text-xl">
-                      {isEditing ? "Edit Transaction" : "নতুন হিসাব"}
+                      {isEditing ? "হিসাব সম্পাদনা" : "নতুন হিসাব"}
                     </h3>
 
                     <p className="mt-1 hidden text-sm leading-5 text-slate-500 dark:text-slate-400 sm:block">
-                      Use Transfer for moving money between accounts. Expense entries support Personal, Equal, Ratio and Fixed split.
+                      এক অ্যাকাউন্ট থেকে অন্য অ্যাকাউন্টে টাকা পাঠাতে আদান-প্রদান ব্যবহার করুন। খরচের ভাগ আলাদা করে নির্ধারণ করা যাবে।
                     </p>
                   </div>
 
@@ -2087,7 +2088,7 @@ export default function Ledger() {
                         value={form.txType}
                         onChange={(e) => {
                           const nextType = e.target.value;
-                          const defaultUser = getId(members?.[0]) || "";
+                          const defaultUser = preferredMemberId(members,me);
 
                           const nextPaidBy = form.paidByUserId || defaultUser;
                           const nextReceivedBy = form.receivedByUserId || defaultUser;
@@ -2539,10 +2540,10 @@ export default function Ledger() {
                     disabled={savingTx}
                     aria-busy={savingTx}
                     className={cn(
-                      "order-1 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-xs font-black text-white shadow-[0_14px_30px_rgba(15,23,42,0.18)] transition active:translate-y-0 dark:bg-white dark:text-slate-950 sm:order-2 sm:w-auto sm:px-5 sm:text-sm",
+                      "order-1 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-5 py-3 text-sm font-black text-white shadow-sm transition active:translate-y-0 hover:bg-teal-700 sm:order-2 sm:w-auto",
                       savingTx
                         ? "cursor-not-allowed opacity-70"
-                        : "hover:-translate-y-0.5 hover:bg-slate-800 dark:hover:bg-slate-100"
+                        : "hover:bg-teal-700"
                     )}
                   >
                     {savingTx && (
@@ -2567,7 +2568,7 @@ export default function Ledger() {
                       </svg>
                     )}
 
-                    {savingTx ? (isEditing ? "Updating..." : "Saving...") : isEditing ? "Update" : "Save"}
+                    {savingTx ? "সংরক্ষণ হচ্ছে…" : isEditing ? "পরিবর্তন সংরক্ষণ" : "হিসাব সংরক্ষণ"}
                   </button>
 
                   <button

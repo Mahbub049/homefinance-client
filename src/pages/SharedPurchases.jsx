@@ -197,9 +197,9 @@ function Modal({ open, title, onClose, children, wide = false }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+    <div className="hn-finance-modal-overlay fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/55 p-0 backdrop-blur-sm sm:items-center sm:p-4">
       <div
-        className={`max-h-[94vh] w-full overflow-y-auto rounded-t-[28px] border border-white/10 bg-white shadow-2xl dark:bg-slate-900 sm:rounded-[28px] ${
+        className={`hn-finance-modal-panel max-h-[94vh] w-full overflow-y-auto rounded-t-[28px] border border-white/10 bg-white shadow-2xl dark:bg-slate-900 sm:rounded-[28px] ${
           wide ? "sm:max-w-4xl" : "sm:max-w-xl"
         }`}
       >

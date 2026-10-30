@@ -920,7 +920,7 @@ export default function Grocery() {
   }
 
   function getDefaultForm(next = {}) {
-    const defaultUser = getId(members?.[0]) || currentUserId || "";
+    const defaultUser = currentUserId || getId(members?.[0]) || "";
     const selectedUserId = next.paidByUserId || defaultUser;
     const preferredAccountId = getPreferredAccountForUser(selectedUserId);
     const userAccounts = getAccountsForUser(selectedUserId);
@@ -1696,11 +1696,11 @@ export default function Grocery() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="mb-1 hidden rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200 sm:inline-flex">
-                      {isEditing ? "Update receipt" : "New receipt"}
+                      {isEditing ? "বাজারের হিসাব পরিবর্তন" : "নতুন বাজারের হিসাব"}
                     </div>
 
                     <h3 className="text-lg pt-2 pl-2 lg:pl-0 lg:pt-0 font-black text-slate-950 dark:text-white sm:text-xl">
-                      {isEditing ? "Edit Grocery Transaction" : "Add Grocery Transaction"}
+                      {isEditing ? "বাজারের হিসাব সম্পাদনা" : "বাজারের নতুন হিসাব"}
                     </h3>
 
                     <p className="mt-1 hidden text-sm leading-5 text-slate-500 dark:text-slate-400 sm:block">

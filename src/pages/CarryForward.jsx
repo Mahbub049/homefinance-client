@@ -254,7 +254,7 @@ export default function CarryForward() {
       }
       setDraftClosing(nextDraft);
     } catch (e) {
-      if (serial === loadSerial.current) setErr(e?.response?.data?.message || "Failed to load carry forward data.");
+      if (serial === loadSerial.current) setErr(e?.response?.data?.message || "মাস শেষে হিসাবের তথ্য আনা যায়নি।");
     } finally {
       if (serial === loadSerial.current) setBusy(false);
     }
@@ -272,11 +272,11 @@ export default function CarryForward() {
     setMsg("");
     setErr("");
     if (!computed?.fingerprint) {
-      setErr("Refresh the month before saving balances.");
+      setErr("টাকা সংরক্ষণের আগে মাসের তথ্য রিফ্রেশ করুন।");
       return;
     }
-    if (action === "close" && !window.confirm(`Close ${month}? This locks its month-end balances and rolls them into later months.`)) return;
-    if (action === "revise" && !window.confirm(`Revise the already closed ${month}? This correction will be recorded in the audit history.`)) return;
+    if (action === "close" && !window.confirm(`${month} মাসের হিসাব বন্ধ করবেন? এই মাসের শেষের টাকা পরবর্তী মাসে যোগ হবে।`)) return;
+    if (action === "revise" && !window.confirm(`আগে বন্ধ করা ${month} মাসের হিসাব সংশোধন করবেন? পরিবর্তনের ইতিহাস সংরক্ষিত থাকবে।`)) return;
     setBusy(true);
     try {
       const res = await api.post(`/api/month-balance/${action}`, {
@@ -301,12 +301,12 @@ export default function CarryForward() {
       setRevisionReason("");
       setRevisionConfirmation("");
       setMsg(action === "save"
-        ? "Draft saved. Month is still open; account cash will continue updating from new transactions."
+        ? "খসড়া সংরক্ষিত হয়েছে। মাস এখনও খোলা আছে; নতুন লেনদেনের হিসাব চলতে থাকবে।"
         : action === "revise"
-          ? "Month-end correction saved with an audit record."
-          : "Completed month closed. Its balances will carry forward into later months.");
+          ? "মাস শেষে সংশোধন ও পরিবর্তনের ইতিহাস সংরক্ষিত হয়েছে।"
+          : "মাসের হিসাব বন্ধ হয়েছে। শেষের টাকা পরবর্তী মাসে যাবে।");
     } catch (e) {
-      setErr(e?.response?.data?.message || "Could not save month. Refresh and retry.");
+      setErr(e?.response?.data?.message || "মাসের হিসাব সংরক্ষণ করা যায়নি। রিফ্রেশ করে আবার চেষ্টা করুন।");
     } finally { setBusy(false); }
   }
   const saveDraft = () => performSave("save");
@@ -396,7 +396,7 @@ export default function CarryForward() {
     const n = Number(editAmount || 0);
 
     if (Number.isNaN(n)) {
-      setErr("Enter a valid balance amount.");
+      setErr("সঠিক টাকার পরিমাণ লিখুন।");
       return;
     }
 
@@ -458,8 +458,7 @@ export default function CarryForward() {
                     মাস বন্ধ করার ব্যবস্থা
                   </h3>
                   <p className="mt-1 text-sm leading-5 text-slate-500 dark:text-slate-400">
-                    Select a month, edit actual closing balances if needed, then
-                    close the month.
+                    প্রথমে মাস নির্বাচন করুন, প্রয়োজনে প্রকৃত শেষের টাকা সংশোধন করুন, তারপর মাসের হিসাব বন্ধ করুন।
                   </p>
                 </div>
               </div>
@@ -499,7 +498,7 @@ export default function CarryForward() {
                   className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:shadow-[0_14px_30px_rgba(255,255,255,0.08)] dark:hover:bg-slate-100"
                 >
                   <Icon name="lock" className="h-4 w-4" />
-                  {isClosed ? "Confirm Revision" : "Close Month"}
+                  {isClosed ? "সংশোধন নিশ্চিত করুন" : "মাস বন্ধ করুন"}
                 </button>
               </div>
             </div>
@@ -507,20 +506,20 @@ export default function CarryForward() {
 
           {computed?.protectedHistorical && (
             <div role="status" className="rounded-2xl border border-sky-300 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-900 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-100">
-              Historical protection: months before October 2026 are read-only. Your earlier manual corrections remain unchanged.
+              অক্টোবর ২০২৬-এর আগের মাসগুলো শুধু দেখা যাবে। আগের হাতে সংশোধন করা হিসাব অপরিবর্তিত থাকবে।
             </div>
           )}
           {!isClosed && computed?.pendingMonth && (
             <div role="status" className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100">
-              This month is still in progress. You may save a draft, but permanent closing is available only after the month has ended (Asia/Dhaka).
+              এই মাস এখনও চলছে। খসড়া সংরক্ষণ করা যাবে, তবে মাস শেষ হওয়ার পরে স্থায়ীভাবে বন্ধ করা যাবে (বাংলাদেশ সময়)।
             </div>
           )}
           {isClosed && !computed?.protectedHistorical && (
             <section className="rounded-2xl border border-violet-300 bg-violet-50 px-4 py-3 text-sm font-semibold text-violet-900 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-100">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <span>মাসটি বন্ধ। সংশোধন হয়েছে: {computed?.revisions || 0}. Use a revision only to correct a verified bank/account balance.</span>
+                <span>মাসটি বন্ধ। সংশোধন হয়েছে: {computed?.revisions || 0}. শুধু ব্যাংক বা অ্যাকাউন্টের নিশ্চিত অমিল সংশোধন করুন।</span>
                 <button type="button" disabled={busy} className="rounded-xl border border-violet-400 px-3 py-2 font-black" onClick={() => setRevisionMode((x) => !x)}>
-                  {revisionMode ? "Cancel revision" : "Review / revise closed month"}
+                  {revisionMode ? "সংশোধন বাতিল" : "বন্ধ মাসের হিসাব দেখুন / সংশোধন করুন"}
                 </button>
               </div>
               {revisionMode && (
@@ -531,7 +530,7 @@ export default function CarryForward() {
                   <label className="text-xs">REVISE লিখুন {month} নিশ্চিত করতে
                     <input className={fieldClass} value={revisionConfirmation} onChange={(e) => setRevisionConfirmation(e.target.value)} />
                   </label>
-                  <p className="text-xs">Earlier closes cannot be revised here if a later month is already closed. No historical transactions are deleted.</p>
+                  <p className="text-xs">পরবর্তী কোনো মাস ইতিমধ্যে বন্ধ থাকলে আগের মাস এখানে সংশোধন করা যাবে না। পুরোনো লেনদেন মুছে ফেলা হবে না।</p>
                 </div>
               )}
             </section>
@@ -550,8 +549,8 @@ export default function CarryForward() {
 
           {!item ? (
             <Loader
-              text="Loading carry forward"
-              subtext="Checking account balances"
+              text="মাসের হিসাব আনা হচ্ছে"
+              subtext="অ্যাকাউন্টের টাকা যাচাই করা হচ্ছে"
             />
           ) : (
             <>
@@ -559,18 +558,18 @@ export default function CarryForward() {
 
               {!isClosed && item?.draftSavedAt && (
                 <div className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-semibold text-violet-900 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-100">
-                  You have saved draft balance edits. These are provisional and may differ from Wallet's transaction-calculated available cash until you formally close this month.
+                  আপনি খসড়ায় টাকার পরিমাণ সংশোধন করেছেন। মাসটি স্থায়ীভাবে বন্ধ না করা পর্যন্ত এই অঙ্ক টাকার হিসাব পেজে দেখানো অঙ্কের থেকে আলাদা হতে পারে।
                 </div>
               )}
               {computed?.openingSource === "previous_closed_month" && (
                 <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-900 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-100">
-                  শুরুর টাকা এসেছে আগের বন্ধ মাস থেকে ({computed.anchorMonth || "previous month"}) এবং মাঝের মাসের লেনদেনসহ।
+                  শুরুর টাকা এসেছে আগের বন্ধ মাস থেকে ({computed.anchorMonth || "আগের মাস"}) এবং মাঝের মাসের লেনদেনসহ।
                 </div>
               )}
               {(computed?.reconciliationIssues?.length > 0 || computed?.staleClosedCount > 0) && (
                 <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100">
                   হিসাবে অমিল: {computed?.reconciliationIssues?.length || 0} টি সমস্যা।
-                  {computed?.staleClosedCount ? ` ${computed.staleClosedCount} account(s) differ from the calculations saved when the month was closed.` : ""}
+                  {computed?.staleClosedCount ? ` ${computed.staleClosedCount} টি অ্যাকাউন্টের হিসাব মাস বন্ধের সময় সংরক্ষিত অঙ্কের সঙ্গে মিলছে না।` : ""}
                   মাস বন্ধ করার আগে সব পরিশোধ মিলিয়ে নিন।
                 </div>
               )}
@@ -582,7 +581,7 @@ export default function CarryForward() {
                 <span>শুরুর টাকা {bdt(computed.summary.liquidOpening)} + পরিবর্তন {bdt(computed.summary.liquidMovement)}</span>
                 <span className="text-lg font-black">হিসাব অনুযায়ী শেষ {bdt(computed.summary.liquidSystemClosing)}</span>
               </div>
-              <p className="mt-1 text-xs text-teal-700 dark:text-teal-200">Transfers between two liquid accounts cancel out in the combined total. Transfers to savings reduce liquid cash but remain assets.</p>
+              <p className="mt-1 text-xs text-teal-700 dark:text-teal-200">নগদ বা ব্যাংক অ্যাকাউন্টের মধ্যে টাকা পাঠালে দুজনের সম্মিলিত টাকা বদলায় না। সঞ্চয়ে জমা দিলে ব্যবহারযোগ্য টাকা কমে, কিন্তু সম্পদ কমে না।</p>
             </section>
           )}
 
@@ -600,8 +599,7 @@ export default function CarryForward() {
                           অ্যাকাউন্ট অনুযায়ী শেষের হিসাব
                         </h3>
                         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                          Edit each account to match actual remaining cash, bank,
-                          or wallet balance.
+                          প্রতিটি অ্যাকাউন্টে বাস্তবে যত টাকা আছে, তার সঙ্গে মিলিয়ে নিন।
                         </p>
                       </div>
                     </div>
@@ -811,8 +809,7 @@ export default function CarryForward() {
                           {bdt(totals.editedClosing)}
                         </p>
                         <p className="mt-1 text-xs font-semibold text-emerald-700/80 dark:text-emerald-200/80">
-                          This total is automatically calculated from all account
-                          balances.
+                          সব অ্যাকাউন্টের হিসাব যোগ করে মোট টাকা দেখানো হয়েছে।
                         </p>
                       </div>
                     </div>
@@ -829,9 +826,9 @@ export default function CarryForward() {
                         মাসের হিসাব সংরক্ষিত
                       </h3>
                       <p className="mt-1 text-sm font-semibold text-emerald-700/80 dark:text-emerald-200/80">
-                        Opening: {bdt(calc.openingTotal)} • Closing:{" "}
-                        {bdt(calc.closingTotal)} • Manual adjusted:{" "}
-                        {calc.manualAdjusted ? "Yes" : "No"}
+                        শুরুতে: {bdt(calc.openingTotal)} • শেষে:{" "}
+                        {bdt(calc.closingTotal)} • নিজে সংশোধন করেছেন:{" "}
+                        {calc.manualAdjusted ? "হ্যাঁ" : "না"}
                       </p>
                     </div>
                   </div>
@@ -839,10 +836,7 @@ export default function CarryForward() {
               )}
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400">
-                Recommendation: close the month only after entering all income,
-                expense, transfer, grocery, EMI, and wallet records. Then edit
-                the account balances only if the actual remaining amount differs
-                from the system calculation.
+                পরামর্শ: আয়, খরচ, টাকা আদান-প্রদান, বাজার ও কিস্তির সব এন্ট্রি সম্পন্ন করে মাস বন্ধ করুন। প্রকৃত অ্যাকাউন্টের টাকার সঙ্গে পার্থক্য থাকলেই সংশোধন করুন।
               </div>
             </>
           )}
@@ -918,8 +912,7 @@ export default function CarryForward() {
                 </Field>
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400">
-                  The total closing balance will update automatically from this
-                  amount.
+                  এই পরিমাণ অনুযায়ী মাসের মোট শেষের টাকা স্বয়ংক্রিয়ভাবে পরিবর্তিত হবে।
                 </div>
               </div>
 
