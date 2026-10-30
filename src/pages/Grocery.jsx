@@ -380,6 +380,7 @@ export default function Grocery() {
 
   const [month, setMonth] = useState(monthNow());
   const [day, setDay] = useState(dayNow());
+  const [filterDate, setFilterDate] = useState(""); // ফাঁকা = নির্বাচিত মাসের সব বাজার
   const [msg, setMsg] = useState("");
   const [savingTxn, setSavingTxn] = useState(false);
   const savingTxnInFlight = useRef(false);
@@ -797,8 +798,8 @@ export default function Grocery() {
   }, [totalPayable, open, form.splitType, otherMember, fixedEditedField]);
 
   const dayTxns = useMemo(() => {
-    return (items || []).filter((t) => toLocalYMD(t.txnDate) === day);
-  }, [items, day]);
+    return (items || []).filter((t) => !filterDate || toLocalYMD(t.txnDate) === filterDate);
+  }, [items, filterDate]);
 
   const filteredTxns = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -1307,7 +1308,7 @@ export default function Grocery() {
   return (
     <AppLayout>
       <div className={`hf-step3-page hf-step3-grocery hf-v2-page hf-v2-grocery ${hfMore ? "hf-step3-expanded" : ""}`}>
-        <HFPageLead title="বাজার" description="কোন দোকান থেকে কী কিনেছেন, তার তালিকা" month={month} onMonthChange={setMonth}
+        <HFPageLead title="বাজার" description="কোন দোকান থেকে কী কিনেছেন, তার তালিকা" month={month} onMonthChange={(value) => { setMonth(value); setFilterDate(""); }}
           metrics={[
  {label:'এই মাসে বাজার খরচ',value:monthlyStats.monthTotal,primary:true},
  {label:'কেনাকাটার সংখ্যা',value:monthlyStats.txnCount,kind:'count'}
@@ -1345,6 +1346,7 @@ export default function Grocery() {
 
           {/* Filters */}
           <section className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_14px_40px_rgba(15,23,42,0.05)] backdrop-blur dark:border-white/10 dark:bg-slate-900/70 sm:p-5">
+            <div className="hn-grocery-datebar"><label>কোন দিনের বাজার দেখতে চান? <input type="date" aria-label="বাজারের তারিখ" value={filterDate} onChange={(e) => { const v = e.target.value; setFilterDate(v); if (v && v.slice(0,7) !== month) setMonth(v.slice(0,7)); }} /></label><button type="button" className="hn-btn hn-btn-light" onClick={() => setFilterDate("")}>পুরো মাস</button><button type="button" className="hn-btn hn-btn-light" onClick={() => { const v = dayNow(); setFilterDate(v); if(v.slice(0,7) !== month) setMonth(v.slice(0,7)); }}>আজকের বাজার</button></div>
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.5fr_1fr_1fr_auto]">
               <Field label="খুঁজুন">
                 <div className="relative">
@@ -1396,6 +1398,7 @@ export default function Grocery() {
                   type="button"
                   onClick={() => {
                     setDay(dayNow());
+                    setFilterDate("");
                     setSearch("");
                     setCategoryFilter("");
                     setPaidByFilter("");
@@ -1414,22 +1417,21 @@ export default function Grocery() {
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h3 className="text-lg font-black text-slate-950 dark:text-white">
-                    এই দিনের হিসাব {day}
+                    {filterDate ? `তারিখের বাজার: ${filterDate}` : `পুরো ${month} মাসের বাজার`}
                   </h3>
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    দেখাচ্ছে {filteredTxns.length} এর মধ্যে {dayTxns.length} transaction(s)
-                    for the selected day.
+                    দেখানো হচ্ছে {filteredTxns.length.toLocaleString("bn-BD")}টি বাজারের হিসাব।
                   </p>
                 </div>
 
                 <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-black text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
-                  দিনের মোট: {bdt(monthlyStats.dayTotal)}
+                  {filterDate ? "দিনের" : "মাসের"} মোট: {bdt(filterDate ? monthlyStats.dayTotal : monthlyStats.monthTotal)}
                 </div>
               </div>
             </div>
 
             {loading ? (
-              <Loader text="Loading grocery data" subtext="Preparing your entries" />
+              <Loader text="বাজারের হিসাব আসছে" subtext="অপেক্ষা করুন" />
             ) : items.length === 0 ? (
               <div className="p-8 text-center">
                 <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-400/10 dark:text-emerald-200 dark:ring-emerald-400/20">
@@ -1482,10 +1484,10 @@ export default function Grocery() {
 
                             <div className="min-w-0 flex-1">
                               <h4 className="truncate text-base font-black text-slate-950 dark:text-white sm:text-lg">
-                                {t.shopName || "Grocery Transaction"}
+                                {t.shopName || "বাজারের কেনাকাটা"}
                               </h4>
                               <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                                {toLocalYMD(t.txnDate)} • {t.location || "No location"}
+                                {toLocalYMD(t.txnDate)} • {t.location || "লোকেশন দেওয়া হয়নি"}
                               </p>
                             </div>
 
@@ -1579,7 +1581,7 @@ export default function Grocery() {
                         onClick={() => setExpandedTxnId(isExpanded ? null : t._id)}
                         className="mt-4 flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-800 transition hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 md:hidden"
                       >
-                        <span>{isExpanded ? "Hide details" : "View details"}</span>
+                        <span>{isExpanded ? "বিস্তারিত বন্ধ করুন" : "কেনা পণ্য দেখুন"}</span>
                         <ChevronDownIcon
                           className={`h-4 w-4 transition duration-200 ${isExpanded ? "rotate-180" : ""
                             }`}

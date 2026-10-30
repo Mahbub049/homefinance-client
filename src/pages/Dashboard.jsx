@@ -588,7 +588,7 @@ export default function Dashboard() {
         <section className="hf-v2-panel hf-v2-trend"><div className="hf-v2-panel-head"><div><h2>গত ১২ মাসের হিসাব</h2><p>আয়, খরচ ও সঞ্চয়ের পরিবর্তন</p></div></div>
           {trendView.length ? <div className="hf-v2-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={trendView} margin={{top:12,right:12,left:0,bottom:2}}><CartesianGrid strokeDasharray="3 5" stroke={chartGrid} vertical={false}/><XAxis dataKey="month" tick={chartTick} axisLine={false} tickLine={false}/><YAxis tick={chartTick} axisLine={false} tickLine={false} width={50}/><Tooltip content={<CustomTooltip/>}/><Legend wrapperStyle={legendStyle}/><Line type="monotone" dataKey="income" name="আয়" stroke={COLORS.income} strokeWidth={2.6} dot={false}/><Line type="monotone" dataKey="spend" name="খরচ ও জমা" stroke={COLORS.living} strokeWidth={2.6} dot={false}/><Line type="monotone" dataKey="balance" name="বাকি" stroke={COLORS.final} strokeWidth={2.6} dot={false}/></LineChart></ResponsiveContainer></div> : <p className="hf-v2-empty">১২ মাসের তথ্য এখনও পাওয়া যায়নি।</p>}
         </section>
-        {cardReviewCount > 0 && cardStatements && <details className="hf-v2-disclosure"><summary>সংরক্ষিত ক্রেডিট কার্ডের বিবরণ</summary><div className="hf-v2-muted">আগের credit-card সুবিধাগুলো এখানে অক্ষত আছে।</div>{(cardStatements.cards||[]).map(a=><div key={String(a.accountId)}><CreditCardStatementEditor account={a} month={month} onSaved={loadNetWorth}/><CreditCardRepaymentEditor account={a} month={month} onSaved={async()=>{await Promise.all([loadSummary(),loadNetWorth()]);}}/></div>)}</details>}
+        {/* ক্রেডিট কার্ডের পুরোনো তথ্য ও API সংরক্ষিত, হোমে প্রদর্শিত নয়। */}
       </div>
     </AppLayout>
   );

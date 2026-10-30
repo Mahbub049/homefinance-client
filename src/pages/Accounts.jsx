@@ -558,7 +558,7 @@ export default function Accounts() {
           ) : (
             <>
               <div
-                className={`hidden overflow-x-auto md:block ${hiddenScrollbarClass}`}
+                className="hidden"
               >
                 <table className="w-full min-w-[760px] text-sm">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/50 dark:text-slate-400">
@@ -657,7 +657,7 @@ export default function Accounts() {
                 </table>
               </div>
 
-              <div className="space-y-3 p-3 md:hidden">
+              <div className="grid grid-cols-1 gap-3 p-3 2xl:grid-cols-2">
                 {filteredItems.map((account) => (
                   <article
                     key={account._id}

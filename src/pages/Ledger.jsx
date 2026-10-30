@@ -1256,6 +1256,32 @@ export default function Ledger() {
   }
 
   async function exportTransactionsPdf() {
+    // The browser print engine supports Bengali text using the page's installed fonts.
+    // jsPDF's built-in Helvetica does not contain Bengali glyphs.
+    if (!Capacitor.isNativePlatform()) {
+      const escapeHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      const taka = value => `৳ ${Number(value || 0).toLocaleString('bn-BD', {maximumFractionDigits: 2})}`;
+      const list = [...rows].sort((a,b) => new Date(a.date) - new Date(b.date));
+      const owner = it => it.txType === 'income' ? memberById.get(getId(it.receivedByUserId))?.name || '—' : it.txType === 'expense' ? (it.paymentMode === 'split' ? 'দুজন মিলে' : memberById.get(getId(it.paidByUserId))?.name || '—') : '—';
+      const accountName = v => v?.name || accountsById.get(String(getId(v)))?.name || '—';
+      const monthText = formatMonthLabel(month);
+      const rowsHtml = list.map((it,index) => `<tr><td>${(index+1).toLocaleString('bn-BD')}</td><td>${escapeHtml(new Date(it.date).toLocaleDateString('bn-BD'))}</td><td>${escapeHtml(typeLabel(it.txType))}</td><td>${escapeHtml(owner(it))}</td><td>${escapeHtml(it.categoryId?.name || (it.txType === 'transfer' ? 'টাকা আদান-প্রদান' : '—'))}</td><td>${escapeHtml(it.txType === 'transfer' ? `${accountName(it.fromAccountId)} → ${accountName(it.toAccountId)}` : (it.txType === 'expense' && it.paymentMode === 'split' ? paymentSummary(it) : accountName(it.fromAccountId || it.toAccountId)))}</td><td class="money">${escapeHtml((it.txType === 'expense' ? '−' : it.txType === 'income' ? '+' : '') + taka(it.amount))}</td><td>${escapeHtml(it.note || '—')}</td></tr>`).join('');
+      const userTitle = memberFilter === 'all' ? 'সব সদস্য' : members.find(m => getId(m) === memberFilter)?.name || 'সব সদস্য';
+      const printedAt = new Date().toLocaleString('bn-BD');
+      const html = `<!doctype html><html lang="bn"><head><meta charset="utf-8"><title>হিসাব নিকাশ - আয়-খরচ - ${escapeHtml(month)}</title><style>
+       @page{size:A4 landscape;margin:13mm}*{box-sizing:border-box}body{font-family:'Hind Siliguri','Noto Sans Bengali','Nirmala UI','Vrinda',system-ui,sans-serif;color:#162632;margin:0;font-size:11px;line-height:1.7}
+       header{border-bottom:2px solid #008675;padding:0 0 13px;margin-bottom:13px;display:flex;justify-content:space-between;align-items:flex-end;gap:18px}h1{margin:0;font-size:23px;line-height:1.3}small,.muted{color:#617583}h2{font-size:13px;margin:0 0 7px}.logo{color:#008675;font-weight:800}table{width:100%;border-collapse:collapse;table-layout:fixed}th{text-align:left;background:#e8f5f1;color:#125b51;font-size:10px}td,th{padding:6px 7px;vertical-align:top;border-bottom:1px solid #dce6e7;overflow-wrap:anywhere}tr:nth-child(even) td{background:#f7fafb}.money{text-align:right;white-space:nowrap;font-weight:700}th:nth-child(1){width:4%}th:nth-child(2){width:10%}th:nth-child(3){width:9%}th:nth-child(4){width:14%}th:nth-child(5){width:13%}th:nth-child(6){width:21%}th:nth-child(7){width:12%}th:nth-child(8){width:17%}
+       .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 16px}.stat{background:#f3f8f7;border:1px solid #dce9e7;border-radius:7px;padding:9px 11px}.stat span{display:block;color:#617583}.stat strong{font-size:16px}.actions{position:sticky;top:0;background:white;padding:10px 0;border-bottom:1px solid #ddd;margin-bottom:14px;display:flex;gap:10px}.actions button{border:0;border-radius:6px;background:#008675;color:white;padding:10px 16px;font:inherit;font-weight:700;cursor:pointer}.actions p{margin:0;align-self:center;color:#64748b}thead{display:table-header-group}tr{break-inside:avoid}footer{margin-top:12px;color:#71818f;font-size:9px} @media print{.actions{display:none}}
+      </style></head><body><div class="actions"><button onclick="window.print()">PDF হিসেবে সংরক্ষণ / প্রিন্ট</button><p>Print → Destination: Save as PDF নির্বাচন করুন</p></div>
+      <header><div><div class="logo">হিসাব নিকাশ</div><h1>আয়-খরচের বিবরণী</h1><div class="muted">${escapeHtml(monthText)} · ${escapeHtml(userTitle)} · ${escapeHtml(activeTab === 'all' ? 'সব লেনদেন' : typeLabel(activeTab))}</div></div><div class="muted">তৈরি হয়েছে: ${escapeHtml(printedAt)}<br/>মোট এন্ট্রি: ${list.length.toLocaleString('bn-BD')}</div></header>
+      <div class="stats"><div class="stat"><span>মাসের আয়</span><strong>${escapeHtml(taka(list.filter(x=>x.txType==='income').reduce((n,x)=>n+Number(x.amount||0),0)))}</strong></div><div class="stat"><span>মাসের খরচ</span><strong>${escapeHtml(taka(list.filter(x=>x.txType==='expense').reduce((n,x)=>n+Number(x.amount||0),0)))}</strong></div><div class="stat"><span>টাকা আদান-প্রদান</span><strong>${escapeHtml(taka(list.filter(x=>x.txType==='transfer').reduce((n,x)=>n+Number(x.amount||0),0)))}</strong></div></div>
+      <h2>লেনদেনের তালিকা</h2><table><thead><tr><th>নং</th><th>তারিখ</th><th>ধরন</th><th>সদস্য</th><th>খাত</th><th>অ্যাকাউন্ট</th><th>টাকা</th><th>নোট</th></tr></thead><tbody>${rowsHtml || '<tr><td colspan="8">এই সময়ে কোনো লেনদেন নেই।</td></tr>'}</tbody></table><footer>ব্যক্তিগত রেকর্ডের ভিত্তিতে তৈরি। ব্যাংকের বিবরণীর বিকল্প নয়।</footer></body></html>`;
+      const page = window.open('', '_blank');
+      if (!page) { setMsg('ব্রাউজারে নতুন ট্যাব খোলা বন্ধ আছে। PDF তৈরি করতে পপ-আপ অনুমতি দিন।'); return; }
+      page.document.open(); page.document.write(html); page.document.close();
+      setMsg('বাংলা PDF প্রিন্ট ভিউ খুলেছে। সেখানে PDF হিসেবে সংরক্ষণ করুন।');
+      return;
+    }
     try {
       const doc = new jsPDF("l", "mm", "a4"); // landscape = better table width
 
@@ -1728,7 +1754,7 @@ export default function Ledger() {
       }
     } catch (error) {
       console.error(error);
-      setMsg("PDF export failed");
+      setMsg("PDF তৈরি করা যায়নি।");
     }
   }
 

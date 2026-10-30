@@ -1099,42 +1099,14 @@ export default function Wallet() {
             </section>
           )}
 
-          {data && (
-            <>
-              <MonthlyRemainingPanel month={month} monthlyCashFlow={monthlyCashFlow} accountStatus={accountStatus} />
-              <details className="hf-hishab-wallet-note">
-                <summary>বড় কেনাকাটার মাসিক ভাগ দেখুন</summary>
-                <div className="hf-hishab-note-inner">
-                  <div className="hf-hishab-note-amount"><span>এই মাসে দুজনের নির্ধারিত ভাগ</span><b>{formatMoney(data?.monthlyBudgetAllocation?.scheduledLargePurchaseAllocation)}</b></div>
-                  <p>এই টাকা মাসের হিসাবের জন্য নির্ধারিত। কেনার সময় পুরো টাকা ব্যাংক থেকে একবারই বের হয়েছে; এখানে আবার টাকা কাটা হয় না।</p>
-                  {(users || []).map(row => <div key={row.userId} className="hf-hishab-detail-row"><span>{row.name}</span><b>{formatMoney(row.scheduledLargePurchaseShare)}</b></div>)}
-                  {!!data?.monthlyBudgetAllocation?.issues?.length && <p role="alert">কিছু কেনাকাটার হিসাব যাচাই করা প্রয়োজন।</p>}
-                </div>
-              </details>
-            </>
-          )}
-
-          <></>
-
-          {data && <details className="hf-hishab-wallet-note">
-            <summary>দেনা-পাওনার হিসাব কীভাবে হয়েছে?</summary>
-            <div className="hf-hishab-note-inner">
-              <p>সাধারণ খরচে যে যার ভাগের বেশি টাকা দিয়েছেন, অন্যজন সেই অতিরিক্ত টাকা দেবেন। বড় কেনাকাটার যে কিস্তি এখনও দেওয়া হয়নি, সেটিও দেনা-পাওনায় যোগ হয়।</p>
-              {topDeficit && topSurplus && safeNumber(topDeficit.net) < -0.009 && <>
-                <div className="hf-hishab-detail-row"><span>সাধারণ খরচের পার্থক্য</span><b>{formatMoney(Math.abs(safeNumber(topDeficit.expenseNet)))}</b></div>
-                <div className="hf-hishab-detail-row"><span>বড় কেনাকাটার বকেয়া</span><b>{formatMoney(Math.max(0, safeNumber(topDeficit.sharedPurchaseDue) - safeNumber(topDeficit.sharedPurchaseReceivable)))}</b></div>
-                <div className="hf-hishab-detail-row"><span>{topDeficit.name} দেবেন {topSurplus.name}-কে</span><b>{formatMoney(Math.abs(safeNumber(topDeficit.net)))}</b></div>
-              </>}
-              <p>দুজনের মধ্যে টাকা পাঠালে একজনের অ্যাকাউন্ট কমবে ও অন্যজনের বাড়বে। দুজনের মোট টাকা অপরিবর্তিত থাকবে।</p>
-            </div>
-          </details>}
+          {data && <MonthlyRemainingPanel month={month} monthlyCashFlow={monthlyCashFlow} accountStatus={accountStatus} />}
 
           <section className="hf-step3-advanced rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="text-base font-black text-slate-950 dark:text-white sm:text-lg">সব অ্যাকাউন্টে মোট টাকা</h3>
                 <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                  Account balances = reconciled opening + real inflows − real outflows. Closed months use their saved closing snapshot.
+                  আগের মাসের সমাপনী টাকার সঙ্গে এই মাসের প্রকৃত টাকা আসা-যাওয়ার হিসাব মিলিয়ে দেখানো হয়েছে।
                   এটি অ্যাপে লেখা লেনদেন থেকে গণনা করা হয়েছে; সরাসরি ব্যাংক থেকে আনা তথ্য নয়।
                 </p>
               </div>
@@ -1158,7 +1130,7 @@ export default function Wallet() {
             )}
             {liquidAccounts.length > 0 && (
               <button type="button" onClick={() => setShowAccounts((v) => !v)} className="mt-3 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
-                {showAccounts ? "Hide individual accounts" : `Show individual accounts (${liquidAccounts.length})`}
+                {showAccounts ? "অ্যাকাউন্টের তালিকা বন্ধ করুন" : `সব অ্যাকাউন্ট দেখুন (${liquidAccounts.length})`}
                 <Icon name="chevron" className={cx("h-4 w-4 transition-transform", showAccounts && "rotate-180")} />
               </button>
             )}
@@ -1217,6 +1189,30 @@ export default function Wallet() {
               )}
             </div>
           </section>
+
+          <div className="hn-wallet-detail-links">
+            {data && <details className="hf-hishab-wallet-note">
+                <summary>বড় কেনাকাটার মাসিক ভাগ দেখুন</summary>
+                <div className="hf-hishab-note-inner">
+                  <div className="hf-hishab-note-amount"><span>এই মাসে দুজনের নির্ধারিত ভাগ</span><b>{formatMoney(data?.monthlyBudgetAllocation?.scheduledLargePurchaseAllocation)}</b></div>
+                  <p>এই টাকা মাসের হিসাবের জন্য নির্ধারিত। কেনার সময় পুরো টাকা ব্যাংক থেকে একবারই বের হয়েছে; এখানে আবার টাকা কাটা হয় না।</p>
+                  {(users || []).map(row => <div key={row.userId} className="hf-hishab-detail-row"><span>{row.name}</span><b>{formatMoney(row.scheduledLargePurchaseShare)}</b></div>)}
+                  {!!data?.monthlyBudgetAllocation?.issues?.length && <p role="alert">কিছু কেনাকাটার হিসাব যাচাই করা প্রয়োজন।</p>}
+                </div>
+              </details>}
+          {data && <details className="hf-hishab-wallet-note">
+            <summary>দেনা-পাওনার হিসাব কীভাবে হয়েছে?</summary>
+            <div className="hf-hishab-note-inner">
+              <p>সাধারণ খরচে যে যার ভাগের বেশি টাকা দিয়েছেন, অন্যজন সেই অতিরিক্ত টাকা দেবেন। বড় কেনাকাটার যে কিস্তি এখনও দেওয়া হয়নি, সেটিও দেনা-পাওনায় যোগ হয়।</p>
+              {topDeficit && topSurplus && safeNumber(topDeficit.net) < -0.009 && <>
+                <div className="hf-hishab-detail-row"><span>সাধারণ খরচের পার্থক্য</span><b>{formatMoney(Math.abs(safeNumber(topDeficit.expenseNet)))}</b></div>
+                <div className="hf-hishab-detail-row"><span>বড় কেনাকাটার বকেয়া</span><b>{formatMoney(Math.max(0, safeNumber(topDeficit.sharedPurchaseDue) - safeNumber(topDeficit.sharedPurchaseReceivable)))}</b></div>
+                <div className="hf-hishab-detail-row"><span>{topDeficit.name} দেবেন {topSurplus.name}-কে</span><b>{formatMoney(Math.abs(safeNumber(topDeficit.net)))}</b></div>
+              </>}
+              <p>দুজনের মধ্যে টাকা পাঠালে একজনের অ্যাকাউন্ট কমবে ও অন্যজনের বাড়বে। দুজনের মোট টাকা অপরিবর্তিত থাকবে।</p>
+            </div>
+          </details>}
+          </div>
 
           <SettlementCenter
             data={data}

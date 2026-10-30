@@ -1,0 +1,87 @@
+/* হিসাব নিকাশ | consistent compact page spacing & readable typography */
+.hf-shell-content{max-width:none!important;padding:12px clamp(8px,1.1vw,18px) 28px!important}
+.hf-shell-content > div{max-width:100%!important}
+@media(min-width:1024px){html{font-size:16.5px}.hf-shell-content{padding-top:10px!important}.hf-v2-page :is(p,small,span,button,input,select,textarea){line-height:1.55}}
+@media(max-width:640px){.hf-shell-content{padding:8px 8px 22px!important}}
+.hf-v2-dashboard.hf-v2-page{gap:9px!important}
+.hf-v2-dashboard.hf-v2-page > *{margin-top:0!important}
+.hf-v2-dashboard .hf-v2-head{margin-bottom:0!important;padding:14px 18px!important}
+.hf-v2-dashboard .hf-v2-feature{padding:18px clamp(15px,1.8vw,23px)!important;gap:16px}
+.hf-v2-dashboard .hf-v2-feature p{margin-top:3px}
+.hf-v2-dashboard .hf-v2-feature-number{margin:3px 0}
+.hf-v2-dashboard .hf-v2-feature-math{gap:5px}
+.hf-v2-dashboard .hf-v2-feature-math div{padding-bottom:5px}
+.hf-v2-dashboard .hf-v2-head-top{gap:9px}
+
+/* Form and list controls: avoid tiny text on wide desktop screens */
+.hf-v2-page :is(input,select,textarea){font-size:max(13px,.81rem)!important}
+.hf-v2-page :is(button:not(.hf-v2-btn),label){font-size:max(12px,.78rem)}
+.hf-step3-page .hf-v2-page h3,.hf-v2-page h3{font-size:max(15px,.91rem)}
+
+/* Clean common editorial style for Planner and Year Overview */
+.hn-page{width:100%;color:var(--hf-text);min-width:0;padding-bottom:20px}
+.hn-page-header,.hn-surface{background:var(--hf-surface);border:1px solid var(--hf-line);border-radius:16px;box-shadow:var(--hf-shadow)}
+.hn-page-header{padding:19px clamp(16px,2vw,26px);display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+.hn-kicker{color:var(--hf-primary);font-size:12px;font-weight:800;letter-spacing:.015em}
+.hn-page-header h1{font-size:clamp(23px,2.2vw,30px);font-weight:800;margin:2px 0;line-height:1.45}
+.hn-page-header p{color:var(--hf-muted);font-size:13px;line-height:1.7}
+.hn-btn{border:1px solid var(--hf-line);display:inline-flex;justify-content:center;align-items:center;gap:8px;min-height:39px;padding:9px 14px;border-radius:10px;font-weight:750;font-size:13px;cursor:pointer;white-space:nowrap;transition:background-color .17s,border-color .17s,transform .17s}
+.hn-btn:disabled{opacity:.5;cursor:not-allowed}
+.hn-btn-primary{background:#098f80!important;border-color:#098f80!important;color:#fff!important}
+.hn-btn-primary:not(:disabled):hover{background:#08796f!important}
+.hn-btn-light{background:var(--hf-surface-alt);color:var(--hf-text)}
+.hn-btn-light:hover{border-color:var(--hf-primary);color:var(--hf-primary)}
+.hn-notice{background:var(--hf-primary-soft);color:var(--hf-text);border:1px solid var(--hf-line);border-radius:12px;padding:12px 15px;margin:10px 0;font-size:13px}
+.hn-error{color:var(--hf-negative)!important}
+.hn-positive{color:var(--hf-positive)!important}.hn-negative{color:var(--hf-negative)!important}
+.hn-panel-heading{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+.hn-panel-heading h2{font-size:17px;font-weight:800}.hn-panel-heading p{font-size:13px;color:var(--hf-muted);margin-top:1px}
+.hn-empty{padding:44px 16px;text-align:center;color:var(--hf-muted);font-size:14px}.hn-empty b{color:var(--hf-text);display:block;font-size:17px}.hn-empty p{margin-top:8px}
+
+/* Planner – a compact and distinct master-detail list (not stacked oversized cards) */
+.hn-plan-overview{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:10px;margin-bottom:12px}
+.hn-plan-overview>div{padding:14px 18px;display:grid;gap:4px;background:var(--hf-surface);border:1px solid var(--hf-line);border-radius:13px}
+.hn-plan-overview>div:first-child{background:var(--hf-primary-soft)}
+.hn-plan-overview span{font-size:12px;color:var(--hf-muted)}.hn-plan-overview strong{font-size:clamp(19px,2vw,25px);font-weight:850}
+.hn-plan-section{padding:0;overflow:hidden}.hn-plan-toolbar{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:center;padding:13px 16px;border-bottom:1px solid var(--hf-line)}
+.hn-tabs{display:inline-flex;gap:3px;background:var(--hf-surface-alt);border-radius:10px;padding:4px;max-width:100%}.hn-tabs button{border-radius:8px;padding:8px 12px;font-weight:800;font-size:13px;white-space:nowrap;color:var(--hf-muted)}.hn-tabs button.active{background:var(--hf-surface);color:var(--hf-primary);box-shadow:0 2px 8px rgba(0,0,0,.06)}.hn-tabs button span{font-size:11px;opacity:.75;margin-left:3px}
+.hn-plan-filters{display:flex;flex:1;justify-content:flex-end;gap:8px;min-width:220px}
+.hn-plan-filters input,.hn-plan-filters select,.hn-plan-form :is(input,textarea,select),.hn-year-select select{border:1px solid var(--hf-line);border-radius:10px;background:var(--hf-surface-alt);padding:10px 12px;color:var(--hf-text);font-size:14px;min-height:41px;min-width:0}
+.hn-plan-filters input{width:clamp(170px,23vw,300px)}.hn-plan-filters select{max-width:160px}
+.hn-plan-row{display:grid;grid-template-columns:minmax(190px,1.5fr) minmax(120px,.65fr) auto auto;gap:14px;align-items:center;padding:14px 17px;border-bottom:1px solid var(--hf-line)}.hn-plan-row:last-child{border-bottom:0}
+.hn-plan-row:hover{background:var(--hf-surface-alt)}.hn-plan-ident{display:flex;gap:11px;min-width:0;align-items:center}.hn-plan-copy{min-width:0}.hn-plan-ident h2{font-weight:800;font-size:15px;line-height:1.5;overflow-wrap:anywhere}.hn-plan-ident p{color:var(--hf-muted);font-size:12px;line-height:1.5}
+.hn-priority-dot{display:block;width:10px;height:10px;flex-shrink:0;border-radius:50%;background:#e5a84e}.hn-priority-dot.high{background:#e45d70}.hn-priority-dot.low{background:#2db29c}
+.hn-plan-price{display:grid;gap:4px}.hn-plan-price small{font-size:11px;color:var(--hf-muted)}.hn-plan-price strong{font-size:16px;font-weight:850;white-space:nowrap}
+.hn-priority-pill{display:inline-flex;width:max-content;justify-content:center;padding:5px 10px;font-size:11px;font-weight:800;border-radius:99px;background:var(--hf-surface-alt);color:var(--hf-muted)}.hn-priority-pill.high{color:#b84b64;background:#fce9ee}.hn-priority-pill.low{color:#128574;background:#e5f5ee}html.dark .hn-priority-pill.high{background:#3c2532;color:#ffbdc7}html.dark .hn-priority-pill.low{background:#17372f;color:#8ce2c5}
+.hn-row-actions{display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap}.hn-row-actions .hn-btn{padding:7px 10px;min-height:35px;font-size:12px}.hn-icon-danger{width:34px;height:35px;border:1px solid var(--hf-line);border-radius:9px;color:var(--hf-negative);font-size:23px;line-height:1}
+.hn-plan-detail{grid-column:1/-1;border-top:1px dashed var(--hf-line);display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:11px 0 1px;font-size:12px;color:var(--hf-muted)}.hn-plan-detail p{flex-basis:100%;color:var(--hf-text);white-space:pre-wrap}.hn-plan-detail a{color:var(--hf-primary);font-weight:800}
+.hn-modal-backdrop{position:fixed;inset:0;background:rgba(3,11,19,.73);z-index:100;display:flex;justify-content:center;align-items:center;padding:14px;backdrop-filter:blur(4px)}
+.hn-modal{width:min(640px,100%);max-height:90dvh;overflow:auto;background:var(--hf-surface);border:1px solid var(--hf-line);border-radius:19px;box-shadow:0 22px 90px rgba(0,0,0,.25)}
+.hn-modal>header{display:flex;align-items:start;justify-content:space-between;padding:19px 21px;border-bottom:1px solid var(--hf-line);gap:16px}.hn-modal h2{font-size:21px;font-weight:850}.hn-close{width:35px;height:35px;border-radius:10px;background:var(--hf-surface-alt);font-size:22px}
+.hn-plan-form{padding:18px 21px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.hn-plan-form>label{display:grid;gap:6px;font-size:12px;color:var(--hf-muted);font-weight:800}.hn-plan-form .hn-full{grid-column:1/-1}.hn-plan-form-extra{display:grid;gap:12px;margin-top:11px}.hn-plan-form-extra label{display:grid;gap:6px;font-size:12px}.hn-plan-form details>summary{color:var(--hf-primary);cursor:pointer;font-weight:800}
+.hn-plan-form footer{display:flex;justify-content:end;gap:10px;padding-top:6px}
+
+/* Year — legible annual figures, one graph, one table; advanced fields tucked away */
+.hn-year-actions{display:flex;align-items:end;flex-wrap:wrap;gap:8px}.hn-year-select{display:grid;gap:2px;font-size:11px;color:var(--hf-muted)}.hn-year-select select{min-width:102px}
+.hn-year-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}.hn-year-stat{padding:15px 17px;border:1px solid var(--hf-line);border-radius:13px;background:var(--hf-surface);min-width:0;display:grid;align-content:start;gap:6px}.hn-year-stat:first-child{background:var(--hf-primary-soft)}.hn-year-stat span{font-size:12px;color:var(--hf-muted)}.hn-year-stat strong{font-size:clamp(18px,2vw,24px);font-weight:850;overflow-wrap:anywhere}.hn-year-stat small{color:var(--hf-muted);font-size:11px}
+.hn-year-chart,.hn-year-list{padding:18px 20px;margin-bottom:12px}.hn-chart-wrap{height:280px;width:100%;min-width:0}
+.hn-table-scroll{overflow-x:auto;scrollbar-width:thin}.hn-year-list table{width:100%;min-width:750px;border-collapse:collapse;font-size:13px}.hn-year-list thead{background:var(--hf-surface-alt)}.hn-year-list th{text-align:left;color:var(--hf-muted);font-size:12px;font-weight:800;white-space:nowrap}.hn-year-list td,.hn-year-list th{padding:12px 13px;border-bottom:1px solid var(--hf-line)}.hn-year-list tbody tr:hover{background:var(--hf-surface-alt)}.hn-year-list tbody th{color:var(--hf-text);font-size:13px}
+.hn-help-note{padding:13px 17px;border:1px solid var(--hf-line);border-radius:12px;background:var(--hf-surface);font-size:13px}.hn-help-note summary{font-weight:800;color:var(--hf-primary);cursor:pointer}.hn-help-note p{margin-top:10px;line-height:1.8;color:var(--hf-muted)}.hn-year-warning{color:var(--hf-warning);font-size:13px;margin:10px 4px}
+
+/* Grocery: date controls and clearly reachable edit/delete controls */
+.hn-grocery-datebar{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin-bottom:12px;background:var(--hf-surface-alt);border:1px solid var(--hf-line);border-radius:13px;padding:12px}
+.hn-grocery-datebar label{display:grid;gap:5px;color:var(--hf-muted);font-size:12px;font-weight:750;flex:1;min-width:165px;max-width:280px}
+.hn-grocery-datebar input{width:100%;min-height:40px;border:1px solid var(--hf-line);border-radius:9px;background:var(--hf-surface);color:var(--hf-text);padding:7px 10px}
+.hf-v2-grocery .grocery-page article button{white-space:nowrap}
+
+/* Accounts: always-fit cards replace the clipped desktop table */
+.hf-shell-content .account-page article,.hf-shell-content article{min-width:0}
+
+/* Wallet helper explanations immediately after member cards, not before */
+.hn-wallet-detail-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.hn-wallet-detail-links .hf-hishab-wallet-note{min-width:0;margin:0;padding:13px 15px}
+.hn-wallet-detail-links .hf-hishab-note-inner{font-size:13px}
+
+@media(max-width:1100px){.hn-plan-row{grid-template-columns:minmax(185px,1.2fr) minmax(100px,.6fr) auto}.hn-plan-row>.hn-priority-pill{display:none}.hn-year-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.hn-plan-overview{grid-template-columns:repeat(2,minmax(0,1fr))}.hn-plan-overview>div:nth-child(2){grid-column:1/-1;grid-row:2}.hn-plan-toolbar{align-items:stretch}.hn-plan-filters{justify-content:stretch;width:100%}.hn-plan-filters input{flex:1;width:100%}.hn-plan-row{grid-template-columns:minmax(0,1fr) auto}.hn-plan-ident{grid-column:1}.hn-plan-price{grid-column:2}.hn-row-actions{grid-column:1/-1;justify-content:start}.hn-plan-detail{grid-column:1/-1}.hn-chart-wrap{height:235px}.hn-wallet-detail-links{grid-template-columns:1fr}}
+@media(max-width:520px){.hn-page-header{padding:15px}.hn-page-header>.hn-btn{width:100%}.hn-year-actions{width:100%}.hn-year-actions .hn-btn{flex:1}.hn-plan-overview{gap:7px}.hn-plan-overview>div{padding:12px}.hn-plan-toolbar{padding:11px}.hn-plan-row{gap:9px;padding:13px}.hn-plan-form{grid-template-columns:1fr;padding:14px}.hn-plan-form>label{grid-column:1}.hn-modal>header{padding:15px}.hn-year-stats{gap:8px}.hn-year-stat{padding:12px}.hn-year-chart,.hn-year-list{padding:13px}.hn-grocery-datebar .hn-btn{flex:1}}
