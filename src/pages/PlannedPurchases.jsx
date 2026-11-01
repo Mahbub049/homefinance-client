@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import AppLayout from '../components/layout/AppLayout';
 import api from '../services/api';
 import '../styles/hishab-page-refinement.css';
+import '../styles/hishab-planned-buttons-fix.css';
 
 const emptyForm = {
   productName: '', expectedPrice: '', category: '', brand: '', notes: '', productLink: '',
@@ -116,10 +117,10 @@ export default function PlannedPurchases() {
             <div className="hn-plan-ident"><span className={`hn-priority-dot ${item.priority || 'medium'}`}/><div className="hn-plan-copy"><h2>{item.productName}</h2><p>{[item.brand, item.category].filter(Boolean).join(' · ') || 'কেনাকাটার পরিকল্পনা'}</p></div></div>
             <div className="hn-plan-price"><small>আনুমানিক দাম</small><strong>{currency(item.expectedPrice)}</strong></div>
             <span className={`hn-priority-pill ${item.priority || 'medium'}`}>{priorityNames[item.priority] || 'মাঝারি'}</span>
-            <div className="hn-row-actions" role="group" aria-label={`${item.productName} পরিবর্তন`}>
+            <div className="hn-plan-actions" role="group" aria-label={`${item.productName} পরিবর্তন`}>
               <button type="button" className="hn-btn hn-btn-light" onClick={() => setDetailId(detailId === item._id ? null : item._id)}>{detailId === item._id ? 'বন্ধ' : 'বিস্তারিত'}</button>
               {tab === 'planned' ? <><button type="button" className="hn-btn hn-btn-light" onClick={() => edit(item)}>সম্পাদনা</button><button type="button" className="hn-btn hn-btn-primary" disabled={busy} onClick={() => act(item, 'bought')}>কেনা হয়েছে</button></> : <button type="button" className="hn-btn hn-btn-light" disabled={busy} onClick={() => act(item, 'planned')}>ফিরিয়ে আনুন</button>}
-              <button type="button" className="hn-icon-danger" disabled={busy} onClick={() => act(item, 'delete')} aria-label={`${item.productName} মুছুন`} title="মুছুন">×</button>
+              <button type="button" className="hn-plan-delete" disabled={busy} onClick={() => act(item, 'delete')} aria-label={`${item.productName} মুছুন`} title="মুছুন">×</button>
             </div>
             {detailId === item._id && <div className="hn-plan-detail"><span>কার জন্য: {item.ownershipType === 'personal' ? memberName(item.personalForUserId) : 'দুজনের'}</span><span>পরিশোধ: {paymentNames[item.paymentMode] || 'ঠিক হয়নি'}</span>{item.notes && <p>{item.notes}</p>}{item.productLink && /^https?:\/\//i.test(item.productLink) && <a href={item.productLink} target="_blank" rel="noopener noreferrer">পণ্যের লিংক খুলুন ↗</a>}</div>}
           </article>)}</div>}

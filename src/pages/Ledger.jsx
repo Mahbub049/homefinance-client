@@ -11,6 +11,7 @@ import { getUser } from "../services/authStorage";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import {preferredMemberId} from "../utils/preferredMember";
 import Loader from "../components/ui/Loader";
+import { rowsForMemberReport } from "../utils/memberLedgerExport";
 
 
 function monthNow() {
@@ -409,6 +410,8 @@ export default function Ledger() {
 
   const [memberFilter, setMemberFilter] = useState("all");
   const [pdfMember, setPdfMember] = useState("all");
+  // The PDF defaults to the currently selected on-screen member.
+  useEffect(() => setPdfMember(memberFilter), [memberFilter]);
   const [q, setQ] = useState("");
 
   const [items, setItems] = useState([]);
@@ -996,20 +999,13 @@ export default function Ledger() {
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
 
+    // The visible member filter follows the same actual-payer rule as the PDF.
+    // Do not add another person's expense only because this member owes half.
+    const matchingIds = memberFilter === 'all' ? null : new Set(
+      rowsForMemberReport(items, memberFilter, members, accounts).map(row => getId(row._id))
+    );
     const filtered = (items || []).filter((it) => {
-      if (memberFilter !== "all") {
-        const filterId = String(memberFilter);
-        if (it.txType === "income" && getId(it.receivedByUserId) !== filterId) return false;
-        if (it.txType === "expense") {
-          const parts = Array.isArray(it.paymentParts) ? it.paymentParts : [];
-          const memberPaidInSplit = it.paymentMode === "split" && parts.some((part) => getId(part.userId) === filterId);
-          const memberResponsible = ledgerItems.some(entry =>
-            getId(entry.sourceId) === getId(it._id) &&
-            (entry.splits || []).some(share => getId(share.userId) === filterId)
-          );
-          if (!memberPaidInSplit && getId(it.paidByUserId) !== filterId && !memberResponsible) return false;
-        }
-      }
+      if (matchingIds && !matchingIds.has(getId(it._id))) return false;
 
       if (!needle) return true;
 
@@ -1024,7 +1020,7 @@ export default function Ledger() {
     });
 
     return filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [items, memberFilter, q, ledgerItems]);
+  }, [items, memberFilter, q, members, accounts]);
 
   const availableDates = useMemo(() => {
     const s = new Set();
@@ -1257,29 +1253,11 @@ export default function Ledger() {
     return finalPath;
   }
 
-  // Export selection is separate from the on-screen member filter. Figures are
-  // full transaction amounts involving that member, not their personal split share.
-  const pdfRows = useMemo(() => {
-    if (pdfMember === 'all') return allItems;
-    const selected = String(pdfMember);
-    const participated = (it) => {
-      if (it.txType === 'income') return getId(it.receivedByUserId) === selected;
-      if (it.txType === 'expense') {
-        if (getId(it.paidByUserId) === selected) return true;
-        if ((it.paymentParts || []).some(part => getId(part.userId) === selected)) return true;
-        return ledgerItems.some(row => getId(row.sourceId) === getId(it._id) &&
-          (row.splits || []).some(part => getId(part.userId) === selected));
-      }
-      if (it.txType === 'transfer') {
-        return [it.fromAccountId, it.toAccountId].some(acc => {
-          const account = accountsById.get(getId(acc)) || acc;
-          return account && accountMatchesPaidBy(account, selected);
-        });
-      }
-      return false;
-    };
-    return allItems.filter(participated);
-  }, [allItems, pdfMember, ledgerItems, accountsById]);
+  // Export only the selected member's ACTUAL income and payments.
+  // Payment responsibility and shared Ledger splits do not add unrelated rows.
+  const pdfRows = useMemo(() => rowsForMemberReport(
+    allItems, pdfMember, members, accounts
+  ), [allItems, pdfMember, members, accounts]);
 
   async function exportTransactionsPdf() {
     // The browser print engine supports Bengali text using the page's installed fonts.
@@ -1288,10 +1266,10 @@ export default function Ledger() {
       const escapeHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
       const taka = value => `৳ ${Number(value || 0).toLocaleString('bn-BD', {maximumFractionDigits: 2})}`;
       const list = [...pdfRows].sort((a,b) => new Date(a.date) - new Date(b.date));
-      const owner = it => it.txType === 'income' ? memberById.get(getId(it.receivedByUserId))?.name || '—' : it.txType === 'expense' ? (it.paymentMode === 'split' ? 'দুজন মিলে' : memberById.get(getId(it.paidByUserId))?.name || '—') : '—';
+      const owner = it => pdfMember !== 'all' ? (members.find(m => getId(m) === pdfMember)?.name || '—') : it.txType === 'income' ? memberById.get(getId(it.receivedByUserId))?.name || '—' : it.txType === 'expense' ? (it.paymentMode === 'split' ? 'দুজন মিলে' : memberById.get(getId(it.paidByUserId))?.name || '—') : '—';
       const accountName = v => v?.name || accountsById.get(String(getId(v)))?.name || '—';
       const monthText = formatMonthLabel(month);
-      const rowsHtml = list.map((it,index) => `<tr><td>${(index+1).toLocaleString('bn-BD')}</td><td>${escapeHtml(new Date(it.date).toLocaleDateString('bn-BD'))}</td><td>${escapeHtml(typeLabel(it.txType))}</td><td>${escapeHtml(owner(it))}</td><td>${escapeHtml(it.categoryId?.name || (it.txType === 'transfer' ? 'টাকা আদান-প্রদান' : '—'))}</td><td>${escapeHtml(it.txType === 'transfer' ? `${accountName(it.fromAccountId)} → ${accountName(it.toAccountId)}` : (it.txType === 'expense' && it.paymentMode === 'split' ? paymentSummary(it) : accountName(it.fromAccountId || it.toAccountId)))}</td><td class="money">${escapeHtml((it.txType === 'expense' ? '−' : it.txType === 'income' ? '+' : '') + taka(it.amount))}</td><td>${escapeHtml(it.note || '—')}</td></tr>`).join('');
+      const rowsHtml = list.map((it,index) => `<tr><td>${(index+1).toLocaleString('bn-BD')}</td><td>${escapeHtml(new Date(it.date).toLocaleDateString('bn-BD'))}</td><td>${escapeHtml(typeLabel(it.txType))}</td><td>${escapeHtml(owner(it))}</td><td>${escapeHtml(it.categoryId?.name || (it.txType === 'transfer' ? 'টাকা আদান-প্রদান' : '—'))}</td><td>${escapeHtml(it.txType === 'transfer' ? `${accountName(it.fromAccountId)} → ${accountName(it.toAccountId)}` : (it._memberPaymentAccounts?.length ? it._memberPaymentAccounts.map(accountName).join(' + ') : it.txType === 'expense' && it.paymentMode === 'split' ? paymentSummary(it) : accountName(it.fromAccountId || it.toAccountId)))}</td><td class="money">${escapeHtml((it.txType === 'expense' ? '−' : it.txType === 'income' ? '+' : '') + taka(it.amount))}</td><td>${escapeHtml(it.note || '—')}</td></tr>`).join('');
       const userTitle = pdfMember === 'all' ? 'সব সদস্য' : members.find(m => getId(m) === pdfMember)?.name || 'সব সদস্য';
       const printedAt = new Date().toLocaleString('bn-BD');
       const html = `<!doctype html><html lang="bn"><head><meta charset="utf-8"><title>হিসাব নিকাশ - আয়-খরচ - ${escapeHtml(month)}</title><style>
@@ -1301,7 +1279,7 @@ export default function Ledger() {
       </style></head><body><div class="actions"><button onclick="window.print()">PDF হিসেবে সংরক্ষণ / প্রিন্ট</button><p>প্রিন্ট অপশনে PDF হিসেবে সংরক্ষণ করুন</p></div>
       <header><div><div class="logo">হিসাব নিকাশ</div><h1>আয়-খরচের বিবরণী</h1><div class="muted">${escapeHtml(monthText)} · ${escapeHtml(userTitle)} · ${escapeHtml('সব লেনদেন')}</div></div><div class="muted">তৈরি হয়েছে: ${escapeHtml(printedAt)}<br/>মোট এন্ট্রি: ${list.length.toLocaleString('bn-BD')}</div></header>
       <div class="stats"><div class="stat"><span>মাসের আয়</span><strong>${escapeHtml(taka(list.filter(x=>x.txType==='income').reduce((n,x)=>n+Number(x.amount||0),0)))}</strong></div><div class="stat"><span>মাসের খরচ</span><strong>${escapeHtml(taka(list.filter(x=>x.txType==='expense').reduce((n,x)=>n+Number(x.amount||0),0)))}</strong></div><div class="stat"><span>টাকা আদান-প্রদান</span><strong>${escapeHtml(taka(list.filter(x=>x.txType==='transfer').reduce((n,x)=>n+Number(x.amount||0),0)))}</strong></div></div>
-      <h2>লেনদেনের তালিকা</h2><table><thead><tr><th>নং</th><th>তারিখ</th><th>ধরন</th><th>সদস্য</th><th>খাত</th><th>অ্যাকাউন্ট</th><th>টাকা</th><th>নোট</th></tr></thead><tbody>${rowsHtml || '<tr><td colspan="8">এই সময়ে কোনো লেনদেন নেই।</td></tr>'}</tbody></table><footer>${pdfMember === 'all' ? '' : 'নির্বাচিত সদস্যের সঙ্গে সংশ্লিষ্ট সম্পূর্ণ লেনদেন দেখানো হয়েছে; এখানে টাকা ব্যক্তিগত খরচের ভাগ হিসেবে ভাগ করা হয়নি। '}ব্যক্তিগত রেকর্ডের ভিত্তিতে তৈরি। ব্যাংকের বিবরণীর বিকল্প নয়।</footer></body></html>`;
+      <h2>লেনদেনের তালিকা</h2><table><thead><tr><th>নং</th><th>তারিখ</th><th>ধরন</th><th>সদস্য</th><th>খাত</th><th>অ্যাকাউন্ট</th><th>টাকা</th><th>নোট</th></tr></thead><tbody>${rowsHtml || '<tr><td colspan="8">এই সময়ে কোনো লেনদেন নেই।</td></tr>'}</tbody></table><footer>${pdfMember === 'all' ? '' : 'শুধু নির্বাচিত সদস্যের পাওয়া আয় ও নিজের অ্যাকাউন্ট থেকে পরিশোধ দেখানো হয়েছে। যৌথ payment-এ শুধু তাঁর পরিশোধিত অংশ নেওয়া হয়েছে; দেনা-পাওনার ভাগ আলাদা। '}ব্যক্তিগত রেকর্ডের ভিত্তিতে তৈরি। ব্যাংকের বিবরণীর বিকল্প নয়।</footer></body></html>`;
       const page = window.open('', '_blank');
       if (!page) { setMsg('ব্রাউজারে নতুন ট্যাব খোলা বন্ধ আছে। PDF তৈরি করতে পপ-আপ অনুমতি দিন।'); return; }
       page.document.open(); page.document.write(html); page.document.close();
@@ -1784,11 +1762,19 @@ export default function Ledger() {
     }
   }
 
+  const selectedMemberEntries = useMemo(() => rowsForMemberReport(
+    allItems, memberFilter, members, accounts
+  ), [allItems, memberFilter, members, accounts]);
   const tabCount = {
-    all: allItems.length,
-    income: allItems.filter((x) => x.txType === "income").length,
-    expense: allItems.filter((x) => x.txType === "expense").length,
-    transfer: allItems.filter((x) => x.txType === "transfer").length,
+    all: selectedMemberEntries.length,
+    income: selectedMemberEntries.filter((x) => x.txType === "income").length,
+    expense: selectedMemberEntries.filter((x) => x.txType === "expense").length,
+    transfer: selectedMemberEntries.filter((x) => x.txType === "transfer").length,
+  };
+  const displayTotals = memberFilter === 'all' ? totals : {
+    income: selectedMemberEntries.filter(x=>x.txType==='income').reduce((v,x)=>v+Number(x.amount||0),0),
+    expense: selectedMemberEntries.filter(x=>x.txType==='expense').reduce((v,x)=>v+Number(x.amount||0),0),
+    transfer: selectedMemberEntries.filter(x=>x.txType==='transfer').reduce((v,x)=>v+Number(x.amount||0),0),
   };
 
   const monthLabel = formatMonthLabel(month);
@@ -1798,8 +1784,8 @@ export default function Ledger() {
       <div className={`hf-step3-page hf-step3-ledger hf-v2-page hf-v2-ledger ${hfMore ? "hf-step3-expanded" : ""}`}>
         <HFPageLead title="আয়-খরচ" description="প্রতিদিনের আয়, খরচ ও টাকা আদান-প্রদানের তালিকা" month={month} onMonthChange={setMonth}
           metrics={[
- {label:'এই মাসের আয়',value:totals.income}, {label:'এই মাসের খরচ',value:totals.expense},
- {label:'টাকা আদান-প্রদান',value:totals.transfer}
+ {label:'এই মাসের আয়',value:displayTotals.income}, {label:'এই মাসে পরিশোধ',value:displayTotals.expense},
+ {label:'টাকা আদান-প্রদান',value:displayTotals.transfer}
 ]}
           onAdd={openModal} addLabel="নতুন হিসাব"
           addDisabled={false}

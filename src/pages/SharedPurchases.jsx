@@ -1,3 +1,4 @@
+import '../styles/hishab-shared-revision.css';
 import HFPageLead from "../components/design/HFPageLead";
 import { useEffect, useMemo, useRef, useState } from "react";
 import AppLayout from "../components/layout/AppLayout";
@@ -239,7 +240,10 @@ export default function SharedPurchases() {
   const [createOpen, setCreateOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [editPurchase, setEditPurchase] = useState(null);
-  const [editPurchaseForm, setEditPurchaseForm] = useState({ title: "", note: "" });
+  const [editPurchaseForm, setEditPurchaseForm] = useState({
+    title: '', note: '', categoryId: '', dueDay: 1,
+    reviseSchedule: false, effectiveMonth: currentMonth(), nextStartMonth: currentMonth(), remainingMonths: 1,
+  });
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [selectedInstallment, setSelectedInstallment] = useState(null);
 
@@ -543,17 +547,33 @@ export default function SharedPurchases() {
     }
   }
 
+  function openPurchaseEdit(plan) {
+    const now = currentMonth();
+    const remaining = Math.max(1, Number(plan.months || 1) - Number(plan.allocationHistory?.previousMonths?.length || 0));
+    setEditPurchase(plan);
+    setEditPurchaseForm({
+      title: plan.title || '', note: plan.note || '', categoryId: idOf(plan.categoryId),
+      dueDay: Number(plan.scheduleDueDay || new Date(plan.purchaseDate || Date.now()).getUTCDate()) || 1,
+      reviseSchedule: false, effectiveMonth: now, nextStartMonth: now, remainingMonths: remaining,
+    });
+  }
+
   async function updatePurchaseInfo(event) {
     event.preventDefault();
     if (!editPurchase || !editPurchaseForm.title.trim() || saving) return;
     try {
       setSaving(true);
-      await api.put(`/api/shared-purchases/${editPurchase._id}/details`, {
-        title: editPurchaseForm.title.trim(), note: editPurchaseForm.note,
+      const result = await api.put(`/api/shared-purchases/${editPurchase._id}/details`, {
+        ...editPurchaseForm,
+        title: editPurchaseForm.title.trim(),
+        note: editPurchaseForm.note.trim(),
+        dueDay: Number(editPurchaseForm.dueDay),
+        remainingMonths: Number(editPurchaseForm.remainingMonths),
+        expectedUpdatedAt: editPurchase.updatedAt,
       });
       setEditPurchase(null);
       await loadPlans(month);
-      setMessage('কেনাকাটার তথ্য পরিবর্তন হয়েছে। মূল্য ও কিস্তির ইতিহাস অপরিবর্তিত রয়েছে।');
+      setMessage(result.data?.message || 'কেনাকাটার তথ্য পরিবর্তন হয়েছে।');
     } catch (error) {
       setMessage(error?.response?.data?.message || 'পরিবর্তন সংরক্ষণ করা যায়নি।');
     } finally {setSaving(false);}
@@ -647,7 +667,10 @@ export default function SharedPurchases() {
                 return (
                   <article key={plan._id} className="hf-hishab-purchase-row">
                     <div className="hf-hishab-purchase-row-main">
-                      <div><h2>{plan.title}</h2><p>পুরো টাকা দিয়েছেন {payerName} · {plan.months} মাসে ভাগ · {plan.purchaseType === 'personal' ? 'ব্যক্তিগত' : 'যৌথ'}</p></div>
+                      <div className="hn-shared-plan-heading">
+                        <div><h2>{plan.title}</h2><p>পুরো টাকা দিয়েছেন {payerName} · {plan.months} মাসে ভাগ · {plan.purchaseType === 'personal' ? 'ব্যক্তিগত' : 'যৌথ'}</p></div>
+                        <button type="button" className="hn-shared-action" onClick={()=>openPurchaseEdit(plan)} aria-label={`${plan.title} সম্পাদনা`}>সম্পাদনা</button>
+                      </div>
                       <div className="hf-hishab-purchase-number"><span>মোট দাম</span><strong>{money(plan.totalAmount)}</strong></div>
                       <div className="hf-hishab-purchase-number"><span>ফেরত পাওয়া</span><strong>{money(stats.paidAmount)}</strong></div>
                       <div className="hf-hishab-purchase-number"><span>ফেরত বাকি</span><strong>{money(stats.outstanding)}</strong></div>
@@ -656,10 +679,6 @@ export default function SharedPurchases() {
                         <strong>আগের মাসগুলোর ভাগ: {money(plan.allocationHistory?.previousAmount)} ({plan.allocationHistory?.previousMonths?.length || 0} মাস)</strong>
                         <small>এটি মাসিক হিসাবের ভাগ, নতুন ব্যাংক কর্তন নয়।</small>
                       </div>
-                      <button type="button" className="hf-v2-btn hf-v2-btn--soft hf-hishab-purchase-edit"
-                        onClick={()=>{setEditPurchase(plan);setEditPurchaseForm({title:plan.title || '',note:plan.note || ''});}}>
-                        সম্পাদনা
-                      </button>
                       {rows.some(item => item.paymentRequired && item.status !== 'paid') && (
                         <button type="button" className="hf-v2-btn hf-v2-btn--main hf-hishab-purchase-pay"
                           onClick={() => openPayment(plan, rows.find(item => item.paymentRequired && item.status !== 'paid'))}>
@@ -843,12 +862,37 @@ export default function SharedPurchases() {
         </div>
       </div>
 
-      <Modal open={!!editPurchase} title="কেনাকাটার তথ্য সম্পাদনা" onClose={()=>setEditPurchase(null)}>
-        <form className="hn-shared-edit-form" onSubmit={updatePurchaseInfo}>
-          <p>পুরোনো হিসাব সুরক্ষিত রাখতে শুধু নাম ও মন্তব্য পরিবর্তন করা যাবে। দাম, মাস, ভাগ বা পরিশোধ এখানে পরিবর্তন হবে না।</p>
-          <label>কেনাকাটার নাম<input required maxLength={160} value={editPurchaseForm.title} onChange={e=>setEditPurchaseForm(f=>({...f,title:e.target.value}))}/></label>
-          <label>মন্তব্য<textarea rows={3} maxLength={1000} value={editPurchaseForm.note} onChange={e=>setEditPurchaseForm(f=>({...f,note:e.target.value}))}/></label>
-          <div className="hn-form-actions"><button type="button" onClick={()=>setEditPurchase(null)}>বাতিল</button><button type="submit" disabled={saving}>{saving?'সংরক্ষণ হচ্ছে…':'পরিবর্তন সংরক্ষণ'}</button></div>
+      <Modal open={!!editPurchase} title="কেনাকাটা ও বাকি কিস্তি সম্পাদনা" onClose={()=>!saving && setEditPurchase(null)} wide>
+        <form className="hn-shared-edit-form hn-shared-edit-wide" onSubmit={updatePurchaseInfo}>
+          <div className="hn-shared-edit-info">
+            <strong>আগের পরিশোধের হিসাব সংরক্ষিত থাকবে</strong>
+            <p>পুরো দাম {money(editPurchase?.totalAmount)} যেদিন কেনা হয়েছে, সেদিনই অ্যাকাউন্ট থেকে কাটা হয়েছে।
+              তাই দাম, প্রথম টাকা দেওয়া ব্যক্তি ও ইতিমধ্যে পরিশোধিত কিস্তি এখানে পরিবর্তন করা যাবে না।
+              তবে খাত, মন্তব্য, বাকি কিস্তির মেয়াদ ও ভবিষ্যতের নির্ধারিত দিন পরিবর্তন করতে পারবেন।</p>
+          </div>
+          <div className="hn-shared-fields">
+            <label>কেনাকাটার নাম<input required maxLength={160} value={editPurchaseForm.title} onChange={e=>setEditPurchaseForm(f=>({...f,title:e.target.value}))}/></label>
+            <label>খরচের খাত<select value={editPurchaseForm.categoryId} onChange={e=>setEditPurchaseForm(f=>({...f,categoryId:e.target.value}))}>
+              <option value="">আগের খাত রাখুন</option>
+              {categories.map(c=><option key={idOf(c)} value={idOf(c)}>{c.name}</option>)}
+            </select></label>
+            <label>পরবর্তী কিস্তির দিন<select value={editPurchaseForm.dueDay} onChange={e=>setEditPurchaseForm(f=>({...f,dueDay:Number(e.target.value)}))}>
+              {Array.from({length:31},(_,i)=><option key={i+1} value={i+1}>{i+1} তারিখ</option>)}
+            </select></label>
+            <label>আগের কেনার তারিখ<input type="text" value={editPurchase?.purchaseDate ? new Date(editPurchase.purchaseDate).toLocaleDateString('bn-BD') : ''} disabled title="ইতিমধ্যে পরিশোধের সঙ্গে যুক্ত হওয়ায় অপরিবর্তনীয়"/></label>
+            <label className="hn-span-two">মন্তব্য<textarea rows={2} maxLength={1000} value={editPurchaseForm.note} onChange={e=>setEditPurchaseForm(f=>({...f,note:e.target.value}))}/></label>
+          </div>
+          <div className="hn-shared-reschedule">
+            <label className="hn-shared-toggle"><input type="checkbox" checked={editPurchaseForm.reviseSchedule} onChange={e=>setEditPurchaseForm(f=>({...f,reviseSchedule:e.target.checked}))}/><span><strong>বাকি কিস্তির সময়সূচি নতুন করে সাজাব</strong><small>আগের কিস্তি ও টাকা দেওয়ার রেকর্ড অপরিবর্তিত থাকবে।</small></span></label>
+            {editPurchaseForm.reviseSchedule && <div className="hn-shared-fields">
+              <label>কোন মাস থেকে পুরোনো সময়সূচি বদলাব<input type="month" required min={currentMonth()} value={editPurchaseForm.effectiveMonth} onChange={e=>setEditPurchaseForm(f=>({...f,effectiveMonth:e.target.value,nextStartMonth:e.target.value>f.nextStartMonth?e.target.value:f.nextStartMonth}))}/></label>
+              <label>নতুন কিস্তি শুরুর মাস<input type="month" required min={editPurchaseForm.effectiveMonth} value={editPurchaseForm.nextStartMonth} onChange={e=>setEditPurchaseForm(f=>({...f,nextStartMonth:e.target.value}))}/></label>
+              <label>এখন থেকে বাকি টাকা কত মাসে ভাগ হবে<input type="number" min="1" max="120" required value={editPurchaseForm.remainingMonths} onChange={e=>setEditPurchaseForm(f=>({...f,remainingMonths:e.target.value}))}/></label>
+              <p className="hn-shared-schedule-note">বাকি টাকা নির্ধারিত নতুন মাসগুলোতে ভাগ হবে। এটি নতুন করে ব্যাংক থেকে টাকা কাটবে না এবং পুরোনো পরিশোধ মুছবে না।</p>
+            </div>}
+          </div>
+          {message && <p role="status" className="hn-shared-form-status">{message}</p>}
+          <div className="hn-form-actions"><button type="button" disabled={saving} onClick={()=>setEditPurchase(null)}>বাতিল</button><button type="submit" disabled={saving}>{saving?'সংরক্ষণ হচ্ছে…':'পরিবর্তন সংরক্ষণ'}</button></div>
         </form>
       </Modal>
       <Modal open={createOpen} title="নতুন বড় কেনাকাটা" onClose={() => setCreateOpen(false)} wide>

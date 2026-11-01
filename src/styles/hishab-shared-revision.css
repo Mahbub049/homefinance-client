@@ -1,0 +1,28 @@
+.hn-shared-plan-heading{display:flex;align-items:center;gap:12px;justify-content:space-between;min-width:0}
+.hn-shared-plan-heading>div{min-width:0;flex:1}
+.hn-shared-action{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;
+  min-height:36px;min-width:81px;padding:7px 11px;border:1px solid var(--hf-line);border-radius:10px;
+  background:var(--hf-surface-alt);color:var(--hf-text);font-size:13px;font-weight:750}
+.hn-shared-action:hover{border-color:#14b8a6;color:#14b8a6}
+.hn-shared-edit-wide{padding:20px 23px;display:grid;gap:17px}
+.hn-shared-edit-info{border:1px solid var(--hf-line);background:var(--hf-surface-alt);border-radius:13px;padding:13px 16px}
+.hn-shared-edit-info strong{font-size:14px;color:var(--hf-text)}
+.hn-shared-edit-info p{margin-top:7px}
+.hn-shared-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 17px;align-items:start}
+.hn-shared-edit-wide label{display:grid;gap:6px;min-width:0}
+.hn-shared-edit-wide input,.hn-shared-edit-wide select,.hn-shared-edit-wide textarea{width:100%;min-width:0;min-height:42px;border:1px solid var(--hf-line);background:var(--hf-surface-alt);border-radius:10px;color:var(--hf-text);padding:9px 11px;font-size:14px}
+.hn-shared-edit-wide input:disabled{opacity:.58;cursor:not-allowed}
+.hn-shared-edit-wide .hn-span-two{grid-column:1/-1}
+.hn-shared-reschedule{border:1px solid var(--hf-line);border-radius:13px;padding:15px;display:grid;gap:13px}
+.hn-shared-toggle{display:flex!important;align-items:flex-start;gap:11px!important;cursor:pointer}
+.hn-shared-toggle input{height:18px!important;width:18px!important;min-height:18px!important;flex:0 0 18px;accent-color:#0d9488;margin-top:2px}
+.hn-shared-toggle span{display:grid;gap:4px;min-width:0}
+.hn-shared-toggle small,.hn-shared-schedule-note{font-size:12px;line-height:1.7;color:var(--hf-muted)}
+.hn-shared-form-status{border-radius:10px;padding:10px 12px;border:1px solid var(--hf-line);color:var(--hf-muted)}
+.hn-shared-edit-wide .hn-form-actions{display:flex;justify-content:flex-end;gap:9px}
+@media(max-width:720px){
+  .hn-shared-plan-heading{align-items:flex-start;flex-direction:column}
+  .hn-shared-edit-wide{padding:14px;gap:13px}
+  .hn-shared-fields{grid-template-columns:1fr}
+  .hn-shared-edit-wide .hn-span-two{grid-column:auto}
+}
