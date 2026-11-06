@@ -1,0 +1,119 @@
+/*
+ * Edge-to-edge Android (Capacitor SystemBars, insetsHandling: "css").
+ *
+ * The document can use html padding, but position:fixed dialogs do NOT inherit
+ * that padding. A 100dvh dialog can therefore sit underneath the Android
+ * status bar and navigation bar. Keep dialog overlays inside the safe viewport
+ * and size their scrollable contents to the overlay, not the raw viewport.
+ * The env() fallbacks also work in browsers without Capacitor.
+ */
+:root {
+  --hn-inset-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --hn-inset-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --hn-inset-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --hn-inset-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+}
+
+html {
+  padding-top: var(--hn-inset-top);
+  padding-right: var(--hn-inset-right);
+  padding-bottom: var(--hn-inset-bottom);
+  padding-left: var(--hn-inset-left);
+  background-color: #ffffff;
+}
+html.dark { background-color: #020617; }
+
+/* Avoid sizing the shell to the full screen after html has reserved safe space. */
+.hf-app-shell,
+.app-sidebar-shell {
+  height: 100%;
+  max-height: 100%;
+}
+
+.hf-mobile-drawer-surface {
+  padding-top: var(--hn-inset-top);
+  padding-right: var(--hn-inset-right);
+  padding-bottom: var(--hn-inset-bottom);
+  padding-left: var(--hn-inset-left);
+}
+
+/* Every modal family, including confirmations, shares the safe fixed bounds.
+   Preserve the existing padding, alignment and desktop modal dimensions. */
+.app-modal-overlay,
+.app-modal-overlay--center,
+.hn-modal-backdrop,
+.hn-finance-modal-overlay,
+.hf-modal-backdrop,
+.hn-confirm-modal-overlay {
+  top: var(--hn-inset-top) !important;
+  right: var(--hn-inset-right) !important;
+  bottom: var(--hn-inset-bottom) !important;
+  left: var(--hn-inset-left) !important;
+  height: auto !important;
+  min-height: 0;
+  box-sizing: border-box;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 767px) {
+  /* These overlays have already been moved below/above the system bars.
+     Adding the insets a second time as padding would waste space. */
+  .app-modal-overlay,
+  .app-modal-overlay--center,
+  .hn-modal-backdrop,
+  .hn-finance-modal-overlay,
+  .hf-modal-backdrop,
+  .hn-confirm-modal-overlay {
+    padding: 8px !important;
+    align-items: center !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Width/height percentages resolve against the now-safe overlay instead
+     of the full 100dvh WebView. This overrides legacy max-height !important
+     declarations and mobile h-[100dvh] utilities. */
+  .app-modal-overlay > .app-modal-panel,
+  .app-modal-overlay--center > .app-modal-panel,
+  .hn-modal-backdrop > .hn-modal,
+  .hn-finance-modal-overlay > .hn-finance-modal-panel,
+  .hn-finance-modal-overlay > .savings-modal,
+  .hn-finance-modal-overlay > .emi-modal,
+  .hf-modal-backdrop > .hf-modal-panel,
+  .hn-confirm-modal-overlay > .hn-confirm-modal-panel {
+    max-height: 100% !important;
+    min-height: 0;
+    min-width: 0;
+  }
+
+  /* Ledger editors have a fixed header + scrollable body + fixed footer.
+     The panel must fill only the SAFE height, never the device's 100dvh. */
+  .app-modal-overlay > .ledger-modal-panel,
+  .app-modal-overlay > .ledger-batch-panel {
+    height: 100% !important;
+    max-height: 100% !important;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .ledger-modal-panel > .ledger-modal-scroll,
+  .ledger-batch-panel > main {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* The overlay itself has already excluded the Android navigation bar.
+     Avoid a second nav-bar padding in the sticky ledger action row. */
+  .app-modal-overlay > .ledger-modal-panel > div:last-child,
+  .app-modal-overlay > .ledger-batch-panel > footer {
+    padding-bottom: 12px !important;
+  }
+
+  .hn-confirm-modal-overlay > .hn-confirm-modal-panel {
+    overflow-y: auto;
+  }
+}

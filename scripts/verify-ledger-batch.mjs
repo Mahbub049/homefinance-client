@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const modal = readFileSync(new URL('../src/components/ledger/LedgerBatchModal.jsx', import.meta.url), 'utf8');
+const ledger = readFileSync(new URL('../src/pages/Ledger.jsx', import.meta.url), 'utf8');
+assert.match(ledger, /LedgerBatchModal/);
+assert.match(ledger, /একসঙ্গে হিসাব যোগ/);
+assert.match(ledger, /setBatchOpen\(false\)/);
+assert.match(modal, /api\.post\("\/api\/transactions\/batch"/);
+assert.match(modal, /"Idempotency-Key": attemptRef\.current\.key/);
+assert.match(modal, /buildPayload\(row, date, members, accounts\)/);
+assert.match(modal, /paymentMode: "split"/);
+assert.match(modal, /split\.ratios = ratios/);
+assert.match(modal, /split\.fixed = fixed/);
+assert.match(modal, /onSaved\(date\)/);
+assert.match(modal, /setReview\(true\)/);
+console.log('Batch UI integration checks passed');

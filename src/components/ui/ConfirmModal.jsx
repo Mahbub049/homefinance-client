@@ -30,7 +30,7 @@ export default function ConfirmModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center px-4 py-6">
+    <div className="hn-confirm-modal-overlay fixed inset-0 z-[80] flex items-center justify-center px-4 py-6">
       {/* Backdrop */}
       <button
         type="button"
@@ -40,7 +40,7 @@ export default function ConfirmModal({
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-black/20 dark:border-white/10 dark:bg-slate-900 dark:shadow-black/50">
+      <div className="hn-confirm-modal-panel relative w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-black/20 dark:border-white/10 dark:bg-slate-900 dark:shadow-black/50">
         <div className="border-b border-slate-100 px-5 py-4 dark:border-white/10">
           <h3 className="text-base font-bold text-slate-950 dark:text-white">
             {title}

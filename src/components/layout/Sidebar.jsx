@@ -102,6 +102,6 @@ export default function Sidebar({ collapsed = false, onToggleCollapse, drawerOpe
   return <div className={`fixed inset-0 z-50 md:hidden ${drawerOpen ? 'pointer-events-auto' : 'pointer-events-none'}`} aria-hidden={!drawerOpen} inert={!drawerOpen}>
     <button type="button" tabIndex={drawerOpen ? 0 : -1} onClick={onCloseDrawer}
       className={`absolute inset-0 w-full bg-slate-950/65 transition-opacity ${drawerOpen ? 'opacity-100' : 'opacity-0'}`} aria-label="মেনু বন্ধ করুন"/>
-    <div className={`relative h-full w-fit transition-transform duration-200 ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>{content}</div>
+    <div className={`hf-mobile-drawer-surface relative h-full w-fit transition-transform duration-200 ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>{content}</div>
   </div>;
 }

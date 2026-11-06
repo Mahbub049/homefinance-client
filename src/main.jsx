@@ -7,6 +7,7 @@ import './styles/hishab-compact.css'
 import './styles/hishab-page-refinement.css'
 import './styles/hishab-form-refinement.css'
 import './styles/hishab-final-polish.css'
+import './styles/android-safe-area.css'
 import App from './App.jsx'
 import { Toaster } from "react-hot-toast";
 

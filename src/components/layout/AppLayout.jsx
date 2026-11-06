@@ -20,8 +20,8 @@ export default function AppLayout({children}) {
     return () => document.removeEventListener('keydown', close);
   }, [drawerOpen]);
 
-  return <div className="hf-app-shell app-clean-shell flex h-screen min-w-0 overflow-hidden">
-    <div className="hidden h-screen shrink-0 md:block"><Sidebar collapsed={collapsed} onToggleCollapse={()=>setCollapsed(v=>!v)}/></div>
+  return <div className="hf-app-shell app-clean-shell flex h-full min-w-0 overflow-hidden">
+    <div className="hidden h-full shrink-0 md:block"><Sidebar collapsed={collapsed} onToggleCollapse={()=>setCollapsed(v=>!v)}/></div>
     <Sidebar drawerOpen={drawerOpen} onCloseDrawer={()=>setDrawerOpen(false)}/>
     <div className="flex min-w-0 flex-1 flex-col">
       <Topbar onToggleSidebar={()=>setCollapsed(v=>!v)} onOpenDrawer={()=>setDrawerOpen(true)}/>

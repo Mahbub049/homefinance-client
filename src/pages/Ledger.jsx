@@ -12,6 +12,7 @@ import ConfirmModal from "../components/ui/ConfirmModal";
 import {preferredMemberId} from "../utils/preferredMember";
 import Loader from "../components/ui/Loader";
 import { rowsForMemberReport } from "../utils/memberLedgerExport";
+import LedgerBatchModal from "../components/ledger/LedgerBatchModal";
 
 
 function monthNow() {
@@ -434,6 +435,7 @@ export default function Ledger() {
   const [savingTx, setSavingTx] = useState(false);
 
   const [open, setOpen] = useState(false);
+  const [batchOpen, setBatchOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -1804,6 +1806,16 @@ export default function Ledger() {
         <div className="relative p-3 sm:p-5 lg:p-3">
           <></>
 
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-teal-200 bg-teal-50/80 px-4 py-3 dark:border-teal-500/20 dark:bg-teal-500/10">
+            <div className="min-w-0">
+              <p className="text-sm font-black text-slate-900 dark:text-white">এক দিনে অনেকগুলো আয়-খরচ?</p>
+              <p className="text-xs text-slate-600 dark:text-slate-300">একবারে সব লিখে আলাদা হিসাব হিসেবে সংরক্ষণ করুন।</p>
+            </div>
+            <button type="button" onClick={() => setBatchOpen(true)} className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-teal-700">
+              <Icon name="plus" className="h-4 w-4" /> একসঙ্গে হিসাব যোগ
+            </button>
+          </div>
+
           <section className="hf-ledger-search-panel mt-4 grid gap-3 sm:mt-5 lg:grid-cols-[1fr_auto] lg:items-center">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <div className="sm:col-span-1 lg:col-span-2">
@@ -2040,6 +2052,29 @@ export default function Ledger() {
             )}
           </section>
         </div>
+
+        {batchOpen && (
+          <LedgerBatchModal
+            date={day.startsWith(month) ? day : `${month}-01`}
+            members={members}
+            accounts={accounts}
+            incomeCats={incomeCats}
+            expenseCats={expenseCats}
+            user={me}
+            onClose={() => setBatchOpen(false)}
+            onSaved={(savedDay) => {
+              setBatchOpen(false);
+              setDay(savedDay);
+              setMemberFilter("all");
+              setQ("");
+              const newMonth = savedDay.slice(0, 7);
+              const needsReload = month !== newMonth || activeTab !== "all";
+              setActiveTab("all");
+              if (month !== newMonth) setMonth(newMonth);
+              if (!needsReload) loadTransactions();
+            }}
+          />
+        )}
 
         <ConfirmModal
           open={confirmOpen}
