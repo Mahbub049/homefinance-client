@@ -325,6 +325,7 @@ export default function Savings() {
   const [yearlySummary, setYearlySummary] = useState(null);
   const [selectedYearlyMemberId, setSelectedYearlyMemberId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [autoSyncIssues, setAutoSyncIssues] = useState([]);
   const [search, setSearch] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -454,6 +455,17 @@ export default function Savings() {
   async function loadAll() {
     setLoading(true);
     try {
+      // Catch up deposits due this month before reading account balances.
+      // The backend scopes processing to the signed-in family and deduplicates it.
+      try {
+        const sync = await api.post('/api/savings/auto/sync');
+        setAutoSyncIssues(sync.data?.errors||[]);
+        if (sync.data?.errors?.length) toast.error('কিছু স্বয়ংক্রিয় সঞ্চয় জমা হয়নি। সঞ্চয় পরিচালনা থেকে বিস্তারিত দেখুন।');
+      } catch (syncError) {
+        const message = syncError?.response?.data?.message || 'স্বয়ংক্রিয় সঞ্চয় যাচাই করা যায়নি।';
+        setAutoSyncIssues([{message}]);
+        toast.error(message);
+      }
       await Promise.all([loadMembers(), loadAccounts(), loadOverview(month), loadYearlySummary(month)]);
     } catch (e) {
       toast.error(e?.response?.data?.message || "Failed to load savings");
@@ -686,7 +698,7 @@ export default function Savings() {
                 )}
               </section>
 
-              <SavingsManage ref={savingsManageRef} members={members} accounts={allAccounts} onChanged={async()=>{await Promise.all([loadOverview(month),loadYearlySummary(month),loadAccounts()]);}} />
+              <SavingsManage ref={savingsManageRef} members={members} accounts={allAccounts} syncIssues={autoSyncIssues} onChanged={async()=>{await Promise.all([loadOverview(month),loadYearlySummary(month),loadAccounts()]);}} />
 
               {/* Desktop detailed table only */}
               <section className="hf-step3-advanced hidden overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.04] md:block">

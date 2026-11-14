@@ -303,6 +303,7 @@ export default function Dashboard() {
   const [networth, setNetworth] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [autoSyncError, setAutoSyncError] = useState("");
   const isDark = useDarkMode();
 
   const chartGrid = isDark ? "#334155" : "#e2e8f0";
@@ -310,13 +311,21 @@ export default function Dashboard() {
   const legendStyle = { color: chartText, fontSize: 12 };
 
   useEffect(() => {
-    loadSummary();
-    loadNetWorth();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month]);
-
-  useEffect(() => {
-    loadTrend();
+    let cancelled = false;
+    (async () => {
+      // Cron normally runs daily; this explicit authenticated sync catches up
+      // if the site was offline or the scheduled run was missed.
+      try {
+        if (month === monthNow()) {
+          const response = await api.post('/api/savings/auto/sync');
+          if (!cancelled) setAutoSyncError(response.data?.errors?.length ? 'কিছু স্বয়ংক্রিয় সঞ্চয় রেকর্ড হয়নি। সঞ্চয় পৃষ্ঠা থেকে যাচাই করুন।' : '');
+        } else if (!cancelled) setAutoSyncError('');
+      } catch (error) {
+        if (!cancelled) setAutoSyncError(error?.response?.data?.message || 'স্বয়ংক্রিয় সঞ্চয় যাচাই করা যায়নি।');
+      }
+      if (!cancelled) await Promise.all([loadSummary(), loadNetWorth(), loadTrend()]);
+    })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month]);
 
@@ -514,6 +523,7 @@ export default function Dashboard() {
       <div className="hf-v2-dashboard hf-v2-page">
         <HFPageLead title="হোম" description="মাসের আয়-খরচ এক নজরে" month={month} onMonthChange={setMonth} onRefresh={() => { loadSummary(); loadNetWorth(); loadTrend(); }} />
         {err && <div className="hf-v2-alert" role="alert">{err}</div>}
+        {autoSyncError && <div className="hf-v2-alert" role="alert">{autoSyncError}</div>}
         <section className="hf-v2-feature hf-hishab-overview" aria-label="এই মাসের আয়-খরচ">
           <div>
             <span className="hf-v2-eyebrow">এই মাসের আয় থেকে</span>

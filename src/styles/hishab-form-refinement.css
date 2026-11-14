@@ -42,3 +42,11 @@
 .hn-finance-modal-panel,.app-modal-overlay--center>.app-modal-panel,.grocery-modal-scroll{max-height:calc(100dvh - 24px)!important;border-radius:20px!important;max-width:min(940px,100%)!important;box-shadow:0 24px 70px rgba(0,0,0,.22)!important}
 .hn-finance-modal-panel>div:last-child,.grocery-modal-scroll>div:last-child{padding-bottom:max(16px,env(safe-area-inset-bottom))}
 @media(max-width:600px){.hn-finance-modal-overlay,.app-modal-overlay--center{padding:8px!important}.hn-finance-modal-panel,.app-modal-overlay--center>.app-modal-panel,.grocery-modal-scroll{border-radius:16px!important;max-height:calc(100dvh - 16px)!important}}
+
+/* Automatic savings synchronization — visible failures and responsive controls. */
+.hn-manage-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;align-items:center}
+.hn-manage-intro button:disabled{opacity:.55;cursor:wait}
+.hn-manage-sync-error{padding:12px 14px;margin:0 0 14px;border:1px solid rgba(245,158,11,.4);border-radius:12px;background:rgba(245,158,11,.08);font-size:13px;line-height:1.6}
+.hn-manage-sync-error b{display:block;font-weight:800}
+.hn-manage-sync-error p{margin-top:4px;overflow-wrap:anywhere}
+@media(max-width:600px){.hn-manage-actions{justify-content:stretch;width:100%}.hn-manage-actions button{flex:1}}
