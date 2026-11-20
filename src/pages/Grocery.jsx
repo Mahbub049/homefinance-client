@@ -5,6 +5,7 @@ import api from "../services/api";
 import { getUser } from "../services/authStorage";
 import ConfirmModal from "../components/ui/ConfirmModal";
 import Loader from "../components/ui/Loader";
+import { recognizeReceipt, parseReceiptText } from "../utils/receiptOcr";
 
 function monthNow() {
   const d = new Date();
@@ -380,7 +381,7 @@ export default function Grocery() {
 
   const [month, setMonth] = useState(monthNow());
   const [day, setDay] = useState(dayNow());
-  const [filterDate, setFilterDate] = useState(""); // ফাঁকা = নির্বাচিত মাসের সব বাজার
+  const [filterDate, setFilterDate] = useState(dayNow()); // ডিফল্ট: আজকের বাজার; পুরো মাস বেছে দেখা যাবে
   const [msg, setMsg] = useState("");
   const [savingTxn, setSavingTxn] = useState(false);
   const savingTxnInFlight = useRef(false);
@@ -406,6 +407,15 @@ export default function Grocery() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [paidByFilter, setPaidByFilter] = useState("");
   const [expandedTxnId, setExpandedTxnId] = useState(null);
+  const [receiptPreview, setReceiptPreview] = useState("");
+  const [receiptOcrText, setReceiptOcrText] = useState("");
+  const [receiptResult, setReceiptResult] = useState(null);
+  const [receiptBusy, setReceiptBusy] = useState(false);
+  const [receiptProgress, setReceiptProgress] = useState(0);
+  const [receiptError, setReceiptError] = useState("");
+  const receiptRun = useRef(0);
+  const receiptInputRef = useRef(null);
+
 
   const [form, setForm] = useState({
     txnDate: new Date().toISOString().slice(0, 10),
@@ -968,7 +978,98 @@ export default function Grocery() {
     };
   }
 
+  function resetReceipt() {
+    receiptRun.current += 1;
+    setReceiptPreview((previous) => {
+      if (previous) URL.revokeObjectURL(previous);
+      return "";
+    });
+    setReceiptOcrText("");
+    setReceiptResult(null);
+    setReceiptProgress(0);
+    setReceiptBusy(false);
+    setReceiptError("");
+    if (receiptInputRef.current) receiptInputRef.current.value = "";
+  }
+
+  function suggestedCategoryId(shopName, currentId) {
+    const name = String(shopName || "").toLowerCase();
+    const terms = /bata|m[r. ]*diy|fashion|shoe|footwear|clothing|আসবাব|জুতা/i.test(name)
+      ? /কেনাকাটা|শপিং|shopping|personal|পোশাক/i
+      : /soya|restaurant|cafe|foodpanda|kitchen|kacchi|biriyani|baraka|ক্যাফে|রেস্টুরেন্ট/i.test(name)
+        ? /খাবার|food|restaurant|dining/i
+        : /বাজার|grocery|bazar|grocer|সদাই/i;
+    const found = groceryExpenseCats.find((cat) => terms.test(cat.name || ""));
+    return found?._id || currentId;
+  }
+
+  function applyReceipt(parsed) {
+    setReceiptResult(parsed);
+    const existingShop = findShopByName(parsed.shopName);
+    setForm((previous) => {
+      const matchedMethod = (getAllowedPaymentMethodsForAccount(previous.fromAccountId) || []).find((method) => {
+        const label = String(method?.name || "").toLowerCase().replace(/[^a-z]/g, "");
+        if (parsed.paymentHint === "card") return /card|visa|master|credit|debit/.test(label);
+        if (parsed.paymentHint === "bkash") return /bkash/.test(label);
+        if (parsed.paymentHint === "nagad") return /nagad/.test(label);
+        return parsed.paymentHint === "cash" && /cash/.test(label);
+      });
+      return ({
+      ...previous,
+      txnDate: parsed.txnDate || previous.txnDate,
+      shopName: parsed.shopName || previous.shopName,
+      location: parsed.location || existingShop?.location || previous.location,
+      categoryId: suggestedCategoryId(parsed.shopName, previous.categoryId),
+      paymentMethodId: matchedMethod?._id || previous.paymentMethodId,
+      note: parsed.invoiceNo && !previous.note.trim() ? `Receipt: ${parsed.invoiceNo}` : previous.note,
+      discountTotal: parsed.discountTotal,
+      deliveryFee: parsed.deliveryFee,
+      vatAmount: parsed.vatAmount,
+      vatIncluded: parsed.vatIncluded,
+      });
+    });
+    if (parsed.items.length) {
+      setTxnItems(parsed.items.map((item) => blankTxnItem({
+        name: item.name, qty: item.qty, unit: item.unit,
+        unitPrice: item.unitPrice,
+      })));
+    }
+  }
+
+  async function readReceiptImage(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const request = ++receiptRun.current;
+    setReceiptBusy(true);
+    setReceiptProgress(0);
+    setReceiptError("");
+    setReceiptResult(null);
+    setReceiptOcrText("");
+    setReceiptPreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return URL.createObjectURL(file);
+    });
+    try {
+      const { text, confidence } = await recognizeReceipt(file, (percent) => {
+        if (receiptRun.current === request) setReceiptProgress(percent);
+      });
+      if (request !== receiptRun.current) return;
+      const parsed = parseReceiptText(text);
+      if (confidence < 45) parsed.warnings.push("লেখা অস্পষ্ট হতে পারে; প্রতিটি সংখ্যা দেখে নিন।");
+      setReceiptOcrText(text);
+      applyReceipt(parsed);
+    } catch (error) {
+      if (request === receiptRun.current) setReceiptError(error?.message || "রসিদ পড়া সম্ভব হয়নি। হাতে তথ্য লিখুন।");
+    } finally {
+      if (request === receiptRun.current) {
+        setReceiptBusy(false);
+        if (receiptInputRef.current) receiptInputRef.current.value = "";
+      }
+    }
+  }
+
   function openModal() {
+    resetReceipt();
     groceryAttempt.current = null;
     setMsg("");
     setIsEditing(false);
@@ -980,6 +1081,7 @@ export default function Grocery() {
   }
 
   function openEditModal(txn) {
+    resetReceipt();
     groceryAttempt.current = null;
     setMsg("");
     setIsEditing(true);
@@ -1039,6 +1141,7 @@ export default function Grocery() {
   }
 
   function closeModal() {
+    resetReceipt();
     groceryAttempt.current = null;
     setOpen(false);
     setIsEditing(false);
@@ -1265,6 +1368,7 @@ export default function Grocery() {
 
       closeModal();
       setDay(nextDay);
+      setFilterDate(nextDay);
 
       if (nextMonth && nextMonth !== month) {
         setMonth(nextMonth);
@@ -1308,7 +1412,7 @@ export default function Grocery() {
   return (
     <AppLayout>
       <div className={`hf-step3-page hf-step3-grocery hf-v2-page hf-v2-grocery ${hfMore ? "hf-step3-expanded" : ""}`}>
-        <HFPageLead title="বাজার" description="কোন দোকান থেকে কী কিনেছেন, তার তালিকা" month={month} onMonthChange={(value) => { setMonth(value); setFilterDate(""); }}
+        <HFPageLead title="বাজার" description="কোন দোকান থেকে কী কিনেছেন, তার তালিকা" month={month} onMonthChange={(value) => { setMonth(value); setFilterDate(value === monthNow() ? dayNow() : ""); }}
           metrics={[
  {label:'এই মাসে বাজার খরচ',value:monthlyStats.monthTotal,primary:true},
  {label:'কেনাকাটার সংখ্যা',value:monthlyStats.txnCount,kind:'count'}
@@ -1398,7 +1502,7 @@ export default function Grocery() {
                   type="button"
                   onClick={() => {
                     setDay(dayNow());
-                    setFilterDate("");
+                    setFilterDate(dayNow());
                     setSearch("");
                     setCategoryFilter("");
                     setPaidByFilter("");
@@ -1719,6 +1823,39 @@ export default function Grocery() {
               </div>
 
               <div className="p-4 pb-5 dark:bg-slate-950 sm:p-6">
+                {/* Optional receipt OCR. The user must confirm/edit all values before Save. */}
+                <section className="mb-5 rounded-[26px] border border-teal-200/70 bg-teal-50/60 p-4 dark:border-teal-400/20 dark:bg-teal-400/[0.06]" aria-label="রসিদ স্ক্যান">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-base font-black text-slate-950 dark:text-white">রসিদ থেকে তথ্য আনুন <span className="text-xs font-medium text-slate-500">(OCR)</span></h4>
+                      <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">সুপারশপ, রেস্তোরাঁ বা অন্য দোকানের ছবি/স্ক্রিনশট দিন। পাঠানোর আগে সব তথ্য বদলাতে পারবেন।</p>
+                    </div>
+                    <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-black text-white hover:bg-teal-700 ${receiptBusy ? "pointer-events-none opacity-60" : ""}`}>
+                      <Icon name="receipt" className="h-4 w-4" /> {receiptBusy ? "পড়া হচ্ছে…" : "ছবি / স্ক্রিনশট বাছুন"}
+                      <input ref={receiptInputRef} type="file" accept="image/*" disabled={receiptBusy} className="sr-only" onChange={readReceiptImage} />
+                    </label>
+                  </div>
+                  {receiptBusy && <p className="mt-3 text-xs font-semibold text-teal-800 dark:text-teal-200" role="status">রসিদ পড়া হচ্ছে… {receiptProgress}% · প্রথমবার OCR ইঞ্জিন ও ভাষার তথ্য ডাউনলোড হতে পারে।</p>}
+                  {receiptError && <p className="mt-3 text-xs font-semibold text-rose-700 dark:text-rose-300" role="alert">{receiptError}</p>}
+                  {receiptPreview && (
+                    <div className="mt-3 flex flex-wrap items-start gap-3">
+                      <img src={receiptPreview} alt="নির্বাচিত রসিদের পূর্বরূপ" className="max-h-40 max-w-36 rounded-xl border border-slate-200 object-contain dark:border-white/10" />
+                      <div className="min-w-0 flex-1 text-xs text-slate-600 dark:text-slate-300">
+                        {receiptResult ? (
+                          <>
+                            <p className="font-bold text-teal-800 dark:text-teal-200">{receiptResult.items.length.toLocaleString("bn-BD")}টি পণ্যের তথ্য শনাক্ত হয়েছে। ফর্মে যাচাই করে সংরক্ষণ করুন।</p>
+                            {receiptResult.receiptTotal !== null && <p className="mt-1">রসিদের প্রিন্টেড মোট: <b>{bdt(receiptResult.receiptTotal)}</b> · ফর্মে হিসাব: <b>{bdt(totalPayable)}</b></p>}
+                            {receiptResult.receiptTotal !== null && Math.abs(totalPayable - receiptResult.receiptTotal) > 0.2 && <p className="mt-1 font-bold text-amber-700 dark:text-amber-300">মোট টাকা মিলছে না। পরিমাণ, দাম, ছাড়, ডেলিভারি ও ভ্যাট যাচাই করুন।</p>}
+                            {receiptResult.warnings.map((warning, idx) => <p className="mt-1 text-amber-700 dark:text-amber-300" key={idx}>• {warning}</p>)}
+                            <details className="mt-2"><summary className="cursor-pointer font-bold">OCR-এ পড়া মূল লেখা দেখুন</summary><pre className="mt-2 max-h-36 overflow-auto whitespace-pre-wrap rounded-xl bg-white/80 p-2 text-[11px] dark:bg-slate-950/50">{receiptOcrText}</pre></details>
+                          </>
+                        ) : <p>ছবি থেকে লেখাগুলো শনাক্ত করা হচ্ছে।</p>}
+                        <button type="button" className="mt-2 font-bold text-rose-700 underline dark:text-rose-300" onClick={resetReceipt}>রসিদের পূর্বরূপ সরান</button>
+                      </div>
+                    </div>
+                  )}
+                  <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">ছবি OCR-এর জন্য আপনার ব্রাউজারেই প্রক্রিয়াজাত হয়; শনাক্ত তথ্য নিজে থেকে Save হয় না। পরিষ্কার, সোজা ছবি সবচেয়ে ভালো ফল দেয়। ইন্টারনেট প্রয়োজন।</p>
+                </section>
                 {/* Basic Info */}
                 <div className="mb-5 rounded-[26px] border border-slate-200/70 bg-slate-50/80 p-4 shadow-inner shadow-white/60 dark:border-white/10 dark:bg-white/[0.035] dark:shadow-none">
                   <div className="mb-4 flex items-center gap-3">

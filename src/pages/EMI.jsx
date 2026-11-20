@@ -501,7 +501,15 @@ function PlanCard({ plan, month, members, onGenerate, onStatus, onEdit, onResume
     <div className="hf-v2-emi-row-main">
       <div className="hf-v2-emi-product"><strong>{plan.productName}</strong><span>{[plan.brand,plan.category].filter(Boolean).join(' · ')}</span></div>
       <div className="hf-v2-emi-amount"><small>মাসিক কিস্তি</small><strong>৳ {money(amount)}</strong></div>
-      <div className="hf-v2-emi-progress"><small>পরিশোধের অগ্রগতি</small><strong>{progress.toLocaleString('bn-BD')}%</strong><div className="hf-v2-progress"><i style={{width:`${progress}%`}}/></div></div>
+      <div className="hf-v2-emi-progress">
+        <small>পরিশোধের অগ্রগতি</small>
+        <strong>{progress.toLocaleString('bn-BD')}%</strong>
+        <div className="hf-v2-progress"><i style={{width:`${progress}%`}}/></div>
+        <small className="mt-1 block" aria-label="পরিশোধিত মাস ও বাকি মাস">
+          {Number(plan?.stats?.paidCount || 0).toLocaleString('bn-BD')}/{Number(plan?.months || 0).toLocaleString('bn-BD')} মাস পরিশোধিত
+          {' · '}বাকি {Number(plan?.stats?.remainingMonths ?? Math.max(0, Number(plan?.months || 0) - Number(plan?.stats?.paidCount || 0))).toLocaleString('bn-BD')} মাস
+        </small>
+      </div>
       <div className="hf-v2-emi-row-actions">
         {canCreateBill && <button type="button" onClick={()=>onGenerate(plan._id,plan.productName)} className="hf-v2-btn hf-v2-btn--main">বিল তৈরি</button>}
         <button type="button" className="hf-v2-btn hf-v2-btn--soft" onClick={()=>onEdit(plan)}>সম্পাদনা</button>

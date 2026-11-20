@@ -120,3 +120,9 @@
 .hf-v2-ledger .ledger-page button[data-active-day="true"]{background:var(--hf-primary)!important;color:#fff!important;border-color:var(--hf-primary)!important;}
 .hf-v2-ledger .ledger-page .hf-ledger-filter:focus-visible,.hf-v2-ledger .ledger-page button[data-active-day]:focus-visible{outline:2px solid var(--hf-primary)!important;outline-offset:2px;}
 @media(max-width:640px){.hf-v2-ledger .ledger-page .hf-ledger-search-panel{padding:11px!important;}.hf-v2-ledger .ledger-page .hf-ledger-filter-bar{max-width:100%;}}
+
+/* Fixed rules and this month's payments appear in the same unchanged list. */
+.hn-fixed-merged-row{grid-template-columns:minmax(175px,1.5fr) minmax(115px,.55fr) minmax(130px,.65fr) minmax(320px,auto);}
+.hn-fixed-paid-money b{font-variant-numeric:tabular-nums;}
+@media(max-width:1200px){.hn-fixed-merged-row{grid-template-columns:1.3fr 1fr 1fr;}.hn-fixed-merged-row .hf-hishab-fixed-actions{grid-column:1/-1;justify-content:flex-start;}}
+@media(max-width:580px){.hn-fixed-merged-row{grid-template-columns:1fr 1fr;}.hn-fixed-merged-row .hf-hishab-fixed-main,.hn-fixed-merged-row .hf-hishab-fixed-actions{grid-column:1/-1;}}

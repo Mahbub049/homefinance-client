@@ -676,8 +676,12 @@ export default function SharedPurchases() {
                       <div className="hf-hishab-purchase-number"><span>ফেরত বাকি</span><strong>{money(stats.outstanding)}</strong></div>
                       <div className="hf-hishab-plan-context">
                         <span>নির্ধারিত মেয়াদ: {plan.months} মাস ({monthLabel(plan.startMonth)} – {monthLabel(plan.endMonth)})</span>
+                        <span className="hn-shared-month-progress">
+                          মাসের অগ্রগতি: {Math.min(Number(plan.months || 0), Number(plan.allocationHistory?.previousMonths?.length || 0)).toLocaleString('bn-BD')}/{Number(plan.months || 0).toLocaleString('bn-BD')} মাস শেষ
+                          {' · '}বাকি {Math.max(0, Number(plan.months || 0) - Number(plan.allocationHistory?.previousMonths?.length || 0)).toLocaleString('bn-BD')} মাস
+                        </span>
                         <strong>আগের মাসগুলোর ভাগ: {money(plan.allocationHistory?.previousAmount)} ({plan.allocationHistory?.previousMonths?.length || 0} মাস)</strong>
-                        <small>এটি মাসিক হিসাবের ভাগ, নতুন ব্যাংক কর্তন নয়।</small>
+                        <small>মাসের অগ্রগতি নির্বাচিত মাসের আগের বরাদ্দভুক্ত মাসের সংখ্যা; টাকা ফেরত দেওয়ার প্রমাণ নয়। নতুন ব্যাংক কর্তনও নয়।</small>
                       </div>
                       {rows.some(item => item.paymentRequired && item.status !== 'paid') && (
                         <button type="button" className="hf-v2-btn hf-v2-btn--main hf-hishab-purchase-pay"

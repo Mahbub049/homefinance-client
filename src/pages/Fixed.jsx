@@ -14,7 +14,13 @@ function monthNow() {
 }
 
 function todayDate() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function paymentDateForMonth(month) {
+  const today = todayDate();
+  return today.startsWith(`${month}-`) ? today : `${month}-01`;
 }
 
 function classNames(...xs) {
@@ -285,36 +291,20 @@ function Pill({ children, tone = "gray", dark = false, className = "" }) {
   );
 }
 
-function SoftButton({ children, onClick, type = "button", dark = false, danger = false, primary = false, className = "" }) {
+function SoftButton({ children, onClick, type = "button", dark = false, danger = false, primary = false, disabled = false, className = "" }) {
   return (
     <button
       type={type}
       onClick={onClick}
+      disabled={disabled}
       className={classNames(
-        "inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition active:scale-[0.98] sm:px-3.5 sm:py-2.5 sm:text-sm",
+        "inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition active:scale-[0.98] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 sm:px-3.5 sm:py-2.5 sm:text-sm",
         primary && "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-lg shadow-orange-500/20 hover:from-orange-600 hover:to-rose-600",
         !primary && !danger && !dark && "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
         !primary && !danger && dark && "border border-white/10 bg-white/10 text-slate-100 hover:bg-white/15",
         danger && !dark && "border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100",
         danger && dark && "border border-rose-300/20 bg-rose-400/10 text-rose-200 hover:bg-rose-400/20",
         className
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Tab({ active, children, onClick, dark = false }) {
-  return (
-    <button
-      onClick={onClick}
-      className={classNames(
-        "relative whitespace-nowrap rounded-xl px-3 py-2 text-xs font-bold transition sm:rounded-2xl sm:px-4 sm:py-2.5 sm:text-sm",
-        active && !dark && "bg-slate-950 text-white shadow-lg shadow-slate-900/15",
-        active && dark && "bg-white text-slate-950 shadow-lg shadow-white/10",
-        !active && !dark && "text-slate-600 hover:bg-white hover:text-slate-950",
-        !active && dark && "text-slate-300 hover:bg-white/10 hover:text-white"
       )}
     >
       {children}
@@ -415,7 +405,6 @@ export default function Fixed() {
   const dark = useGlobalDarkMode();
   const monthInputRef = useRef(null);
 
-  const [tab, setTab] = useState("templates");
   const [month, setMonth] = useState(monthNow());
   const [msg, setMsg] = useState("");
 
@@ -436,7 +425,6 @@ export default function Fixed() {
 
   const [q, setQ] = useState("");
   const [filterVar, setFilterVar] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
 
   const [templateOpen, setTemplateOpen] = useState(false);
   const [templateMode, setTemplateMode] = useState("create");
@@ -714,7 +702,7 @@ export default function Fixed() {
     setPaymentForm({
       paidByUserId: defaultPayer,
       fromAccountId: availableAccounts?.[0]?._id || "",
-      paymentDate: todayDate(),
+      paymentDate: paymentDateForMonth(month),
       amount: template?.isVariable ? "" : String(template?.defaultAmount || ""),
       note: "",
     });
@@ -734,7 +722,7 @@ export default function Fixed() {
     setPaymentForm({
       paidByUserId: defaultPayer,
       fromAccountId: availableAccounts?.[0]?._id || "",
-      paymentDate: todayDate(),
+      paymentDate: paymentDateForMonth(month),
       amount: instance?.templateId?.isVariable
         ? String(instance?.amount || "")
         : String(instance?.templateId?.defaultAmount || ""),
@@ -826,7 +814,6 @@ export default function Fixed() {
       }
 
       closePaymentModal();
-      setTab("instances");
       await loadInstances();
     } catch (e) {
       setMsg(e?.response?.data?.message || "Action failed");
@@ -844,8 +831,8 @@ export default function Fixed() {
   function deleteInstance(id) {
     setDeleteKind("instance");
     setDeleteId(id);
-    setConfirmTitle("Delete Month Item");
-    setConfirmMessage("Are you sure you want to delete this month item? If it is already posted, its ledger and transaction entry will also be removed.");
+    setConfirmTitle("এই মাসের বিল সরাবেন?");
+    setConfirmMessage("এই মাস থেকে বিলটি সরিয়ে দেওয়া হবে। পরিশোধিত হলে সংশ্লিষ্ট লেজার এন্ট্রি ও অ্যাকাউন্ট লেনদেনও মুছে যাবে। সংরক্ষিত নিয়ম থাকবে।");
     setConfirmOpen(true);
   }
 
@@ -870,18 +857,6 @@ export default function Fixed() {
     }
   }
 
-  async function generateMonth() {
-    setMsg("");
-    try {
-      const res = await api.post("/api/fixed/generate", { month });
-      setMsg(`Generated ${res.data.createdCount} pending item(s) for ${monthLabel(month)}.`);
-      setTab("instances");
-      await loadInstances();
-    } catch (e) {
-      setMsg(e?.response?.data?.message || "Generate failed");
-    }
-  }
-
   const filteredTemplates = useMemo(() => {
     const qq = q.trim().toLowerCase();
 
@@ -898,23 +873,11 @@ export default function Fixed() {
       });
   }, [templates, q, filterVar]);
 
-  const filteredInstances = useMemo(() => {
-    const qq = q.trim().toLowerCase();
-
-    return instances
-      .filter((i) => {
-        if (!qq) return true;
-        const name = i.templateId?.name?.toLowerCase() || "";
-        const note = (i.note || "").toLowerCase();
-        const paidBy = i.paidByUserId?.name?.toLowerCase() || "";
-        const account = i.fromAccountId?.name?.toLowerCase() || "";
-        return name.includes(qq) || note.includes(qq) || paidBy.includes(qq) || account.includes(qq);
-      })
-      .filter((i) => {
-        if (filterStatus === "all") return true;
-        return filterStatus === i.status;
-      });
-  }, [instances, q, filterStatus]);
+  // Template and the month posting share one row. The server also enforces
+  // one FixedInstance per (family, template, month) with a unique index.
+  const instanceByTemplateId = useMemo(() => new Map(
+    instances.filter((item) => item.templateId).map((item) => [getId(item.templateId), item])
+  ), [instances]);
 
   const stats = useMemo(() => {
     const fixedTemplates = templates.filter((t) => !t.isVariable);
@@ -923,7 +886,11 @@ export default function Fixed() {
     const posted = instances.filter((i) => i.status === "posted" || i.status === "active");
     const pending = instances.filter((i) => i.status === "pending");
     const paidTotal = posted.reduce((sum, i) => sum + Number(i.amount || 0), 0);
-    const pendingEstimate = pending.reduce((sum, i) => sum + Number(i.templateId?.isVariable ? 0 : i.templateId?.defaultAmount || 0), 0);
+    const pendingEstimate = templates.reduce((sum, t) => {
+      const instance = instances.find((i) => getId(i.templateId) === getId(t));
+      if (instance?.status === "posted" || instance?.status === "active") return sum;
+      return sum + (t.isVariable ? 0 : Number(t.defaultAmount || 0));
+    }, 0);
 
     return {
       templateCount: templates.length,
@@ -997,36 +964,22 @@ export default function Fixed() {
             )}
           >
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className={classNames("fixed-no-scrollbar flex w-full overflow-x-auto rounded-2xl p-1 xl:w-auto", dark ? "bg-white/5" : "bg-slate-100")}>
-                <Tab active={tab === "templates"} onClick={() => setTab("templates")} dark={dark}>
-                  সংরক্ষিত নিয়ম <span className="opacity-70">({templates.length})</span>
-                </Tab>
-                <Tab active={tab === "instances"} onClick={() => setTab("instances")} dark={dark}>
-                  এই মাসের বিল <span className="opacity-70">({instances.length})</span>
-                </Tab>
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+                <span>সংরক্ষিত নিয়ম ({templates.length})</span>
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">· {monthLabel(month)} মাসের পরিশোধ একই তালিকায়</span>
               </div>
-
-              <div className="flex flex-col gap-2 md:flex-row md:items-center xl:min-w-[650px] xl:justify-end">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center xl:min-w-[580px] xl:justify-end">
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder={tab === "templates" ? "বিল বা খাত খুঁজুন…" : "বিল, মন্তব্য বা অ্যাকাউন্ট খুঁজুন…"}
+                  placeholder="বিল বা খাত খুঁজুন…"
                   className={inputClass}
                 />
-
-                {tab === "templates" ? (
-                  <select className={classNames(selectClass, "md:max-w-[190px]")} value={filterVar} onChange={(e) => setFilterVar(e.target.value)}>
-                    <option value="all">সব নিয়ম</option>
-                    <option value="fixed">নির্দিষ্ট টাকা</option>
-                    <option value="variable">পরিমাণ বদলায়</option>
-                  </select>
-                ) : (
-                  <select className={classNames(selectClass, "md:max-w-[180px]")} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                    <option value="all">সব অবস্থা</option>
-                    <option value="pending">বাকি</option>
-                    <option value="posted">পরিশোধিত</option>
-                  </select>
-                )}
+                <select className={classNames(selectClass, "md:max-w-[190px]")} value={filterVar} onChange={(e) => setFilterVar(e.target.value)}>
+                  <option value="all">সব নিয়ম</option>
+                  <option value="fixed">নির্দিষ্ট টাকা</option>
+                  <option value="variable">পরিমাণ বদলায়</option>
+                </select>
               </div>
             </div>
 
@@ -1050,62 +1003,47 @@ export default function Fixed() {
 
           {loading ? (
             <div className={classNames("rounded-3xl border p-8", dark ? "border-white/10 bg-white/[0.05]" : "border-white/80 bg-white/85")}>
-              <Loader text="তথ্য আসছে" subtext="নিয়ম ও এই মাসের বিল দেখা হচ্ছে" />
+              <Loader text="তথ্য আসছে" subtext="নিয়ম ও পরিশোধ যাচাই করা হচ্ছে" />
             </div>
-          ) : tab === "templates" ? (
+          ) : (
             <section>
               {filteredTemplates.length === 0 ? (
                 <EmptyState
                   dark={dark}
                   title="কোনো নিয়ম পাওয়া যায়নি"
-                  desc="Create your first recurring template, such as House Rent, Internet Bill, Electricity Bill or ChatGPT Premium."
+                  desc="এই মাসে নিয়মিত বিল দিতে প্রথমে একটি সংরক্ষিত নিয়ম তৈরি করুন।"
                   action={<SoftButton dark={dark} primary onClick={openTemplateModal}>+ নতুন নিয়ম</SoftButton>}
                 />
               ) : (
                 <div className="hf-hishab-fixed-list">
-                  {filteredTemplates.map((t) => (
-                    <article key={t._id} className="hf-hishab-fixed-row">
-                      <div className="hf-hishab-fixed-main">
-                        <h3>{t.name}</h3>
-                        <p>{t.categoryId?.name || 'অন্যান্য'} · {t.isVariable ? 'মাসভেদে টাকার পরিমাণ বদলায়' : 'নির্দিষ্ট টাকা'} · {splitLabel(t.defaultSplitType)}</p>
-                      </div>
-                      <div className="hf-hishab-fixed-money"><small>সাধারণ পরিমাণ</small><b>{t.isVariable ? 'মাসে লিখবেন' : money(t.defaultAmount)}</b></div>
-                      <div className="hf-hishab-fixed-actions">
-                        <span className="hn-fixed-post-action"><SoftButton dark={dark} primary onClick={() => openPaymentModalForTemplate(t)}>এই মাসে যোগ করুন</SoftButton></span>
-                        <SoftButton dark={dark} onClick={() => openEditTemplateModal(t)}>সম্পাদনা</SoftButton>
-                        <SoftButton dark={dark} danger onClick={() => deleteTemplate(t._id)}>মুছুন</SoftButton>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
-          ) : (
-            <section>
-              {filteredInstances.length === 0 ? (
-                <EmptyState
-                  dark={dark}
-                  title={`No month items for ${monthLabel(month)}`}
-                  desc="Generate the month to create pending items from all templates, or add any template directly to this month."
-                  action={<SoftButton dark={dark} primary onClick={generateMonth}>মাসের বিল তৈরি</SoftButton>}
-                />
-              ) : (
-                <div className="hf-hishab-fixed-list">
-                  {filteredInstances.map(i => {
-                    const posted = i.status === 'posted' || i.status === 'active';
-                    const amount = posted ? i.amount : i.templateId?.isVariable ? 0 : i.templateId?.defaultAmount || 0;
-                    return <article key={i._id} className="hf-hishab-fixed-row">
-                      <div className="hf-hishab-fixed-main">
-                        <h3>{i.templateId?.name || 'নিয়মিত বিল'}</h3>
-                        <p>{i.templateId?.categoryId?.name || 'অন্যান্য'} · {i.paidByUserId?.name || 'দেওয়া বাকি'} {i.note ? ` · ${i.note}` : ''}</p>
-                      </div>
-                      <div className="hf-hishab-fixed-money"><small>{posted ? 'পরিশোধ হয়েছে' : 'দিতে হবে'}</small><b>{i.templateId?.isVariable && !posted ? 'টাকা লিখবেন' : money(amount)}</b></div>
-                      <div className="hf-hishab-fixed-actions">
-                        {!posted ? <SoftButton dark={dark} primary onClick={()=>openPaymentModalForInstance(i)}>এখন পরিশোধ করুন</SoftButton>
-                        : <SoftButton dark={dark} onClick={()=>openEditPaymentModal(i)}>পরিশোধ সংশোধন</SoftButton>}
-                        <SoftButton dark={dark} danger onClick={()=>deleteInstance(i._id)}>মুছুন</SoftButton>
-                      </div>
-                    </article>;
+                  {filteredTemplates.map((t) => {
+                    const instance = instanceByTemplateId.get(getId(t));
+                    const posted = instance?.status === "posted" || instance?.status === "active";
+                    return (
+                      <article key={t._id} className="hf-hishab-fixed-row hn-fixed-merged-row">
+                        <div className="hf-hishab-fixed-main">
+                          <h3>{t.name}</h3>
+                          <p>{t.categoryId?.name || "অন্যান্য"} · {t.isVariable ? "মাসভেদে টাকার পরিমাণ বদলায়" : "নির্দিষ্ট টাকা"} · {splitLabel(t.defaultSplitType)}</p>
+                        </div>
+                        <div className="hf-hishab-fixed-money"><small>সাধারণ পরিমাণ</small><b>{t.isVariable ? "মাসে লিখবেন" : money(t.defaultAmount)}</b></div>
+                        <div className="hf-hishab-fixed-money hn-fixed-paid-money">
+                          <small>এই মাসে পরিশোধ</small>
+                          <b className={posted ? "text-emerald-600 dark:text-emerald-300" : ""}>{posted ? money(instance.amount) : money(0)}</b>
+                          {posted ? <small>{instance.paidByUserId?.name || "পরিশোধিত"}</small> : <small>{instance ? "এখনও দেওয়া হয়নি" : "বিল যোগ হয়নি"}</small>}
+                        </div>
+                        <div className="hf-hishab-fixed-actions">
+                          {posted ? (
+                            <SoftButton dark={dark} primary disabled>✓ পরিশোধিত</SoftButton>
+                          ) : (
+                            <span className="hn-fixed-post-action"><SoftButton dark={dark} primary onClick={() => instance ? openPaymentModalForInstance(instance) : openPaymentModalForTemplate(t)}>{instance ? "এখন পরিশোধ করুন" : "এই মাসে যোগ করুন"}</SoftButton></span>
+                          )}
+                          {posted && <SoftButton dark={dark} onClick={() => openEditPaymentModal(instance)}>পরিশোধ সংশোধন</SoftButton>}
+                          {instance && <SoftButton dark={dark} onClick={() => deleteInstance(instance._id)}>মাস থেকে সরান</SoftButton>}
+                          <SoftButton dark={dark} onClick={() => openEditTemplateModal(t)}>সম্পাদনা</SoftButton>
+                          <SoftButton dark={dark} danger onClick={() => deleteTemplate(t._id)}>মুছুন</SoftButton>
+                        </div>
+                      </article>
+                    );
                   })}
                 </div>
               )}
